@@ -1,0 +1,71 @@
+import PetProfile from "@/components/pets/pet-profile/PetProfile";
+import { prisma } from "@/lib/prisma";
+import { notFound, redirect } from "next/navigation";
+import { requireRole } from "@/lib/auth/session";
+
+export default async function PetProfilePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  let session;
+  try {
+    session = await requireRole(["OWNER"]);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === "User is not authenticated" ||
+        error.message === "User does not have the required role")
+    ) {
+      redirect("/");
+    }
+    throw error;
+  }
+
+  let pet;
+
+  pet = await prisma.pet.findUnique({ // leaving the calls uncaught on purpose (not catching throws) so a thrown query renders the error.tsx page where the try again button runs the query again
+    where: {
+      id, // property shortcut: when the property name and the variable name are identical, we can write it once (instead of id: id,)
+      ownerId: session.user.id, // must also check the owner id to make sure the page won't display another owner's pet
+    },
+    include: {
+      weightRecords: { // current weight is the latest weight record, not a column on the pet
+        orderBy: { recordedAt: "desc" },
+        take: 1,
+        select: { weightGrams: true },
+      },
+      vaccinations: { select: { id: true, type: true, administeredAt: true } },
+      treatments: { select: { id: true, type: true, administeredAt: true } },
+      appointments: { // only visits that have not started yet
+        where: { startAt: { gte: new Date() } },
+        orderBy: { startAt: "asc" },
+        select: { id: true, type: true, startAt: true, duration: true },
+      },
+    },
+  });
+
+  if (!pet) notFound(); // if query succeeds but no pet is found, query returns null. notFound() displays our custom not-found.tsx page
+
+  /* 
+  The estimatedAgeValue field in the Pet model is of type Decimal
+  When Prisma retrieves the value, it returns a Decimal object, not an ordinary JavaScript number
+  Client components do not support Decimal props so we must convert the Decimal object into a normal JS number before passing it to PetProfile
+  We cannot just remove it because the pet profile needs to display the age
+  */
+  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, ...petFields } = pet;
+
+  const profilePet = {
+    ...petFields, // using spread to copy the existing properties of the pet object into a new object
+    estimatedAgeValue: estimatedAgeValue?.toNumber() ?? null, // optional chaining in case estimatedAgeValue is null or undefined. If it is, return null instead
+    currentWeightGrams: weightRecords[0]?.weightGrams ?? null,
+    vaccinations, // given doses only. A due date is not stored on these rows yet
+    treatments,
+    appointments,
+  }
+
+  return (
+    <PetProfile pet={profilePet} /> // pass the new profilePet object instead of the original pet object returned by the query
+  );
+}

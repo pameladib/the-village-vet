@@ -1,0 +1,269 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String        @id
+  name          String
+  phoneNumber   String
+  email         String
+  emailVerified Boolean       @default(false)
+  username      String        @unique
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  pets          Pet[]
+  role          UserRole      @default(OWNER)
+  appointments  Appointment[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Pet {
+  id String @id @default(uuid())
+
+  // basic information
+  name              String
+  species           Species
+  sex               Sex
+  photoUrl          String?
+  color             String?
+  breed             String?
+  dateOfBirth       DateTime?
+  estimatedAgeValue Decimal?
+  estimatedAgeUnit  AgeUnit?
+  estimatedAgeAt    DateTime?
+  lifestyle         Lifestyle?
+
+  // medical information
+  spayedNeutered    spayedNeuteredStatus?
+  spayedNeuteredAt  DateTime?
+  allergies         String?
+  medicalConditions String?
+  medications       String?
+  diet              String?
+  previousHistory   String?
+  vaccinations      Vaccination[]
+  weightRecords     WeightRecord[]
+  treatments        Treatment[]
+  medicalVisits     MedicalVisit[]
+  appointments      Appointment[]
+  healthReminders   HealthReminder[]
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  @@index([ownerId])
+  @@map("pet")
+}
+
+enum spayedNeuteredStatus {
+  YES
+  NO
+  UNKNOWN
+}
+
+model Treatment {
+  id             String          @id @default(uuid())
+  type           TreatmentType
+  administeredAt DateTime?
+  petId          String
+  healthReminder HealthReminder?
+  pet            Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@index([petId])
+  @@map("treatment")
+}
+
+model Appointment {
+  id       String          @id @default(uuid())
+  type     AppointmentType
+  startAt  DateTime
+  duration Int // Duration in minutes
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  petId String
+  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, startAt])
+  @@index([petId, startAt])
+  @@index([startAt])
+  @@map("appointment")
+}
+
+enum AppointmentType {
+  CHECKUP
+  VACCINATION
+  TREATMENT
+  GROOMING
+  OPERATION
+}
+
+enum TreatmentType {
+  DEWORMING
+  FLEA_TICK
+}
+
+enum Species {
+  CAT
+  DOG
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum Lifestyle {
+  INDOOR
+  OUTDOOR
+  HYBRID
+}
+
+model Vaccination {
+  id             String          @id @default(uuid())
+  administeredAt DateTime?
+  type           VaccinationType
+  healthReminder HealthReminder?
+  petId          String
+  pet            Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@index([petId])
+  @@map("vaccination")
+}
+
+model WeightRecord {
+  id          String   @id @default(uuid())
+  weightGrams Int
+  recordedAt  DateTime @default(now())
+  petId       String
+  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@index([petId])
+  @@map("weight_record")
+}
+
+enum VaccinationType {
+  FIRST
+  SECOND
+  THIRD
+  ANNUAL
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  SECONDARY_ADMIN
+}
+
+enum AgeUnit {
+  DAYS
+  WEEKS
+  MONTHS
+  YEARS
+}
+
+model MedicalVisit {
+  id        String   @id @default(uuid())
+  visitedAt DateTime
+  notes     String?
+  petId     String
+  pet       Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@index([petId])
+  @@map("medical_visit")
+}
+
+model HealthReminder {
+  id       String       @id @default(uuid())
+  type     ReminderType
+  dueAt    DateTime // when the vaccine or treatment is due
+  notifyAt DateTime // when the next notification should be sent
+
+  petId String // which pet needs it
+  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  vaccinationId String      @unique
+  vaccination   Vaccination @relation(fields: [vaccinationId], references: [id])
+
+  treatmentId String    @unique
+  treatment   Treatment @relation(fields: [treatmentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([petId, dueAt])
+  @@map("health_reminder")
+}
+
+enum ReminderType {
+  VACCINATION
+  DEWORMING
+  FLEA_TREATMENT
+}

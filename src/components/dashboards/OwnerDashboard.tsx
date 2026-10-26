@@ -1,0 +1,73 @@
+"use client";
+
+import type { AppointmentWithPet } from "../../lib/types/appointments";
+import type { PetCardData } from "../../lib/types/pets";
+import AppointmentCard from "../pets/cards/AppointmentCard";
+import PetCard from "../pets/cards/PetCard";
+import { useRouter } from "next/navigation";
+
+export default function OwnerDashboard({ pets, ownerName, appointments }: { pets: PetCardData[], ownerName: string, appointments: AppointmentWithPet[] }) {
+    const router = useRouter();
+    return (
+        <div className="flex flex-1 justify-center bg-emerald-50 px-4 py-10 dark:bg-stone-950 sm:px-6">
+            <div className="w-full max-w-3xl">
+                <h1 className="rounded-2xl bg-emerald-800 px-5 py-4 text-2xl font-semibold tracking-tight text-white dark:bg-emerald-700">
+                    Welcome Back, {ownerName} 🐾
+                </h1>
+
+                <section className="mt-6 rounded-2xl border border-emerald-200 bg-white px-5 py-4 dark:border-emerald-900 dark:bg-stone-900">
+                    <h2 className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
+                        My Pets
+                    </h2>
+                    {pets.length === 0 && (
+                        <p className="mt-4 text-sm text-emerald-800 dark:text-emerald-200">
+                            No added pets
+                        </p>
+                    )}
+                    <div className="mt-4 flex flex-wrap items-start gap-4">
+                        {pets.map((pet) => (
+                            <PetCard key={pet.id} pet={pet} />
+                        ))}
+                        <button
+                            type="button"
+                            onClick={() => router.push("pets/new")}
+                            className="w-36 cursor-pointer rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 px-3 py-2.5 text-center text-sm font-medium text-emerald-800 shadow-sm transition duration-200 hover:scale-[1.03] hover:border-emerald-700 hover:bg-emerald-100 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-950"
+                        >
+                            + Add new pet
+                        </button>
+                    </div>
+                </section>
+
+                <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4 dark:border-sky-900 dark:bg-sky-950/40">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-sm font-medium text-sky-950 dark:text-sky-100">
+                            Upcoming Appointments
+                        </h2>
+                        <button
+                            type="button"
+                            className="cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition duration-200 hover:scale-[1.03] hover:bg-emerald-700 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:bg-emerald-700 dark:hover:bg-emerald-600"
+                        >
+                            + Book an appointment
+                        </button>
+                    </div>
+                    {appointments.length === 0 && (
+                        <p className="mt-4 text-sm text-sky-800 dark:text-sky-200">
+                            No upcoming appointments
+                        </p>
+                    )}
+                    <div className="mt-4 flex flex-col gap-3 empty:hidden">
+                        {appointments.map((appointment) => (
+                            <AppointmentCard key={appointment.id} appointment={appointment} />
+                        ))}
+                    </div>
+                </section>
+
+                <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900 dark:bg-amber-950/40">
+                    <h2 className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                        Upcoming Vaccines and Treatments
+                    </h2>
+                </section>
+            </div>
+        </div>
+    );
+}
