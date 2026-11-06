@@ -35,7 +35,7 @@ export default async function EditPetPage({
     const { id } = await params;
     let session;
     try {
-        session = await requireRole(["OWNER"]);
+        session = await requireRole(["OWNER", "ADMIN"]);
     } catch (error) {
         if (
             error instanceof Error &&
@@ -47,11 +47,8 @@ export default async function EditPetPage({
         throw error;
     }
 
-    const pet = await prisma.pet.findUnique({ // leaving the calls uncaught on purpose (not catching throws) so a thrown query renders the error.tsx page where the try again button runs the query again
-        where: {
-            id, // property shortcut: when the property name and the variable name are identical, we can write it once (instead of id: id,)
-            ownerId: session.user.id, // must also check the owner id to make sure the page won't display another owner's pet
-        },
+    const pet = await prisma.pet.findFirst({
+        where: session.user.role === "ADMIN" ? { id } : { id, ownerId: session.user.id },
         include: {
             weightRecords: { // current weight is the latest weight record, not a column on the pet
                 orderBy: { recordedAt: "desc" },
@@ -97,5 +94,5 @@ export default async function EditPetPage({
         previousHistory: textValue(petFields.previousHistory),
     };
 
-    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id}/>;
+    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id} allowClinical={session.user.role === "ADMIN"} />;
 }

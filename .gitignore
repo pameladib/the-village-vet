@@ -44,3 +44,6 @@ next-env.d.ts
 
 /public/pet-photos/*
 !/public/pet-photos/.gitkeep
+
+# Private medical files. They are not served from /public.
+/storage

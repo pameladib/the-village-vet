@@ -1,4 +1,5 @@
 import { CirclePlus, ClipboardList, History, Pill, TriangleAlert, Utensils } from "lucide-react";
+import DocumentList from "@/components/pets/DocumentList";
 import type { PetProfileData } from "../PetProfile";
 
 function formatCalendarDate(date: Date) {
@@ -24,7 +25,15 @@ function note(value: string | null) {
     return text ? text : null;
 }
 
-export default function MedicalTab({ pet }: { pet: PetProfileData }) {
+export default function MedicalTab({
+    pet,
+    documents,
+    canUpload,
+}: {
+    pet: PetProfileData;
+    documents: { id: string; title: string }[];
+    canUpload: boolean;
+}) {
     const cards = [
         { label: "Spayed/Neutered", value: formatSpayed(pet), icon: <CirclePlus className="size-4" strokeWidth={1.75} /> },
         { label: "Allergies", value: note(pet.allergies), icon: <TriangleAlert className="size-4" strokeWidth={1.75} /> },
@@ -49,6 +58,7 @@ export default function MedicalTab({ pet }: { pet: PetProfileData }) {
                     </p>
                 </div>
             ))}
+            <DocumentList petId={pet.id} documents={documents} canUpload={canUpload} />
         </div>
     );
 }

@@ -1,18 +1,22 @@
 "use server";
 
-import { mkdir, unlink, writeFile } from "fs/promises";
-import path from "path";
 import { PetForm, petSchema } from "../validations/pet";
 import { requireRole } from "../auth/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { syncVaccineReminder } from "@/lib/clinic/reminders";
+import { canChangePetPhoto } from "@/lib/auth/permissions";
+import { PET_PHOTOS_BUCKET, isSafeObjectKey } from "@/lib/storage/files";
+import { removeStoredObject } from "@/lib/storage/supabase";
 
-const photoExtensions: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
-};
+async function discardPhoto(photoUrl: string | null) {
+    if (!photoUrl || !isSafeObjectKey(photoUrl)) return;
+    await removeStoredObject(PET_PHOTOS_BUCKET, photoUrl);
+}
+
+function saveError() {
+    return "Could not save this pet.";
+}
 
 function doseDateKey(date: Date | null) {
     if (!date) return "";
@@ -56,26 +60,6 @@ function splitKeptAndNew<T extends { id: string; type: string; administeredAt: D
         removedIds: existing.filter((row) => !used.has(row.id)).map((row) => row.id),
         toCreate,
     };
-}
-
-async function savePetPhoto(photo: File) {
-    const extension = photoExtensions[photo.type];
-    if (!extension) {
-        throw new Error("Unsupported image");
-    }
-
-    const filename = `${crypto.randomUUID()}.${extension}`;
-    const directory = path.join(process.cwd(), "public", "pet-photos");
-    await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, filename), Buffer.from(await photo.arrayBuffer()));
-    return `/pet-photos/${filename}`;
-}
-
-async function removeStoredPhoto(photoUrl: string | null) {
-    if (!photoUrl?.startsWith("/pet-photos/")) return;
-    const filename = path.basename(photoUrl);
-    if (filename !== photoUrl.slice("/pet-photos/".length)) return;
-    await unlink(path.join(process.cwd(), "public", "pet-photos", filename)).catch(() => undefined);
 }
 
 export async function createPet(data: PetForm) {
@@ -124,54 +108,44 @@ export async function createPet(data: PetForm) {
                 estimatedAgeUnit: result.data.estimatedAge != null ? result.data.estimatedAgeUnit ?? null : null,
                 estimatedAgeAt: result.data.estimatedAge != null ? new Date() : null,
                 lifestyle: result.data.lifestyle || null,
-
-                spayedNeutered: result.data.spayedNeutered ?? null,
-                spayedNeuteredAt:
-                    result.data.spayedNeutered === "YES" && result.data.spayedNeuteredAt
-                        ? new Date(result.data.spayedNeuteredAt)
-                        : null,
-                allergies: result.data.allergies || null,
-                medicalConditions: result.data.medicalConditions || null,
-                medications: result.data.medications || null,
-                diet: result.data.diet || null,
-                previousHistory: result.data.previousHistory || null,
-
                 ownerId: session.user.id,
-
-                vaccinations: {
-                    create: result.data.vaccinations.map((vaccination) => ({
-                        type: vaccination.type,
-                        administeredAt: vaccination.administeredAt
-                            ? new Date(vaccination.administeredAt)
-                            : null,
-                    }))
-                },
-
-                treatments: {
-                    create: result.data.treatments.map((treatment) => ({
-                        type: treatment.type,
-                        administeredAt: treatment.administeredAt ? new Date(treatment.administeredAt) : null,
-                    }))
-                },
-
-                ...(weightGrams != null
-                    ? { weightRecords: { create: { weightGrams } } }
+                ...(session.user.role === "ADMIN"
+                    ? {
+                        spayedNeutered: result.data.spayedNeutered ?? null,
+                        spayedNeuteredAt:
+                            result.data.spayedNeutered === "YES" && result.data.spayedNeuteredAt
+                                ? new Date(result.data.spayedNeuteredAt)
+                                : null,
+                        allergies: result.data.allergies || null,
+                        medicalConditions: result.data.medicalConditions || null,
+                        medications: result.data.medications || null,
+                        diet: result.data.diet || null,
+                        previousHistory: result.data.previousHistory || null,
+                        vaccinations: {
+                            create: result.data.vaccinations.map((vaccination) => ({
+                                type: vaccination.type,
+                                administeredAt: vaccination.administeredAt ? new Date(vaccination.administeredAt) : null,
+                            })),
+                        },
+                        treatments: {
+                            create: result.data.treatments.map((treatment) => ({
+                                type: treatment.type,
+                                administeredAt: treatment.administeredAt ? new Date(treatment.administeredAt) : null,
+                            })),
+                        },
+                        ...(weightGrams != null ? { weightRecords: { create: { weightGrams } } } : {}),
+                    }
                     : {}),
             },
         });
 
-        let photoUrl: string | null = null;
-        if (result.data.photo) {
-            photoUrl = await savePetPhoto(result.data.photo);
-            await prisma.pet.update({
-                where: { id: created.id },
-                data: { photoUrl },
-            });
+        if (session.user.role === "ADMIN") {
+            await syncVaccineReminder(prisma, created.id, result.data.species);
         }
 
         return { success: true, id: created.id };
     } catch {
-        return { success: false, formErrors: ["Could not save this pet."] };  
+        return { success: false, formErrors: [saveError()] };
     }
 
 }
@@ -192,7 +166,7 @@ it returns success: true only if the pet row is inserted
 */
 
 export async function updatePet(id: string, data: PetForm) {
-    let session;
+    let session: Awaited<ReturnType<typeof requireRole>>;
     try {
         session = await requireRole(["ADMIN", "OWNER"]);
     } catch (error) {
@@ -223,10 +197,12 @@ export async function updatePet(id: string, data: PetForm) {
                 : Math.round(result.data.currentWeight)
             : null;
 
-    const existing = await prisma.pet.findUnique({
-        where: { id, ownerId: session.user.id },
+    const clinical = session.user.role === "ADMIN";
+    const existing = await prisma.pet.findFirst({
+        where: clinical ? { id } : { id, ownerId: session.user.id },
         select: {
             photoUrl: true,
+            species: true,
             estimatedAgeValue: true,
             estimatedAgeUnit: true,
             estimatedAgeAt: true,
@@ -243,6 +219,8 @@ export async function updatePet(id: string, data: PetForm) {
     if (!existing) {
         return { success: false, formErrors: ["We couldn't find this pet."] };
     }
+    const currentPet = existing;
+    const form = result.data;
 
     const estimatedAge = result.data.estimatedAge ?? null;
     const estimatedAgeUnit = estimatedAge != null ? result.data.estimatedAgeUnit ?? null : null;
@@ -252,42 +230,40 @@ export async function updatePet(id: string, data: PetForm) {
 
     const vaccinations = splitKeptAndNew(existing.vaccinations, result.data.vaccinations);
     const treatments = splitKeptAndNew(existing.treatments, result.data.treatments);
-    let newPhotoUrl: string | null = null;
+    if (result.data.removePhoto && !canChangePetPhoto(session.user.role)) {
+        return { success: false, formErrors: ["You cannot change this photo."] };
+    }
 
-    try {
-        if (result.data.photo) {
-            newPhotoUrl = await savePetPhoto(result.data.photo);
-        }
-
+    async function savePet(photoUrl: string | null | undefined) {
         await prisma.$transaction(async (tx) => {
             const updated = await tx.pet.updateMany({
-                where: { id, ownerId: session.user.id },
+                where: clinical ? { id } : { id, ownerId: session.user.id },
                 data: {
-                    name: result.data.name,
-                    species: result.data.species,
-                    sex: result.data.sex,
-                    color: result.data.color || null,
-                    breed: result.data.breed || null,
-                    dateOfBirth: result.data.dateOfBirth ? new Date(result.data.dateOfBirth) : null,
+                    name: form.name,
+                    ...(clinical
+                        ? {
+                            species: form.species,
+                            sex: form.sex,
+                            color: form.color || null,
+                            breed: form.breed || null,
+                            lifestyle: form.lifestyle || null,
+                            spayedNeutered: form.spayedNeutered ?? null,
+                            spayedNeuteredAt:
+                                form.spayedNeutered === "YES" && form.spayedNeuteredAt
+                                    ? new Date(form.spayedNeuteredAt)
+                                    : null,
+                            allergies: form.allergies || null,
+                            medicalConditions: form.medicalConditions || null,
+                            medications: form.medications || null,
+                            diet: form.diet || null,
+                            previousHistory: form.previousHistory || null,
+                        }
+                        : {}),
+                    dateOfBirth: form.dateOfBirth ? new Date(form.dateOfBirth) : null,
                     estimatedAgeValue: estimatedAge,
                     estimatedAgeUnit,
                     estimatedAgeAt,
-                    lifestyle: result.data.lifestyle || null,
-                    spayedNeutered: result.data.spayedNeutered ?? null,
-                    spayedNeuteredAt:
-                        result.data.spayedNeutered === "YES" && result.data.spayedNeuteredAt
-                            ? new Date(result.data.spayedNeuteredAt)
-                            : null,
-                    allergies: result.data.allergies || null,
-                    medicalConditions: result.data.medicalConditions || null,
-                    medications: result.data.medications || null,
-                    diet: result.data.diet || null,
-                    previousHistory: result.data.previousHistory || null,
-                    ...(newPhotoUrl
-                        ? { photoUrl: newPhotoUrl }
-                        : result.data.removePhoto
-                            ? { photoUrl: null }
-                            : {}),
+                    ...(photoUrl !== undefined ? { photoUrl } : {}),
                 },
             });
 
@@ -295,61 +271,65 @@ export async function updatePet(id: string, data: PetForm) {
                 throw new Error("Pet not found");
             }
 
-            const reminderFilters = [
-                ...(vaccinations.removedIds.length > 0 ? [{ vaccinationId: { in: vaccinations.removedIds } }] : []),
-                ...(treatments.removedIds.length > 0 ? [{ treatmentId: { in: treatments.removedIds } }] : []),
-            ];
-            if (reminderFilters.length > 0) {
-                await tx.healthReminder.deleteMany({
-                    where: { petId: id, OR: reminderFilters },
-                });
+            if (clinical) {
+                const reminderFilters = [
+                    ...(vaccinations.removedIds.length > 0 ? [{ vaccinationId: { in: vaccinations.removedIds } }] : []),
+                    ...(treatments.removedIds.length > 0 ? [{ treatmentId: { in: treatments.removedIds } }] : []),
+                ];
+                if (reminderFilters.length > 0) {
+                    await tx.healthReminder.deleteMany({
+                        where: { petId: id, OR: reminderFilters },
+                    });
+                }
+
+                if (vaccinations.removedIds.length > 0) {
+                    await tx.vaccination.deleteMany({ where: { id: { in: vaccinations.removedIds } } });
+                }
+                if (treatments.removedIds.length > 0) {
+                    await tx.treatment.deleteMany({ where: { id: { in: treatments.removedIds } } });
+                }
+
+                if (vaccinations.toCreate.length > 0) {
+                    await tx.vaccination.createMany({
+                        data: vaccinations.toCreate.map((vaccination) => ({
+                            petId: id,
+                            type: vaccination.type as "FIRST" | "SECOND" | "THIRD" | "ANNUAL",
+                            administeredAt: vaccination.administeredAt,
+                        })),
+                    });
+                }
+
+                if (treatments.toCreate.length > 0) {
+                    await tx.treatment.createMany({
+                        data: treatments.toCreate.map((treatment) => ({
+                            petId: id,
+                            type: treatment.type as "DEWORMING" | "FLEA_TICK",
+                            administeredAt: treatment.administeredAt,
+                        })),
+                    });
+                }
+
+                const latestWeight = currentPet.weightRecords[0]?.weightGrams;
+                if (
+                    weightGrams != null &&
+                    (latestWeight == null || weightGrams !== gramsShownInForm(latestWeight))
+                ) {
+                    await tx.weightRecord.create({
+                        data: { petId: id, weightGrams },
+                    });
+                }
             }
 
-            if (vaccinations.removedIds.length > 0) {
-                await tx.vaccination.deleteMany({ where: { id: { in: vaccinations.removedIds } } });
-            }
-            if (treatments.removedIds.length > 0) {
-                await tx.treatment.deleteMany({ where: { id: { in: treatments.removedIds } } });
-            }
-
-            if (vaccinations.toCreate.length > 0) {
-                await tx.vaccination.createMany({
-                    data: vaccinations.toCreate.map((vaccination) => ({
-                        petId: id,
-                        type: vaccination.type as "FIRST" | "SECOND" | "THIRD" | "ANNUAL",
-                        administeredAt: vaccination.administeredAt,
-                    })),
-                });
-            }
-
-            if (treatments.toCreate.length > 0) {
-                await tx.treatment.createMany({
-                    data: treatments.toCreate.map((treatment) => ({
-                        petId: id,
-                        type: treatment.type as "DEWORMING" | "FLEA_TICK",
-                        administeredAt: treatment.administeredAt,
-                    })),
-                });
-            }
-
-            const latestWeight = existing.weightRecords[0]?.weightGrams;
-            if (
-                weightGrams != null &&
-                (latestWeight == null || weightGrams !== gramsShownInForm(latestWeight))
-            ) {
-                await tx.weightRecord.create({
-                    data: { petId: id, weightGrams },
-                });
-            }
+            await syncVaccineReminder(tx, id, form.species);
         });
+    }
 
-        if (newPhotoUrl || result.data.removePhoto) {
-            await removeStoredPhoto(existing.photoUrl);
-        }
+    try {
+        await savePet(result.data.removePhoto ? null : undefined);
+        if (result.data.removePhoto) await discardPhoto(existing.photoUrl).catch(() => undefined);
 
         return { success: true, id };
     } catch {
-        if (newPhotoUrl) await removeStoredPhoto(newPhotoUrl);
-        return { success: false, formErrors: ["Could not save this pet."] };
+        return { success: false, formErrors: [saveError()] };
     }
 }

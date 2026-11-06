@@ -30,9 +30,11 @@ function fieldMessage(error: { message?: unknown } | undefined) {
 export default function BasicPetInfo({
   title,
   photoUrl,
+  lockIdentity = false,
 }: {
   title: string; // title is "Edit pet" for the edit form and "New pet" for the add form
   photoUrl?: string | null; // photoUrl is the URL of the pet's existing photo. It's an optional props because when this component is used for adding a pet, photoUrl is not passed. When the component is used for editing the pet, photoUrl is always passed, but it can either be a string if the pet has a saved photo, or null if it doesn't have a saved photo
+  lockIdentity?: boolean;
 }) {
   const { register, setValue } = useFormContext();
   const { errors } = useFormState(); // we are reading errors using useFormState instead of useFormContext because we want the component to re-render when errors change so the error messages next to the fields are updated in real-time as the user types. If we used useFormContext, the component would not re-render when errors change and the error messages would not be updated in real-time.
@@ -128,6 +130,7 @@ export default function BasicPetInfo({
           {fieldMessage(errors.name) && <p className={fieldErrorClassName}>{fieldMessage(errors.name)}</p>}
         </div>
 
+        <div className={lockIdentity ? "pointer-events-none opacity-60" : undefined}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="species" className={labelClassName}>
@@ -179,6 +182,7 @@ export default function BasicPetInfo({
           />
           {fieldMessage(errors.color) && <p className={fieldErrorClassName}>{fieldMessage(errors.color)}</p>}
         </div>
+        </div>
 
         <div>
           <label htmlFor="dateOfBirth" className={labelClassName}>
@@ -227,7 +231,7 @@ export default function BasicPetInfo({
           </p>
         </div>
 
-        <div>
+        <div className={lockIdentity ? "pointer-events-none opacity-60" : undefined}>
           <label htmlFor="lifestyle" className={labelClassName}>
             Lifestyle
           </label>
@@ -238,6 +242,9 @@ export default function BasicPetInfo({
           </select>
           {fieldMessage(errors.lifestyle) && <p className={fieldErrorClassName}>{fieldMessage(errors.lifestyle)}</p>}
         </div>
+        {lockIdentity && (
+          <p className="text-sm text-stone-500 dark:text-stone-400">You can change the name, photo, and age. The clinic keeps the other details.</p>
+        )}
       </div>
     </div>
   );

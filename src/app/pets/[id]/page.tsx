@@ -11,7 +11,7 @@ export default async function PetProfilePage({
   const { id } = await params;
   let session;
   try {
-    session = await requireRole(["OWNER"]);
+        session = await requireRole(["OWNER", "ADMIN"]);
   } catch (error) {
     if (
       error instanceof Error &&
@@ -25,11 +25,8 @@ export default async function PetProfilePage({
 
   let pet;
 
-  pet = await prisma.pet.findUnique({ // leaving the calls uncaught on purpose (not catching throws) so a thrown query renders the error.tsx page where the try again button runs the query again
-    where: {
-      id, // property shortcut: when the property name and the variable name are identical, we can write it once (instead of id: id,)
-      ownerId: session.user.id, // must also check the owner id to make sure the page won't display another owner's pet
-    },
+  pet = await prisma.pet.findFirst({
+    where: session.user.role === "ADMIN" ? { id } : { id, ownerId: session.user.id },
     include: {
       weightRecords: { // current weight is the latest weight record, not a column on the pet
         orderBy: { recordedAt: "desc" },
@@ -38,10 +35,14 @@ export default async function PetProfilePage({
       },
       vaccinations: { select: { id: true, type: true, administeredAt: true } },
       treatments: { select: { id: true, type: true, administeredAt: true } },
-      appointments: { // only visits that have not started yet
-        where: { startAt: { gte: new Date() } },
+      appointments: {
+        where: { status: "BOOKED", startAt: { gte: new Date() } },
         orderBy: { startAt: "asc" },
         select: { id: true, type: true, startAt: true, duration: true },
+      },
+      documents: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, title: true },
       },
     },
   });
@@ -54,7 +55,7 @@ export default async function PetProfilePage({
   Client components do not support Decimal props so we must convert the Decimal object into a normal JS number before passing it to PetProfile
   We cannot just remove it because the pet profile needs to display the age
   */
-  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, ...petFields } = pet;
+  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, documents, ...petFields } = pet;
 
   const profilePet = {
     ...petFields, // using spread to copy the existing properties of the pet object into a new object
@@ -66,6 +67,11 @@ export default async function PetProfilePage({
   }
 
   return (
-    <PetProfile pet={profilePet} /> // pass the new profilePet object instead of the original pet object returned by the query
+    <PetProfile
+      pet={profilePet}
+      documents={documents}
+      canUpload={session.user.role === "ADMIN"}
+      canEditClinical={session.user.role === "ADMIN"}
+    />
   );
 }

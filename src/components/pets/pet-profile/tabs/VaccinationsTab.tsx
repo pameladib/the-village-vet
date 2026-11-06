@@ -1,3 +1,4 @@
+import TreatmentDueForm from "@/components/pets/TreatmentDueForm";
 import type { PetProfileData, ProfileTreatment, ProfileVaccination } from "../PetProfile";
 
 const vaccinationLabels: Record<ProfileVaccination["type"], string> = {
@@ -75,13 +76,11 @@ function EmptyRecord({ children }: { children: string }) {
     );
 }
 
-export default function VaccinationsTab({ pet }: { pet: PetProfileData }) {
+export default function VaccinationsTab({ pet, canEditClinical }: { pet: PetProfileData; canEditClinical?: boolean }) {
     const vaccinations = [...pet.vaccinations]
         .sort(byNewestGivenDate)
         .map((vaccination) => ({ ...vaccination, type: vaccinationLabels[vaccination.type] }));
-    const treatments = [...pet.treatments]
-        .sort(byNewestGivenDate)
-        .map((treatment) => ({ ...treatment, type: treatmentLabels[treatment.type] }));
+    const treatments = [...pet.treatments].sort(byNewestGivenDate);
 
     return (
         <div className="flex flex-col gap-6">
@@ -91,7 +90,16 @@ export default function VaccinationsTab({ pet }: { pet: PetProfileData }) {
             </section>
             <section>
                 <h3 className="mb-2 text-sm font-medium text-emerald-900 dark:text-emerald-200">Treatments</h3>
-                {treatments.length === 0 ? <EmptyRecord>No treatments yet</EmptyRecord> : <RecordTable rows={treatments} />}
+                {treatments.length === 0 ? <EmptyRecord>No treatments yet</EmptyRecord> : (
+                    <div className="flex flex-col gap-3">
+                        {treatments.map((treatment) => (
+                            <div key={treatment.id}>
+                                <RecordTable rows={[{ id: treatment.id, type: treatmentLabels[treatment.type], administeredAt: treatment.administeredAt }]} />
+                                {canEditClinical && <TreatmentDueForm petId={pet.id} treatmentId={treatment.id} />}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </section>
         </div>
     );

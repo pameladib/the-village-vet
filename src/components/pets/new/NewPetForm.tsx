@@ -7,9 +7,29 @@ import BasicPetInfo from "./BasicPetInfo";
 import MedicalPetInfo from "./MedicalPetInfo";
 import { useState } from "react";
 import { createPet, updatePet } from "@/lib/actions/pet";
+import { confirmPetPhoto, preparePetPhotoUpload } from "@/lib/actions/photo";
+import { uploadToSignedUrl } from "@/lib/storage/direct-upload";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { petPhotoSrc } from "@/lib/storage/files";
+
+async function storePetPhoto(petId: string, file: File) {
+  const prepared = await preparePetPhotoUpload(petId, { contentType: file.type, size: file.size });
+  if (!prepared.success) {
+    return `The pet was saved, but the photo could not be stored. ${prepared.formErrors[0] ?? ""}`.trim();
+  }
+  try {
+    await uploadToSignedUrl(prepared.signedUrl, file);
+  } catch {
+    return "The pet was saved, but the photo could not be stored.";
+  }
+  const confirmed = await confirmPetPhoto(petId, { key: prepared.key, contentType: file.type });
+  if (!confirmed.success) {
+    return `The pet was saved, but the photo could not be stored. ${confirmed.formErrors[0] ?? ""}`.trim();
+  }
+  return null;
+}
 
 const basicFields = [
   "name",
@@ -37,9 +57,10 @@ the isFirstPet and ownerName props are needed only for adding a pet
 defaultValues, photoUrl and id are for updating a pet (id is to identify the pet and send it to the updatePet action)
 for this reason we made all 5 props optional so we can pass them as needed or leave them out when not needed
 */ 
-export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photoUrl, id }: { isFirstPet?: boolean; ownerName?: string; defaultValues?: PetForm; photoUrl?: string | null; id?: string }) {
+export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photoUrl, id, allowClinical = false }: { isFirstPet?: boolean; ownerName?: string; defaultValues?: PetForm; photoUrl?: string | null; id?: string; allowClinical?: boolean }) {
   const [step, setStep] = useState(1); // 1 for Basic Info, 2 for Medical Info
   const [formError, setFormError] = useState<string | null>(null);
+  const [petId, setPetId] = useState(id);
   const router = useRouter();
 
   const form = useForm<PetForm>({
@@ -80,15 +101,28 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
       return;
     }
 
-    const result = id ? await updatePet(id, data) : await createPet(data);
+    // The photo is not part of the pet save. The browser sends it straight to Supabase with a signed URL.
+    const file = data.photo instanceof File ? data.photo : null;
+    const payload: PetForm = { ...data, photo: undefined, removePhoto: file ? false : data.removePhoto };
+    const result = petId ? await updatePet(petId, payload) : await createPet(payload);
 
-    if (!result.success) {
+    if (!result.success || !result.id) {
       setFormError(result.formErrors?.[0] ?? "Could not save this pet."); // show the error message set by the server action when it exists, otherwise use the backup sentence
       return;
     }
+    const savedId = result.id;
+
+    if (file) {
+      const photoError = await storePetPhoto(savedId, file);
+      if (photoError) {
+        setPetId(savedId);
+        setFormError(photoError);
+        return;
+      }
+    }
 
     setFormError(null);
-    router.push(`/pets/${result.id}`);
+    router.push(`/pets/${savedId}`);
   }
 
   return (
@@ -135,6 +169,7 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
             )
             }
           </div>
+          {allowClinical && (
           <div className="mt-6 mb-6 flex overflow-hidden rounded-lg border border-stone-200 text-sm dark:border-stone-700">
             <div className={step === 1 ? activeStepClassName : inactiveStepClassName}>
               Basic Information
@@ -143,6 +178,7 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
               Medical Information
             </div>
           </div>
+          )}
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-8"
@@ -150,12 +186,13 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
             {step === 1 && (
               <BasicPetInfo
                 title={defaultValues ? "Edit pet" : "New pet"}
-                photoUrl={photoUrl}
+                photoUrl={id ? petPhotoSrc(id, photoUrl) : photoUrl}
+                lockIdentity={Boolean(id) && !allowClinical}
               />
             )}
             {step === 2 && <MedicalPetInfo species={species} />}
 
-            {step === 1 && (
+            {step === 1 && allowClinical && (
               <button
                 type="button"
                 onClick={handleContinue}
@@ -163,6 +200,18 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
               >
                 Continue
               </button>
+            )}
+            {step === 1 && !allowClinical && (
+              <>
+                {formError && <p className="mt-6 text-sm text-red-700 dark:text-red-300">{formError}</p>}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="mt-6 w-full cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-70 dark:bg-emerald-700"
+                >
+                  {isSubmitting ? "Saving..." : "Save pet"}
+                </button>
+              </>
             )}
             {isFirstPet && (
               <button

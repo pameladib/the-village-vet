@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from "@/lib/storage/files";
 
 /* HTML input fields return string values, even when the type is set to number.
 RHF's register function has a valueAsNumber option that converts the string to a number -> so we set valueAsNumber: true.
@@ -25,8 +26,8 @@ export const basicPetSchema = z.object({
   lifestyle: z.enum(["INDOOR", "OUTDOOR", "HYBRID"]).optional(),
   photo: z
     .file()
-    .max(5 * 1024 * 1024, { message: "Photo must be under 5 MB" }) // maximum file size in bytes
-    .refine((file) => file.type.startsWith("image/"), { message: "Photo must be an image" }) // adding another validation rule; refine() lets us provide our own condition.
+    .max(PHOTO_MAX_BYTES, { message: "Photo must be under 5 MB" })
+    .refine((file) => file.type in PHOTO_TYPES, { message: "Use a JPEG, PNG, WEBP, or GIF" })
     .optional(),
   removePhoto: z.boolean().optional(), // true when the owner removes the photo. A new file still replaces the saved one.
 });

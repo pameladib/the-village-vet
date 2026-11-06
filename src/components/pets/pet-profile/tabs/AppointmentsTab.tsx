@@ -3,7 +3,8 @@ import type { PetProfileData, ProfileAppointment } from "../PetProfile";
 const appointmentTypeLabels: Record<ProfileAppointment["type"], string> = {
     CHECKUP: "Checkup",
     VACCINATION: "Vaccination",
-    TREATMENT: "Deworming / Flea Treatment",
+    TREATMENT: "Treatment",
+    FOLLOW_UP: "Follow-up",
     GROOMING: "Grooming",
     OPERATION: "Operation",
 };
@@ -15,6 +16,7 @@ function startTime(value: Date | string) {
 
 function formatAppointmentDate(startAt: Date | string) {
     return new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Beirut",
         weekday: "short",
         month: "short",
         day: "numeric",
@@ -23,6 +25,7 @@ function formatAppointmentDate(startAt: Date | string) {
 
 function formatAppointmentTime(startAt: Date | string) {
     return new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Beirut",
         hour: "numeric",
         minute: "2-digit",
     }).format(new Date(startTime(startAt)));

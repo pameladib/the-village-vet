@@ -1,6 +1,6 @@
 "use client";
 
-import type { Pet } from "../../../../generated/prisma/client";
+import type { AppointmentType, Pet } from "../../../../generated/prisma/client";
 import Link from "next/link";
 import { ChevronLeft, SquarePen } from "lucide-react";
 import { useState } from "react";
@@ -8,6 +8,7 @@ import GeneralTab from "./tabs/GeneralTab";
 import AppointmentsTab from "./tabs/AppointmentsTab";
 import VaccinationsTab from "./tabs/VaccinationsTab";
 import MedicalTab from "./tabs/MedicalTab";
+import { petPhotoSrc } from "@/lib/storage/files";
 
 /* cannot use the Prisma generated Pet type because estimatedAgeValue is a Decimal while we are passing it as a normal JS number
 thus we must create a new type 
@@ -28,7 +29,7 @@ export type ProfileTreatment = {
 
 export type ProfileAppointment = {
     id: string;
-    type: "CHECKUP" | "VACCINATION" | "TREATMENT" | "GROOMING" | "OPERATION";
+    type: AppointmentType;
     startAt: Date;
     duration: number;
 };
@@ -41,7 +42,7 @@ export type PetProfileData = Omit<Pet, "estimatedAgeValue"> & { // keep every ot
     appointments: ProfileAppointment[];
 };
 
-export default function PetProfile({ pet }: { pet: PetProfileData }) {
+export default function PetProfile({ pet, documents = [], canUpload = false, canEditClinical = false }: { pet: PetProfileData; documents?: { id: string; title: string }[]; canUpload?: boolean; canEditClinical?: boolean }) {
     const [activeTab, setActiveTab] = useState("general");
 
     const tabs = [ // this array lets us define the tabs once and generate the buttons dynamically instead of writing four buttons manually
@@ -78,8 +79,8 @@ export default function PetProfile({ pet }: { pet: PetProfileData }) {
 
                 <div className="mt-8 flex flex-col items-center text-center">
                     <div className="size-32 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950">
-                        {pet.photoUrl ? (
-                            <img src={pet.photoUrl} alt="" className="size-full object-cover" />
+                        {petPhotoSrc(pet.id, pet.photoUrl) ? (
+                            <img src={petPhotoSrc(pet.id, pet.photoUrl) ?? ""} alt="" className="size-full object-cover" />
                         ) : (
                             <div className="flex size-full items-center justify-center text-4xl font-medium text-emerald-800 dark:text-emerald-200">
                                 {pet.name.slice(0, 1)}
@@ -119,8 +120,8 @@ export default function PetProfile({ pet }: { pet: PetProfileData }) {
                 <div className="mt-3">
                     {activeTab === "general" && <GeneralTab pet={pet} />}
                     {activeTab === "appointments" && <AppointmentsTab pet={pet} />}
-                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} />}
-                    {activeTab === "medical" && <MedicalTab pet={pet} />}
+                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} canEditClinical={canEditClinical} />}
+                    {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload} />}
                 </div>
             </div>
         </div>

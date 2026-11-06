@@ -27,6 +27,9 @@ model User {
   pets          Pet[]
   role          UserRole      @default(OWNER)
   appointments  Appointment[]
+  scheduleBlocks ScheduleBlock[]
+  notifications Notification[]
+  shopOrders    ShopOrder[]
 
   @@unique([email])
   @@map("user")
@@ -110,6 +113,8 @@ model Pet {
   medicalVisits     MedicalVisit[]
   appointments      Appointment[]
   healthReminders   HealthReminder[]
+  careReminders     CareReminder[]
+  documents         MedicalDocument[]
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -137,10 +142,13 @@ model Treatment {
 }
 
 model Appointment {
-  id       String          @id @default(uuid())
-  type     AppointmentType
-  startAt  DateTime
-  duration Int // Duration in minutes
+  id              String            @id @default(uuid())
+  type            AppointmentType
+  startAt         DateTime
+  duration        Int // Duration in minutes
+  status          AppointmentStatus @default(BOOKED)
+  // Set only when type is GROOMING. Shower, haircut, or both do not change the two-hour duration.
+  groomingService GroomingService?
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -153,7 +161,7 @@ model Appointment {
 
   @@index([ownerId, startAt])
   @@index([petId, startAt])
-  @@index([startAt])
+  @@index([status, startAt])
   @@map("appointment")
 }
 
@@ -163,6 +171,18 @@ enum AppointmentType {
   TREATMENT
   GROOMING
   OPERATION
+  FOLLOW_UP
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CANCELLED
+}
+
+enum GroomingService {
+  SHOWER
+  HAIRCUT
+  BOTH
 }
 
 enum TreatmentType {
@@ -266,4 +286,155 @@ enum ReminderType {
   VACCINATION
   DEWORMING
   FLEA_TREATMENT
+}
+
+model ScheduleBlock {
+  id        String   @id @default(uuid())
+  startAt   DateTime
+  endAt     DateTime
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt DateTime @default(now())
+  scope BlockScope
+
+  @@index([startAt, endAt])
+  @@map("schedule_block")
+}
+
+enum BlockScope {
+  CLINIC
+  GROOMING
+  BOTH
+}
+
+// One open follow-up per pet and kind. The old health_reminder table required both a vaccine and a treatment, so new reminders live here.
+model CareReminder {
+  id          String       @id @default(uuid())
+  kind        ReminderType
+  dueAt       DateTime
+  completedAt DateTime?
+  // True when the vet changed the calculated date. A later dose still replaces it.
+  overridden  Boolean      @default(false)
+  dose        String?
+
+  petId String
+  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  vaccinationId String?
+  treatmentId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([petId, dueAt])
+  @@index([dueAt, completedAt])
+  @@map("care_reminder")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  title     String
+  body      String
+  readAt    DateTime?
+  // Stops a retried booking or a repeated cron run from writing the same notice twice.
+  dedupeKey String?   @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("notification")
+}
+
+model ClinicSetting {
+  id             String  @id @default("clinic")
+  phone          String?
+  whatsapp       String?
+  address        String?
+  mapsUrl        String?
+  // Left empty until the clinic provides an after-hours emergency number. The app must not invent one.
+  emergencyPhone String?
+  about          String?
+
+  @@map("clinic_setting")
+}
+
+model MedicalDocument {
+  id          String   @id @default(uuid())
+  title       String
+  storedName  String
+  contentType String
+
+  petId String
+  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([petId])
+  @@map("medical_document")
+}
+
+model ProductCategory {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  products Product[]
+
+  @@map("product_category")
+}
+
+model Product {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  // Whole Lebanese pounds. The clinic has not asked for another currency.
+  price       Int
+  stock       Int             @default(0)
+  photoUrl    String?
+  available   Boolean         @default(true)
+  categoryId  String
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+
+  @@index([categoryId])
+  @@map("product")
+}
+
+enum ShopOrderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+model ShopOrder {
+  id        String          @id @default(uuid())
+  status    ShopOrderStatus @default(PENDING)
+  // Payment is arranged at the clinic. This is not an online payment.
+  payment   String          @default("CASH_ON_DELIVERY")
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+  items   OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([status])
+  @@map("shop_order")
+}
+
+model OrderItem {
+  id             String    @id @default(uuid())
+  quantity       Int
+  unitPrice      Int
+  orderId        String
+  order          ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@map("order_item")
 }
