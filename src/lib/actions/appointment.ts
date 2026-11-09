@@ -11,6 +11,7 @@ import {
     getAvailableStarts,
 } from "@/lib/appointments/availability";
 import type { AppointmentType, Species, UserRole } from "../../../generated/prisma/client";
+import { orderedVisitServices } from "@/lib/appointments/labels";
 import { notifyOwnerAndStaff } from "@/lib/notifications";
 
 const BOOKING_ROLES = ["OWNER", "ADMIN", "SECONDARY_ADMIN"] as const satisfies readonly UserRole[];
@@ -135,9 +136,10 @@ export async function bookAppointment(data: unknown) {
             const appointment = await tx.appointment.create({
                 data: {
                     type: parsed.data.type,
+                    services: parsed.data.type === "VETERINARY_VISIT" ? orderedVisitServices(parsed.data.services) : [],
                     startAt: chosen,
                     duration: appointmentDuration(parsed.data.type, pet.species),
-                    groomingService: parsed.data.type === "GROOMING" ? parsed.data.groomingService : null,
+                    groomingService: parsed.data.type === "GROOMING" ? parsed.data.groomingService ?? null : null,
                     ownerId: pet.ownerId,
                     petId: pet.id,
                 },

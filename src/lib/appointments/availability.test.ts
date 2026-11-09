@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getAvailableStarts } from "./availability.ts";
+import { getAvailableStarts, hourInBeirut } from "./availability.ts";
 
 const monday = "2027-01-04";
 const saturday = "2027-01-02";
@@ -18,20 +18,29 @@ function labels(starts: Date[]) {
 }
 
 function at(day: string, time: string) {
-    const starts = getAvailableStarts("CHECKUP", "CAT", day, [], []);
+    const starts = getAvailableStarts("VETERINARY_VISIT", "CAT", day, [], []);
     const match = starts.find((start) => labels([start])[0] === time);
     assert.ok(match, `missing ${time} on ${day}`);
     return match;
 }
 
+describe("Beirut clock", () => {
+    it("is 8:00 at 06:00 UTC in winter and 05:00 UTC in summer", () => {
+        assert.equal(hourInBeirut(new Date("2027-01-15T06:00:00.000Z")), 8);
+        assert.equal(hourInBeirut(new Date("2027-07-15T05:00:00.000Z")), 8);
+        assert.equal(hourInBeirut(new Date("2027-01-15T05:00:00.000Z")), 7);
+        assert.equal(hourInBeirut(new Date("2027-07-15T06:00:00.000Z")), 9);
+    });
+});
+
 describe("clinic hours", () => {
     it("closes Sunday", () => {
-        assert.deepEqual(getAvailableStarts("CHECKUP", "CAT", sunday, [], []), []);
+        assert.deepEqual(getAvailableStarts("VETERINARY_VISIT", "CAT", sunday, [], []), []);
     });
 
-    it("ends weekday check-ups at 17:30 and Saturday check-ups at 13:30", () => {
-        assert.deepEqual(labels(getAvailableStarts("CHECKUP", "DOG", monday, [], [])).at(-1), "17:30");
-        assert.deepEqual(labels(getAvailableStarts("CHECKUP", "DOG", saturday, [], [])).at(-1), "13:30");
+    it("ends weekday veterinary visits at 17:30 and Saturday veterinary visits at 13:30", () => {
+        assert.deepEqual(labels(getAvailableStarts("VETERINARY_VISIT", "DOG", monday, [], [])).at(-1), "17:30");
+        assert.deepEqual(labels(getAvailableStarts("VETERINARY_VISIT", "DOG", saturday, [], [])).at(-1), "13:30");
     });
 
     it("ends weekday grooming at 16:00 and Saturday grooming at 12:00", () => {
@@ -40,7 +49,7 @@ describe("clinic hours", () => {
     });
 
     it("rejects a past day", () => {
-        assert.deepEqual(getAvailableStarts("CHECKUP", "CAT", "2020-01-06", [], []), []);
+        assert.deepEqual(getAvailableStarts("VETERINARY_VISIT", "CAT", "2020-01-06", [], []), []);
     });
 });
 
@@ -60,13 +69,13 @@ describe("operations", () => {
 describe("separate calendars and blocks", () => {
     it("lets grooming overlap a vet visit", () => {
         const checkup = at(monday, "09:00");
-        const grooming = labels(getAvailableStarts("GROOMING", "CAT", monday, [{ type: "CHECKUP", startAt: checkup, duration: 30 } as never], []));
+        const grooming = labels(getAvailableStarts("GROOMING", "CAT", monday, [{ type: "VETERINARY_VISIT", startAt: checkup, duration: 30 } as never], []));
         assert.equal(grooming[0], "09:00");
     });
 
     it("keeps two vet visits from sharing the same half hour", () => {
         const checkup = at(monday, "09:00");
-        const next = labels(getAvailableStarts("VACCINATION", "CAT", monday, [{ type: "CHECKUP", startAt: checkup, duration: 30 } as never], []));
+        const next = labels(getAvailableStarts("VETERINARY_VISIT", "CAT", monday, [{ type: "VETERINARY_VISIT", startAt: checkup, duration: 30 } as never], []));
         assert.equal(next[0], "09:30");
     });
 
@@ -74,7 +83,7 @@ describe("separate calendars and blocks", () => {
         const start = at(monday, "09:00");
         const end = at(monday, "11:00");
         const block = { startAt: start, endAt: end, scope: "CLINIC" as const };
-        assert.equal(labels(getAvailableStarts("CHECKUP", "CAT", monday, [], [block as never]))[0], "11:00");
+        assert.equal(labels(getAvailableStarts("VETERINARY_VISIT", "CAT", monday, [], [block as never]))[0], "11:00");
         assert.equal(labels(getAvailableStarts("GROOMING", "CAT", monday, [], [block as never]))[0], "09:00");
     });
 });

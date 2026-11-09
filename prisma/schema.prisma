@@ -4,8 +4,9 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -27,7 +28,7 @@ model User {
   pets          Pet[]
   role          UserRole      @default(OWNER)
   appointments  Appointment[]
-  scheduleBlocks ScheduleBlock[]
+  scheduleBlocks ScheduleBlock[] // periods blocked by admin
   notifications Notification[]
   shopOrders    ShopOrder[]
 
@@ -112,7 +113,6 @@ model Pet {
   treatments        Treatment[]
   medicalVisits     MedicalVisit[]
   appointments      Appointment[]
-  healthReminders   HealthReminder[]
   careReminders     CareReminder[]
   documents         MedicalDocument[]
 
@@ -134,10 +134,15 @@ model Treatment {
   type           TreatmentType
   administeredAt DateTime?
   petId          String
-  healthReminder HealthReminder?
+  careReminder   CareReminder?
   pet            Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
 
+  // Empty for a dose entered from registration or the pet profile.
+  medicalVisitId String?
+  medicalVisit   MedicalVisit? @relation(fields: [medicalVisitId], references: [id], onDelete: SetNull)
+
   @@index([petId])
+  @@index([medicalVisitId])
   @@map("treatment")
 }
 
@@ -147,6 +152,8 @@ model Appointment {
   startAt         DateTime
   duration        Int // Duration in minutes
   status          AppointmentStatus @default(BOOKED)
+  // Services requested for a veterinary visit. Grooming and operations leave this empty.
+  services        VisitService[]    @default([])
   // Set only when type is GROOMING. Shower, haircut, or both do not change the two-hour duration.
   groomingService GroomingService?
 
@@ -155,6 +162,8 @@ model Appointment {
 
   petId String
   pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  medicalVisit MedicalVisit?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -166,17 +175,24 @@ model Appointment {
 }
 
 enum AppointmentType {
-  CHECKUP
-  VACCINATION
-  TREATMENT
+  VETERINARY_VISIT
   GROOMING
   OPERATION
+}
+
+enum VisitService {
+  CHECKUP
+  VACCINATION
+  DEWORMING
+  FLEA_TREATMENT
   FOLLOW_UP
 }
 
 enum AppointmentStatus {
   BOOKED
+  COMPLETED
   CANCELLED
+  EXPIRED
 }
 
 enum GroomingService {
@@ -210,11 +226,16 @@ model Vaccination {
   id             String          @id @default(uuid())
   administeredAt DateTime?
   type           VaccinationType
-  healthReminder HealthReminder?
+  careReminder   CareReminder?
   petId          String
   pet            Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
 
+  // Empty for a dose entered from registration or the pet profile.
+  medicalVisitId String?
+  medicalVisit   MedicalVisit? @relation(fields: [medicalVisitId], references: [id], onDelete: SetNull)
+
   @@index([petId])
+  @@index([medicalVisitId])
   @@map("vaccination")
 }
 
@@ -256,30 +277,15 @@ model MedicalVisit {
   petId     String
   pet       Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
 
+  // Empty for a walk-in. One visit note per booking.
+  appointmentId String?      @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  vaccinations Vaccination[]
+  treatments   Treatment[]
+
   @@index([petId])
   @@map("medical_visit")
-}
-
-model HealthReminder {
-  id       String       @id @default(uuid())
-  type     ReminderType
-  dueAt    DateTime // when the vaccine or treatment is due
-  notifyAt DateTime // when the next notification should be sent
-
-  petId String // which pet needs it
-  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
-
-  vaccinationId String      @unique
-  vaccination   Vaccination @relation(fields: [vaccinationId], references: [id])
-
-  treatmentId String    @unique
-  treatment   Treatment @relation(fields: [treatmentId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([petId, dueAt])
-  @@map("health_reminder")
 }
 
 enum ReminderType {
@@ -307,7 +313,8 @@ enum BlockScope {
   BOTH
 }
 
-// One open follow-up per pet and kind. The old health_reminder table required both a vaccine and a treatment, so new reminders live here.
+// One open follow-up per pet and kind, enforced by care_reminder_one_open_per_kind.
+// A row points at a vaccination or a treatment, not both.
 model CareReminder {
   id          String       @id @default(uuid())
   kind        ReminderType
@@ -320,12 +327,16 @@ model CareReminder {
   petId String
   pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
 
-  vaccinationId String?
-  treatmentId   String?
+  vaccinationId String?      @unique
+  vaccination   Vaccination? @relation(fields: [vaccinationId], references: [id], onDelete: Cascade)
+
+  treatmentId String?    @unique
+  treatment   Treatment? @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([petId, kind], map: "care_reminder_one_open_per_kind", where: { completedAt: null })
   @@index([petId, dueAt])
   @@index([dueAt, completedAt])
   @@map("care_reminder")

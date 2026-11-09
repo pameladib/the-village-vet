@@ -5,19 +5,20 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronDown, ChevronLeft } from "lucide-react";
+import ClinicDateField from "@/components/ClinicDateField";
+import { visitServiceLabels, visitServiceOrder } from "@/lib/appointments/labels";
 import { bookingSchema, type BookingForm } from "@/lib/validations/appointment";
 import { bookAppointment, getOpenings } from "@/lib/actions/appointment";
 import type { Species } from "../../generated/prisma/client";
 
 const appointmentTypes = [
-    { value: "CHECKUP", label: "Check-up", detail: "30 minutes" },
-    { value: "VACCINATION", label: "Vaccination", detail: "30 minutes" },
-    { value: "TREATMENT", label: "Treatment", detail: "30 minutes" },
-    { value: "FOLLOW_UP", label: "Follow-up", detail: "30 minutes" },
-    { value: "GROOMING", label: "Grooming", detail: "2 hours, with the grooming assistant" },
-    { value: "OPERATION", label: "Operation", detail: "Morning only. 1 hour for a cat, 2 hours for a dog" },
+    { value: "VETERINARY_VISIT", label: "Veterinary visit", detail: "Duration of this appointment is 30 minutes." },
+    { value: "GROOMING", label: "Grooming", detail: "Duration of this appointment is 2 hours, with the grooming assistant." },
+    { value: "OPERATION", label: "Operation", detail: "Duration of this appointment is 1 hour for a cat and 2 hours for a dog. Operations are booked in the morning." },
 ] as const;
+
+const visitServices = visitServiceOrder.map((value) => ({ value, label: visitServiceLabels[value] }));
 
 // The clinic has not written package descriptions yet. These say what the owner is choosing, without listing a price.
 const groomingServices = [
@@ -29,7 +30,14 @@ const groomingServices = [
 type BookablePet = { id: string; name: string; species: Species };
 
 const fieldClassName =
-    "mt-1 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm text-emerald-950 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-50";
+    "w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm text-emerald-950 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-50";
+
+const selectClassName = `${fieldClassName} appearance-none pe-12`;
+
+function FieldMessage({ message }: { message?: string }) {
+    if (!message) return null;
+    return <p className="mt-1 text-xs font-normal text-red-700 dark:text-red-300">{message}</p>;
+}
 
 function formatSlot(startIso: string, duration: number) {
     const start = new Date(startIso);
@@ -53,7 +61,9 @@ export default function NewAppointmentForm({ pets, today, emptyMessage }: { pets
     const form = useForm<BookingForm>({
         resolver: zodResolver(bookingSchema),
         defaultValues: {
-            petId: pets.length === 1 ? pets[0].id : "",
+            petId: pets[0]?.id ?? "",
+            type: "VETERINARY_VISIT",
+            services: [],
             date: "",
             start: "",
         },
@@ -61,8 +71,14 @@ export default function NewAppointmentForm({ pets, today, emptyMessage }: { pets
 
     const petId = useWatch({ control: form.control, name: "petId" });
     const type = useWatch({ control: form.control, name: "type" });
+    const services = useWatch({ control: form.control, name: "services" });
     const date = useWatch({ control: form.control, name: "date" });
     const start = useWatch({ control: form.control, name: "start" });
+
+    useEffect(() => {
+        if (type !== "VETERINARY_VISIT") form.setValue("services", []);
+        if (type !== "GROOMING") form.setValue("groomingService", undefined);
+    }, [type, form]);
 
     useEffect(() => {
         if (!petId || !type || !date) {
@@ -105,24 +121,30 @@ export default function NewAppointmentForm({ pets, today, emptyMessage }: { pets
 
     if (pets.length === 0) {
         return (
-            <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 bg-emerald-50 px-4 py-8 dark:bg-stone-950">
-                <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                    <ChevronLeft className="size-4" strokeWidth={1.5} />
-                    Back to dashboard
-                </Link>
-                <h1 className="text-2xl font-semibold text-emerald-950 dark:text-emerald-50">Book an appointment</h1>
-                <p className="text-sm text-emerald-900 dark:text-emerald-100">{emptyMessage ?? "Add a pet before booking a visit."}</p>
-                {!emptyMessage && (
-                <Link href="/pets/new" className="w-fit rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white">
-                    Add a pet
-                </Link>
-                )}
+            <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8">
+                <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-stone-950">
+                <section className="flex flex-col gap-4 rounded-2xl border border-emerald-200 bg-white p-5 dark:border-emerald-900 dark:bg-stone-900">
+                    <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                        <ChevronLeft className="size-4" strokeWidth={1.5} />
+                        Back to dashboard
+                    </Link>
+                    <h1 className="text-2xl font-semibold text-emerald-950 dark:text-emerald-50">Book an appointment</h1>
+                    <p className="text-sm text-emerald-900 dark:text-emerald-100">{emptyMessage ?? "Add a pet before booking a visit."}</p>
+                    {!emptyMessage && (
+                        <Link href="/pets/new" className="w-fit rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-900">
+                            Add a pet
+                        </Link>
+                    )}
+                </section>
+                </div>
             </main>
         );
     }
 
     return (
-        <main className="mx-auto flex w-full max-w-lg flex-1 flex-col bg-emerald-50 px-4 py-8 dark:bg-stone-950">
+        <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8">
+            <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-stone-950">
+            <section className="rounded-2xl border border-emerald-200 bg-white p-5 dark:border-emerald-900 dark:bg-stone-900">
             <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
                 <ChevronLeft className="size-4" strokeWidth={1.5} />
                 Back to dashboard
@@ -133,32 +155,65 @@ export default function NewAppointmentForm({ pets, today, emptyMessage }: { pets
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-4">
                 <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
                     Pet
-                    <select className={fieldClassName} {...form.register("petId")}>
-                        <option value="">Choose a pet</option>
+                    <span className="relative mt-1 block">
+                    <select className={selectClassName} {...form.register("petId")}>
                         {pets.map((pet) => (
                             <option key={pet.id} value={pet.id}>
                                 {pet.name}
                             </option>
                         ))}
                     </select>
+                    <ChevronDown className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2 text-emerald-800 dark:text-emerald-200" />
+                    </span>
+                    <FieldMessage message={form.formState.errors.petId?.message} />
                 </label>
 
                 <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
                     Type
-                    <select className={fieldClassName} {...form.register("type")}>
-                        <option value="">Choose a type</option>
+                    <span className="relative mt-1 block">
+                    <select className={selectClassName} {...form.register("type")}>
                         {appointmentTypes.map((option) => (
                             <option key={option.value} value={option.value}>
                                 {option.label}
                             </option>
                         ))}
                     </select>
+                    <ChevronDown className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2 text-emerald-800 dark:text-emerald-200" />
+                    </span>
                     {type && (
                         <span className="mt-1 block text-xs font-normal text-emerald-800 dark:text-emerald-200">
                             {appointmentTypes.find((option) => option.value === type)?.detail}
                         </span>
                     )}
+                    <FieldMessage message={form.formState.errors.type?.message} />
                 </label>
+
+                {type === "VETERINARY_VISIT" && (
+                    <fieldset className="rounded-2xl border border-emerald-200 p-3">
+                        <legend className="px-1 text-sm font-medium text-emerald-950 dark:text-emerald-50">Services</legend>
+                        <div className="mt-2 flex flex-col gap-2">
+                            {visitServices.map((service) => (
+                                <label key={service.value} className="flex items-center gap-2 text-sm font-normal text-emerald-950 dark:text-emerald-50">
+                                    <input
+                                        type="checkbox"
+                                        value={service.value}
+                                        checked={(services ?? []).includes(service.value)}
+                                        className="size-4"
+                                        onChange={(event) => {
+                                            const current = services ?? [];
+                                            const next = event.target.checked
+                                                ? [...current, service.value]
+                                                : current.filter((selected) => selected !== service.value);
+                                            form.setValue("services", next, { shouldValidate: form.formState.isSubmitted });
+                                        }}
+                                    />
+                                    {service.label}
+                                </label>
+                            ))}
+                        </div>
+                        <FieldMessage message={form.formState.errors.services?.message} />
+                    </fieldset>
+                )}
 
                 {type === "GROOMING" && (
                     <fieldset className="rounded-2xl border border-emerald-200 bg-white p-3 dark:border-emerald-900 dark:bg-stone-900">
@@ -174,12 +229,15 @@ export default function NewAppointmentForm({ pets, today, emptyMessage }: { pets
                                 </label>
                             ))}
                         </div>
+                        <FieldMessage message={form.formState.errors.groomingService?.message} />
                     </fieldset>
                 )}
 
                 <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
                     Date
-                    <input type="date" min={today} className={fieldClassName} {...form.register("date")} />
+                    <input type="hidden" {...form.register("date")} />
+                    <ClinicDateField value={date} min={today} onChange={(next) => form.setValue("date", next, { shouldValidate: form.formState.isSubmitted })} />
+                    <FieldMessage message={form.formState.errors.date?.message} />
                 </label>
 
                 <div>
@@ -193,17 +251,20 @@ export default function NewAppointmentForm({ pets, today, emptyMessage }: { pets
                             <button
                                 key={slot}
                                 type="button"
-                                onClick={() => form.setValue("start", slot, { shouldValidate: true })}
-                                className={`rounded-xl border px-3 py-2.5 text-sm font-medium ${
+                                onClick={() => form.setValue("start", slot, { shouldValidate: form.formState.isSubmitted })}
+                                className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
                                     start === slot
-                                        ? "border-emerald-800 bg-emerald-800 text-white"
-                                        : "border-emerald-200 bg-white text-emerald-950 dark:border-emerald-900 dark:bg-stone-900 dark:text-emerald-50"
+                                        ? "border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900"
+                                        : "border-emerald-200 bg-white text-emerald-950 hover:border-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-50 dark:hover:bg-emerald-950"
                                 }`}
                             >
                                 {formatSlot(slot, duration)}
                             </button>
                         ))}
                     </div>
+                    {!(date && !loadingTimes && starts.length === 0) && (
+                        <FieldMessage message={form.formState.errors.start?.message} />
+                    )}
                 </div>
 
                 {formError && <p className="text-sm text-red-700 dark:text-red-300">{formError}</p>}
@@ -211,11 +272,13 @@ export default function NewAppointmentForm({ pets, today, emptyMessage }: { pets
                 <button
                     type="submit"
                     disabled={form.formState.isSubmitting}
-                    className="rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60 dark:bg-emerald-700"
+                    className="rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white transition duration-200 hover:scale-[1.02] hover:bg-emerald-900 hover:shadow-md disabled:scale-100 disabled:opacity-60 disabled:hover:bg-emerald-800 disabled:hover:shadow-none dark:bg-emerald-700 dark:hover:bg-emerald-600"
                 >
                     {form.formState.isSubmitting ? "Booking…" : "Book appointment"}
                 </button>
             </form>
+            </section>
+            </div>
         </main>
     );
 }

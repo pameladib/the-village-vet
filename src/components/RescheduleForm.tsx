@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ClinicDateField from "@/components/ClinicDateField";
 import { getOpenings, rescheduleAppointment } from "@/lib/actions/appointment";
 import type { AppointmentType, Species } from "../../generated/prisma/client";
 
@@ -55,7 +56,7 @@ export default function RescheduleForm({
         <form className="mt-6 flex flex-col gap-4">
             <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
                 Date
-                <input type="date" min={today} value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-xl border border-emerald-200 px-3 py-2.5 text-sm dark:border-emerald-900 dark:bg-stone-950" />
+                <ClinicDateField value={date} min={today} onChange={setDate} />
             </label>
             <div className="grid grid-cols-2 gap-2">
                 {starts.map((start) => (
@@ -74,7 +75,7 @@ export default function RescheduleForm({
                             router.push("/dashboard");
                             router.refresh();
                         }}
-                        className="rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-medium text-emerald-950 dark:border-emerald-900 dark:bg-stone-900 dark:text-emerald-50"
+                        className="rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-medium text-emerald-950 transition-colors hover:border-emerald-700 hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-50 dark:hover:bg-emerald-950"
                     >
                         {time.format(new Date(start))}–{time.format(new Date(new Date(start).getTime() + duration * 60_000))}
                     </button>

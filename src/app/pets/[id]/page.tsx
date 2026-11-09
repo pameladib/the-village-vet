@@ -38,7 +38,7 @@ export default async function PetProfilePage({
       appointments: {
         where: { status: "BOOKED", startAt: { gte: new Date() } },
         orderBy: { startAt: "asc" },
-        select: { id: true, type: true, startAt: true, duration: true },
+        select: { id: true, type: true, services: true, groomingService: true, startAt: true, duration: true },
       },
       documents: {
         orderBy: { createdAt: "desc" },

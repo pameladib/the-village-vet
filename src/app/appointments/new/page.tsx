@@ -41,7 +41,7 @@ export default async function NewAppointmentPage({
     return (
         <>
             {staff && (
-                <form action="/appointments/new" className="mx-auto flex w-full max-w-lg gap-2 bg-emerald-50 px-4 pt-8 dark:bg-stone-950">
+                <form action="/appointments/new" className="mx-auto mt-8 flex w-full max-w-lg gap-2 px-4">
                     <input name="q" defaultValue={q} placeholder="Search by pet name" className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-stone-950" />
                     <button className="rounded-lg bg-emerald-800 px-3 py-2 text-sm font-medium text-white">Find</button>
                 </form>

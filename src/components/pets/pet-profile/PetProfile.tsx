@@ -1,6 +1,6 @@
 "use client";
 
-import type { AppointmentType, Pet } from "../../../../generated/prisma/client";
+import type { AppointmentType, GroomingService, Pet, VisitService } from "../../../../generated/prisma/client";
 import Link from "next/link";
 import { ChevronLeft, SquarePen } from "lucide-react";
 import { useState } from "react";
@@ -30,6 +30,8 @@ export type ProfileTreatment = {
 export type ProfileAppointment = {
     id: string;
     type: AppointmentType;
+    services: VisitService[];
+    groomingService: GroomingService | null;
     startAt: Date;
     duration: number;
 };

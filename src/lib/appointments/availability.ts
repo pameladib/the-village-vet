@@ -1,3 +1,36 @@
+/* 
+This file contains functions to handle appointment availability and timing.
+Its job is to determine which appointments are available for booking at a given date. It takes into consideration the following:
+- The clinic's opening hours
+- The duration of each appointment type
+- The booked appointments for that date
+- The blocked periods for that date
+
+The functions can be grouped into 4 categories:
+1. Date and timezone handling: these functions ensure that appointment times are interpreted according to the clinic’s local timezone (Beirut), rather than the server’s timezone.  
+  - clinicDate() validates a date string in the format YYYY-MM-DD, extracts the year, month, and day number, and checks if it is a real calendar day
+  - beirutParts() converts a Date object to a record of its year, month, day, hour, minute, and second components, in Beirut time
+  - beirutOffset() calculates the difference between a Date object and the same instant in Beirut time
+  - isBeforeToday() checks if a given date is before today
+  - atBeirut() converts a time in minutes to a Date object in Beirut time
+  - hourInBeirut() returns the current hour in Beirut time
+  - todayInBeirut() returns the current date in Beirut time
+  - clinicDayRange() returns the open and close instants for one clinic day
+  - beirutInstant() converts a date string and hour and minute to a Date object in Beirut time
+
+2. Appointment rules: these functions determine the duration of each appointment type and the availability of each appointment type.
+  - appointmentDuration() returns the duration of an appointment type in minutes
+  - hourInBeirut() returns the current hour in Beirut time
+  - todayInBeirut() returns the current date in Beirut time
+  - clinicDayRange() returns the open and close instants for one clinic day
+  - beirutInstant() converts a date string and hour and minute to a Date object in Beirut time
+
+3. Availability calculations
+4. Conflict detection
+*/
+
+
+
 import type { Appointment, AppointmentType, BlockScope, ScheduleBlock, Species } from "../../../generated/prisma/client";
 
 const TIME_ZONE = "Asia/Beirut"; // must ensure appointment times correspond to the clinic’s local timezone, regardless of the server’s timezone (which may be in another timezone)
@@ -24,8 +57,8 @@ function clinicDate(date: string) {
     return { year, month, day, weekday: check.getUTCDay() };
 }
 
-function beirutParts(instant: Date) {
-    const parts = new Intl.DateTimeFormat("en-US", {
+function beirutParts(instant: Date) { // a JavaScript Date object represents an instant in time, not a specific timezone. beirutParts take that instant and and extracts its date and time components in Beirut time. It returns an object with the year, month, day, hour, minute, and second.
+    const parts = new Intl.DateTimeFormat("en-US", { // 
         timeZone: TIME_ZONE,
         hourCycle: "h23",
         year: "numeric",
@@ -64,11 +97,16 @@ function atBeirut(year: number, month: number, day: number, minutes: number) {
     return corrected === offset ? instant : new Date(guess.getTime() - corrected);
 }
 
-// Check-up, vaccination, treatment, and follow-up are 30 minutes. Grooming is always 2 hours.
+// A veterinary visit is 30 minutes however many services it includes. Grooming is 2 hours. An operation is 1 hour for a cat and 2 hours for a dog.
 export function appointmentDuration(type: AppointmentType, species: Species) {
     if (type === "GROOMING") return 120;
     if (type === "OPERATION") return species === "CAT" ? 60 : 120;
     return 30;
+}
+
+// hourInBeirut returns the current hour in Beirut time
+export function hourInBeirut(now = new Date()) { // now is a default parameter. If we call the function without an argument, now defaults to the current date and time
+    return beirutParts(now).hour; // beirutParts returns an object with the year, month, day, hour, minute, and second. We only need the hour, so we access it with .hour.
 }
 
 export function todayInBeirut(now = new Date()) {

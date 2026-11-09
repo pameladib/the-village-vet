@@ -3,22 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type MouseEvent } from "react";
-import type { AppointmentType } from "../../../../generated/prisma/client";
 import type { AppointmentWithPet } from "../../../lib/types/appointments";
+import { appointmentTypeLabels, formatVisitServices, groomingServiceLabels } from "@/lib/appointments/labels";
 import { cancelAppointment } from "@/lib/actions/appointment";
 import { petPhotoSrc } from "@/lib/storage/files";
-
-
-// appointmentTypeLabels is an object with keys and values used for converting appointment type enum values into user-friendly, readable labels
-// we access the value using its key: appointmentTypeLabels.CHECKUP; // "Checkup"
-const appointmentTypeLabels: Record<AppointmentType, string> = { // Record is a TS utility type 
-  CHECKUP: "Checkup",
-  VACCINATION: "Vaccination",
-  TREATMENT: "Treatment",
-  FOLLOW_UP: "Follow-up",
-  GROOMING: "Grooming",
-  OPERATION: "Operation",
-};
 
 function formatAppointmentDate(startAt: Date) {
   return new Intl.DateTimeFormat("en-US", {
@@ -76,6 +64,12 @@ export default function AppointmentCard({ appointment }: { appointment: Appointm
         <p className="mt-0.5 text-sm text-emerald-800 dark:text-emerald-300">
           {appointmentTypeLabels[appointment.type]}
         </p>
+        {appointment.type === "VETERINARY_VISIT" && appointment.services.length > 0 && (
+          <p className="mt-0.5 text-sm text-stone-600 dark:text-stone-300">{formatVisitServices(appointment.services)}</p>
+        )}
+        {appointment.type === "GROOMING" && appointment.groomingService && (
+          <p className="mt-0.5 text-sm text-stone-600 dark:text-stone-300">{groomingServiceLabels[appointment.groomingService]}</p>
+        )}
         <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400">
           {formatAppointmentDate(appointment.startAt)} · {formatAppointmentTime(appointment.startAt)} · {appointment.duration} min
         </p>
@@ -95,7 +89,7 @@ export default function AppointmentCard({ appointment }: { appointment: Appointm
           event.preventDefault();
           router.push(`/appointments/${appointment.id}/reschedule`);
         }}
-        className="shrink-0 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium text-stone-700 dark:border-stone-600 dark:text-stone-200"
+        className="shrink-0 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:border-emerald-800 hover:text-emerald-800 dark:border-stone-600 dark:text-stone-200 dark:hover:border-emerald-300 dark:hover:text-emerald-300"
       >
         Move
       </button>

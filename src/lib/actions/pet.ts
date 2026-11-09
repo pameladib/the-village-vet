@@ -277,7 +277,7 @@ export async function updatePet(id: string, data: PetForm) {
                     ...(treatments.removedIds.length > 0 ? [{ treatmentId: { in: treatments.removedIds } }] : []),
                 ];
                 if (reminderFilters.length > 0) {
-                    await tx.healthReminder.deleteMany({
+                    await tx.careReminder.deleteMany({
                         where: { petId: id, OR: reminderFilters },
                     });
                 }

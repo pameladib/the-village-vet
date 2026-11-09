@@ -1,13 +1,5 @@
+import { appointmentTypeLabels, formatVisitServices, groomingServiceLabels } from "@/lib/appointments/labels";
 import type { PetProfileData, ProfileAppointment } from "../PetProfile";
-
-const appointmentTypeLabels: Record<ProfileAppointment["type"], string> = {
-    CHECKUP: "Checkup",
-    VACCINATION: "Vaccination",
-    TREATMENT: "Treatment",
-    FOLLOW_UP: "Follow-up",
-    GROOMING: "Grooming",
-    OPERATION: "Operation",
-};
 
 function startTime(value: Date | string) {
     const date = value instanceof Date ? value : new Date(value);
@@ -37,6 +29,12 @@ function AppointmentCard({ appointment }: { appointment: ProfileAppointment }) {
             <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
                 {appointmentTypeLabels[appointment.type]}
             </p>
+            {appointment.type === "VETERINARY_VISIT" && appointment.services.length > 0 && (
+                <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{formatVisitServices(appointment.services)}</p>
+            )}
+            {appointment.type === "GROOMING" && appointment.groomingService && (
+                <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{groomingServiceLabels[appointment.groomingService]}</p>
+            )}
             <p className="mt-1 text-sm text-stone-900 dark:text-stone-50">
                 {formatAppointmentDate(appointment.startAt)} · {formatAppointmentTime(appointment.startAt)} · {appointment.duration} min
             </p>

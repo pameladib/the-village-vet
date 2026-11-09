@@ -1,11 +1,15 @@
 import Link from "next/link";
 import DueOverrideForm from "@/components/admin/DueOverrideForm";
 import NotificationList from "@/components/NotificationList";
+import { appointmentDetail } from "@/lib/appointments/labels";
 import type { Copy } from "@/lib/i18n";
+import type { AppointmentType, GroomingService, VisitService } from "../../../generated/prisma/client";
 
 type Visit = {
     id: string;
-    type: string;
+    type: AppointmentType;
+    services: VisitService[];
+    groomingService: GroomingService | null;
     startAt: Date;
     petName: string;
     ownerName: string;
@@ -150,7 +154,7 @@ function VisitList({ visits, empty }: { visits: Visit[]; empty: string }) {
         <ul className="mt-2 flex flex-col gap-2 text-sm">
             {visits.map((visit) => (
                 <li key={visit.id} className="rounded-xl border border-stone-200 px-3 py-2 dark:border-stone-700">
-                    <p className="font-medium">{visit.petName} · {visit.type}</p>
+                    <p className="font-medium">{visit.petName} · {appointmentDetail(visit.type, visit.services, visit.groomingService)}</p>
                     <p>{visit.ownerName} · {visit.phone}</p>
                     <p className="text-stone-500">{time.format(visit.startAt)}</p>
                     <Link href={`/appointments/${visit.id}/reschedule`} className="text-emerald-800 underline">Reschedule</Link>
