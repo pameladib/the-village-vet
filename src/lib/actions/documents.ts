@@ -17,19 +17,18 @@ import { createUploadUrl, readStoredPrefix, removeStoredObject, StorageNotConfig
 
 type Failure = { success: false; formErrors: string[] };
 
-async function veterinarian(petId: string): Promise<{ petId: string } | Failure> {
+async function editablePet(petId: string): Promise<{ petId: string } | Failure> {
     let session;
     try {
-        session = await requireRole(["ADMIN"]);
+        session = await requireRole(["ADMIN", "OWNER"]);
     } catch {
-        return { success: false, formErrors: ["Only the veterinarian can add documents."] };
-    }
-    if (!canUploadMedicalDocument(session.user.role)) {
-        return { success: false, formErrors: ["Only the veterinarian can add documents."] };
+        return { success: false, formErrors: ["You cannot add documents for this pet."] };
     }
     if (!z.uuid().safeParse(petId).success) return { success: false, formErrors: ["That pet was not found."] };
-    const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { id: true } });
-    if (!pet) return { success: false, formErrors: ["That pet was not found."] };
+    const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { id: true, ownerId: true } });
+    if (!pet || !canUploadMedicalDocument(session.user.role, session.user.id, pet.ownerId)) {
+        return { success: false, formErrors: ["You cannot add documents for this pet."] };
+    }
     return { petId: pet.id };
 }
 
@@ -40,7 +39,7 @@ function titleOf(value: string) {
 }
 
 export async function prepareMedicalDocumentUpload(petId: string, input: { title: string; contentType: string; size: number }) {
-    const allowed = await veterinarian(petId);
+    const allowed = await editablePet(petId);
     if ("success" in allowed) return allowed;
     const title = titleOf(input.title);
     if (!title) return { success: false as const, formErrors: ["Add a title and a PDF or image under 10 MB."] };
@@ -59,7 +58,7 @@ export async function prepareMedicalDocumentUpload(petId: string, input: { title
 }
 
 export async function confirmMedicalDocument(petId: string, input: { title: string; key: string; contentType: string }) {
-    const allowed = await veterinarian(petId);
+    const allowed = await editablePet(petId);
     if ("success" in allowed) return allowed;
     const title = titleOf(input.title);
     if (!title) return { success: false as const, formErrors: ["Add a title and a PDF or image under 10 MB."] };

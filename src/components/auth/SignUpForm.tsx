@@ -52,10 +52,13 @@ function signUpRequestMessage(error: { code?: string; message?: string }) {
     if (error.code === "USERNAME_TOO_LONG") return "Use 30 characters or fewer.";
     if (error.code === "INVALID_USERNAME") return "Use only letters, numbers, dots, and underscores.";
     if (error.code === "PASSWORD_TOO_SHORT") return "Use at least 8 characters.";
+    if (error.code === "PASSWORD_TOO_LONG") return "Use 128 characters or fewer.";
+    if (error.message && error.code) return `${error.message} (${error.code})`;
+    if (error.message) return error.message;
     return "We couldn't create your account. Check your details and try again.";
 }
 
-export default function SignInForm() {
+export default function SignUpForm() {
     const [form, setForm] = useState<SignUpFields>({
         name: "",
         username: "",
@@ -97,7 +100,7 @@ export default function SignInForm() {
                 setSubmitting(false);
             }
         } catch {
-            setFormError("We couldn't create your account. Check your details and try again.");
+            setFormError("The sign-up request did not finish. Try again.");
             setSubmitting(false);
         }
     }

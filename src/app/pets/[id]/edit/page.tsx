@@ -94,5 +94,5 @@ export default async function EditPetPage({
         previousHistory: textValue(petFields.previousHistory),
     };
 
-    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id} allowClinical={session.user.role === "ADMIN"} />;
+    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id} allowClinical />;
 }

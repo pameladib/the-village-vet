@@ -87,9 +87,10 @@ describe("photo and document access", () => {
     });
 
     it("keeps medical documents away from the assistant and from other owners", () => {
-        assert.equal(canUploadMedicalDocument("ADMIN"), true);
-        assert.equal(canUploadMedicalDocument("OWNER"), false);
-        assert.equal(canUploadMedicalDocument("SECONDARY_ADMIN"), false);
+        assert.equal(canUploadMedicalDocument("ADMIN", "vet", ownerId), true);
+        assert.equal(canUploadMedicalDocument("OWNER", ownerId, ownerId), true);
+        assert.equal(canUploadMedicalDocument("OWNER", otherOwner, ownerId), false);
+        assert.equal(canUploadMedicalDocument("SECONDARY_ADMIN", "assistant", ownerId), false);
         assert.equal(canDownloadMedicalDocument("ADMIN", "vet", ownerId), true);
         assert.equal(canDownloadMedicalDocument("OWNER", ownerId, ownerId), true);
         assert.equal(canDownloadMedicalDocument("OWNER", otherOwner, ownerId), false);

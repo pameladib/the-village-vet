@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getAvailableStarts, hourInBeirut } from "./availability.ts";
+import { careNoticeDay, getAvailableStarts, hourInBeirut } from "./availability.ts";
 
 const monday = "2027-01-04";
 const saturday = "2027-01-02";
@@ -30,6 +30,28 @@ describe("Beirut clock", () => {
         assert.equal(hourInBeirut(new Date("2027-07-15T05:00:00.000Z")), 8);
         assert.equal(hourInBeirut(new Date("2027-01-15T05:00:00.000Z")), 7);
         assert.equal(hourInBeirut(new Date("2027-07-15T06:00:00.000Z")), 9);
+    });
+});
+
+describe("care notice days", () => {
+    const dueAt = new Date("2027-01-15T00:00:00.000Z");
+
+    it("notifies on the due date at 8:00 Beirut in winter", () => {
+        assert.equal(careNoticeDay(dueAt, new Date("2027-01-15T06:00:00.000Z")), "due");
+    });
+
+    it("stays quiet on the days between the two notices", () => {
+        assert.equal(careNoticeDay(dueAt, new Date("2027-01-16T06:00:00.000Z")), null);
+    });
+
+    it("notifies again seven calendar days later and not on the day after that", () => {
+        assert.equal(careNoticeDay(dueAt, new Date("2027-01-22T06:00:00.000Z")), "plus7");
+        assert.equal(careNoticeDay(dueAt, new Date("2027-01-23T06:00:00.000Z")), null);
+    });
+
+    it("notifies on the due date at 8:00 Beirut in summer", () => {
+        const summerDue = new Date("2027-07-15T00:00:00.000Z");
+        assert.equal(careNoticeDay(summerDue, new Date("2027-07-15T05:00:00.000Z")), "due");
     });
 });
 

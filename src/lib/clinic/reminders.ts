@@ -1,10 +1,7 @@
-import type { Prisma, Species } from "../../../generated/prisma/client";
+import type { PrismaClient, Species } from "../../../generated/prisma/client";
 import { nextVaccineDue } from "./vaccines";
 
-type ReminderDb = {
-    vaccination: Prisma.TransactionClient["vaccination"];
-    careReminder: Prisma.TransactionClient["careReminder"];
-};
+type ReminderDb = Pick<PrismaClient, "vaccination" | "careReminder">;
 
 // Keeps one open vaccination reminder for the latest recorded dose. Deworming and flea dates are entered by the vet, not guessed.
 export async function syncVaccineReminder(db: ReminderDb, petId: string, species: Species) {

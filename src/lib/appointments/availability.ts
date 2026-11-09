@@ -109,11 +109,30 @@ export function hourInBeirut(now = new Date()) { // now is a default parameter. 
     return beirutParts(now).hour; // beirutParts returns an object with the year, month, day, hour, minute, and second. We only need the hour, so we access it with .hour.
 }
 
+export function calendarDateInBeirut(instant: Date) {
+    const parts = beirutParts(instant);
+    const month = String(parts.month).padStart(2, "0");
+    const day = String(parts.day).padStart(2, "0");
+    return `${parts.year}-${month}-${day}`;
+}
+
 export function todayInBeirut(now = new Date()) {
-    const today = beirutParts(now);
-    const month = String(today.month).padStart(2, "0");
-    const day = String(today.day).padStart(2, "0");
-    return `${today.year}-${month}-${day}`;
+    return calendarDateInBeirut(now);
+}
+
+function addCalendarDays(date: string, days: number) {
+    const [year, month, day] = date.split("-").map(Number);
+    const next = new Date(Date.UTC(year, month - 1, day + days));
+    return next.toISOString().slice(0, 10);
+}
+
+// "due" on the due date and "plus7" seven calendar days later. Any other day, including the days after a missed notice, returns null.
+export function careNoticeDay(dueAt: Date, now: Date) {
+    const today = todayInBeirut(now);
+    const dueDay = calendarDateInBeirut(dueAt);
+    if (dueDay === today) return "due" as const;
+    if (dueDay === addCalendarDays(today, -7)) return "plus7" as const;
+    return null;
 }
 
 // Open and close instants for one clinic day. Sunday has no range.

@@ -70,8 +70,7 @@ export default async function PetProfilePage({
     <PetProfile
       pet={profilePet}
       documents={documents}
-      canUpload={session.user.role === "ADMIN"}
-      canEditClinical={session.user.role === "ADMIN"}
+      canUpload
     />
   );
 }

@@ -109,39 +109,33 @@ export async function createPet(data: PetForm) {
                 estimatedAgeAt: result.data.estimatedAge != null ? new Date() : null,
                 lifestyle: result.data.lifestyle || null,
                 ownerId: session.user.id,
-                ...(session.user.role === "ADMIN"
-                    ? {
-                        spayedNeutered: result.data.spayedNeutered ?? null,
-                        spayedNeuteredAt:
-                            result.data.spayedNeutered === "YES" && result.data.spayedNeuteredAt
-                                ? new Date(result.data.spayedNeuteredAt)
-                                : null,
-                        allergies: result.data.allergies || null,
-                        medicalConditions: result.data.medicalConditions || null,
-                        medications: result.data.medications || null,
-                        diet: result.data.diet || null,
-                        previousHistory: result.data.previousHistory || null,
-                        vaccinations: {
-                            create: result.data.vaccinations.map((vaccination) => ({
-                                type: vaccination.type,
-                                administeredAt: vaccination.administeredAt ? new Date(vaccination.administeredAt) : null,
-                            })),
-                        },
-                        treatments: {
-                            create: result.data.treatments.map((treatment) => ({
-                                type: treatment.type,
-                                administeredAt: treatment.administeredAt ? new Date(treatment.administeredAt) : null,
-                            })),
-                        },
-                        ...(weightGrams != null ? { weightRecords: { create: { weightGrams } } } : {}),
-                    }
-                    : {}),
+                spayedNeutered: result.data.spayedNeutered ?? null,
+                spayedNeuteredAt:
+                    result.data.spayedNeutered === "YES" && result.data.spayedNeuteredAt
+                        ? new Date(result.data.spayedNeuteredAt)
+                        : null,
+                allergies: result.data.allergies || null,
+                medicalConditions: result.data.medicalConditions || null,
+                medications: result.data.medications || null,
+                diet: result.data.diet || null,
+                previousHistory: result.data.previousHistory || null,
+                vaccinations: {
+                    create: result.data.vaccinations.map((vaccination) => ({
+                        type: vaccination.type,
+                        administeredAt: vaccination.administeredAt ? new Date(vaccination.administeredAt) : null,
+                    })),
+                },
+                treatments: {
+                    create: result.data.treatments.map((treatment) => ({
+                        type: treatment.type,
+                        administeredAt: treatment.administeredAt ? new Date(treatment.administeredAt) : null,
+                    })),
+                },
+                ...(weightGrams != null ? { weightRecords: { create: { weightGrams } } } : {}),
             },
         });
 
-        if (session.user.role === "ADMIN") {
-            await syncVaccineReminder(prisma, created.id, result.data.species);
-        }
+        await syncVaccineReminder(prisma, created.id, result.data.species);
 
         return { success: true, id: created.id };
     } catch {
@@ -197,9 +191,9 @@ export async function updatePet(id: string, data: PetForm) {
                 : Math.round(result.data.currentWeight)
             : null;
 
-    const clinical = session.user.role === "ADMIN";
+    const isAdmin = session.user.role === "ADMIN";
     const existing = await prisma.pet.findFirst({
-        where: clinical ? { id } : { id, ownerId: session.user.id },
+        where: isAdmin ? { id } : { id, ownerId: session.user.id },
         select: {
             photoUrl: true,
             species: true,
@@ -237,28 +231,24 @@ export async function updatePet(id: string, data: PetForm) {
     async function savePet(photoUrl: string | null | undefined) {
         await prisma.$transaction(async (tx) => {
             const updated = await tx.pet.updateMany({
-                where: clinical ? { id } : { id, ownerId: session.user.id },
+                where: isAdmin ? { id } : { id, ownerId: session.user.id },
                 data: {
                     name: form.name,
-                    ...(clinical
-                        ? {
-                            species: form.species,
-                            sex: form.sex,
-                            color: form.color || null,
-                            breed: form.breed || null,
-                            lifestyle: form.lifestyle || null,
-                            spayedNeutered: form.spayedNeutered ?? null,
-                            spayedNeuteredAt:
-                                form.spayedNeutered === "YES" && form.spayedNeuteredAt
-                                    ? new Date(form.spayedNeuteredAt)
-                                    : null,
-                            allergies: form.allergies || null,
-                            medicalConditions: form.medicalConditions || null,
-                            medications: form.medications || null,
-                            diet: form.diet || null,
-                            previousHistory: form.previousHistory || null,
-                        }
-                        : {}),
+                    species: form.species,
+                    sex: form.sex,
+                    color: form.color || null,
+                    breed: form.breed || null,
+                    lifestyle: form.lifestyle || null,
+                    spayedNeutered: form.spayedNeutered ?? null,
+                    spayedNeuteredAt:
+                        form.spayedNeutered === "YES" && form.spayedNeuteredAt
+                            ? new Date(form.spayedNeuteredAt)
+                            : null,
+                    allergies: form.allergies || null,
+                    medicalConditions: form.medicalConditions || null,
+                    medications: form.medications || null,
+                    diet: form.diet || null,
+                    previousHistory: form.previousHistory || null,
                     dateOfBirth: form.dateOfBirth ? new Date(form.dateOfBirth) : null,
                     estimatedAgeValue: estimatedAge,
                     estimatedAgeUnit,
@@ -271,62 +261,60 @@ export async function updatePet(id: string, data: PetForm) {
                 throw new Error("Pet not found");
             }
 
-            if (clinical) {
-                const reminderFilters = [
-                    ...(vaccinations.removedIds.length > 0 ? [{ vaccinationId: { in: vaccinations.removedIds } }] : []),
-                    ...(treatments.removedIds.length > 0 ? [{ treatmentId: { in: treatments.removedIds } }] : []),
-                ];
-                if (reminderFilters.length > 0) {
-                    await tx.careReminder.deleteMany({
-                        where: { petId: id, OR: reminderFilters },
-                    });
-                }
-
-                if (vaccinations.removedIds.length > 0) {
-                    await tx.vaccination.deleteMany({ where: { id: { in: vaccinations.removedIds } } });
-                }
-                if (treatments.removedIds.length > 0) {
-                    await tx.treatment.deleteMany({ where: { id: { in: treatments.removedIds } } });
-                }
-
-                if (vaccinations.toCreate.length > 0) {
-                    await tx.vaccination.createMany({
-                        data: vaccinations.toCreate.map((vaccination) => ({
-                            petId: id,
-                            type: vaccination.type as "FIRST" | "SECOND" | "THIRD" | "ANNUAL",
-                            administeredAt: vaccination.administeredAt,
-                        })),
-                    });
-                }
-
-                if (treatments.toCreate.length > 0) {
-                    await tx.treatment.createMany({
-                        data: treatments.toCreate.map((treatment) => ({
-                            petId: id,
-                            type: treatment.type as "DEWORMING" | "FLEA_TICK",
-                            administeredAt: treatment.administeredAt,
-                        })),
-                    });
-                }
-
-                const latestWeight = currentPet.weightRecords[0]?.weightGrams;
-                if (
-                    weightGrams != null &&
-                    (latestWeight == null || weightGrams !== gramsShownInForm(latestWeight))
-                ) {
-                    await tx.weightRecord.create({
-                        data: { petId: id, weightGrams },
-                    });
-                }
+            const reminderFilters = [
+                ...(vaccinations.removedIds.length > 0 ? [{ vaccinationId: { in: vaccinations.removedIds } }] : []),
+                ...(treatments.removedIds.length > 0 ? [{ treatmentId: { in: treatments.removedIds } }] : []),
+            ];
+            if (reminderFilters.length > 0) {
+                await tx.careReminder.deleteMany({
+                    where: { petId: id, OR: reminderFilters },
+                });
             }
 
-            await syncVaccineReminder(tx, id, form.species);
+            if (vaccinations.removedIds.length > 0) {
+                await tx.vaccination.deleteMany({ where: { id: { in: vaccinations.removedIds } } });
+            }
+            if (treatments.removedIds.length > 0) {
+                await tx.treatment.deleteMany({ where: { id: { in: treatments.removedIds } } });
+            }
+
+            if (vaccinations.toCreate.length > 0) {
+                await tx.vaccination.createMany({
+                    data: vaccinations.toCreate.map((vaccination) => ({
+                        petId: id,
+                        type: vaccination.type as "FIRST" | "SECOND" | "THIRD" | "ANNUAL",
+                        administeredAt: vaccination.administeredAt,
+                    })),
+                });
+            }
+
+            if (treatments.toCreate.length > 0) {
+                await tx.treatment.createMany({
+                    data: treatments.toCreate.map((treatment) => ({
+                        petId: id,
+                        type: treatment.type as "DEWORMING" | "FLEA_TICK",
+                        administeredAt: treatment.administeredAt,
+                    })),
+                });
+            }
+
+            const latestWeight = currentPet.weightRecords[0]?.weightGrams;
+            if (
+                weightGrams != null &&
+                (latestWeight == null || weightGrams !== gramsShownInForm(latestWeight))
+            ) {
+                await tx.weightRecord.create({
+                    data: { petId: id, weightGrams },
+                });
+            }
         });
     }
 
     try {
         await savePet(result.data.removePhoto ? null : undefined);
         if (result.data.removePhoto) await discardPhoto(existing.photoUrl).catch(() => undefined);
+        // The pet is already saved. A failed reminder must not undo that save. The next save rebuilds it.
+        await syncVaccineReminder(prisma, id, form.species).catch(() => undefined);
 
         return { success: true, id };
     } catch {

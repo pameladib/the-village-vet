@@ -1,4 +1,5 @@
-// Clinical records stay with the veterinarian. The assistant can run the diary and the shop.
+// The clinic-wide care list stays with the veterinarian. The assistant can run the diary and the shop.
+// An owner manages medical information for their own pets on the pet pages.
 export function canSeeClinicalRecords(role: string) {
     return role === "ADMIN";
 }
@@ -21,8 +22,9 @@ export function canViewPetPhoto(role: string, userId: string, ownerId: string) {
     return role === "OWNER" && userId === ownerId;
 }
 
-export function canUploadMedicalDocument(role: string) {
-    return role === "ADMIN";
+export function canUploadMedicalDocument(role: string, userId: string, ownerId: string) {
+    if (role === "ADMIN") return true;
+    return role === "OWNER" && userId === ownerId;
 }
 
 export function canDownloadMedicalDocument(role: string, userId: string, ownerId: string) {

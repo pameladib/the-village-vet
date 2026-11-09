@@ -1,4 +1,3 @@
-import TreatmentDueForm from "@/components/pets/TreatmentDueForm";
 import type { PetProfileData, ProfileTreatment, ProfileVaccination } from "../PetProfile";
 
 const vaccinationLabels: Record<ProfileVaccination["type"], string> = {
@@ -76,7 +75,7 @@ function EmptyRecord({ children }: { children: string }) {
     );
 }
 
-export default function VaccinationsTab({ pet, canEditClinical }: { pet: PetProfileData; canEditClinical?: boolean }) {
+export default function VaccinationsTab({ pet }: { pet: PetProfileData }) {
     const vaccinations = [...pet.vaccinations]
         .sort(byNewestGivenDate)
         .map((vaccination) => ({ ...vaccination, type: vaccinationLabels[vaccination.type] }));
@@ -93,10 +92,7 @@ export default function VaccinationsTab({ pet, canEditClinical }: { pet: PetProf
                 {treatments.length === 0 ? <EmptyRecord>No treatments yet</EmptyRecord> : (
                     <div className="flex flex-col gap-3">
                         {treatments.map((treatment) => (
-                            <div key={treatment.id}>
-                                <RecordTable rows={[{ id: treatment.id, type: treatmentLabels[treatment.type], administeredAt: treatment.administeredAt }]} />
-                                {canEditClinical && <TreatmentDueForm petId={pet.id} treatmentId={treatment.id} />}
-                            </div>
+                            <RecordTable key={treatment.id} rows={[{ id: treatment.id, type: treatmentLabels[treatment.type], administeredAt: treatment.administeredAt }]} />
                         ))}
                     </div>
                 )}

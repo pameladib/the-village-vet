@@ -25,5 +25,5 @@ export default async function NewPetPage() {
   const isFirstPet = petCount === 0; // to display different headers based on whether this is the user's first pet or not
   const ownerName = session.user.name.trim().split(/\s+/)[0]; // getting the first name of the user to display a welcome message
 
-  return <NewPetForm isFirstPet={isFirstPet} ownerName={ownerName} />;
+  return <NewPetForm isFirstPet={isFirstPet} ownerName={ownerName} allowClinical />;
 }

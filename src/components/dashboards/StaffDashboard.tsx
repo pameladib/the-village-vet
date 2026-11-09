@@ -1,5 +1,4 @@
 import Link from "next/link";
-import DueOverrideForm from "@/components/admin/DueOverrideForm";
 import NotificationList from "@/components/NotificationList";
 import { appointmentDetail } from "@/lib/appointments/labels";
 import type { Copy } from "@/lib/i18n";
@@ -129,7 +128,6 @@ export default function StaffDashboard({
                                 <p className={reminder.dueAt.getTime() < now ? "text-red-700" : "text-stone-500"}>
                                     {reminder.dueAt.getTime() < now ? copy.overdue : copy.due} {time.format(reminder.dueAt)}
                                 </p>
-                                <DueOverrideForm reminderId={reminder.id} />
                             </li>
                         ))}
                         {reminders.length === 0 && <li>{copy.noCare}</li>}

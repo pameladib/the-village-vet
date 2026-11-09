@@ -44,7 +44,7 @@ export type PetProfileData = Omit<Pet, "estimatedAgeValue"> & { // keep every ot
     appointments: ProfileAppointment[];
 };
 
-export default function PetProfile({ pet, documents = [], canUpload = false, canEditClinical = false }: { pet: PetProfileData; documents?: { id: string; title: string }[]; canUpload?: boolean; canEditClinical?: boolean }) {
+export default function PetProfile({ pet, documents = [], canUpload = false }: { pet: PetProfileData; documents?: { id: string; title: string }[]; canUpload?: boolean }) {
     const [activeTab, setActiveTab] = useState("general");
 
     const tabs = [ // this array lets us define the tabs once and generate the buttons dynamically instead of writing four buttons manually
@@ -122,7 +122,7 @@ export default function PetProfile({ pet, documents = [], canUpload = false, can
                 <div className="mt-3">
                     {activeTab === "general" && <GeneralTab pet={pet} />}
                     {activeTab === "appointments" && <AppointmentsTab pet={pet} />}
-                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} canEditClinical={canEditClinical} />}
+                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} />}
                     {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload} />}
                 </div>
             </div>

@@ -6,7 +6,7 @@
 // hourInBeirut() returns the current hour in Beirut time
 // todayInBeirut() returns the current date in Beirut time as a YYYY-MM-DD string
 
-import { beirutInstant, hourInBeirut, todayInBeirut } from "@/lib/appointments/availability";
+import { beirutInstant, careNoticeDay, hourInBeirut, todayInBeirut } from "@/lib/appointments/availability";
 import { notify } from "@/lib/notifications"; // notify creates a new notification record in the database
 import { prisma } from "@/lib/prisma"; // prisma is the database client, which allows us to query the database
 
@@ -83,20 +83,43 @@ export async function GET(request: Request) {
         Dedupe key: appt-tomorrow:123 */
     }
 
-    const dayAhead = new Date(now.getTime() + 24 * 60 * 60_000); // calculates 24 hours from the current instant
-    const due = await prisma.careReminder.findMany({
-        where: { completedAt: null, dueAt: { lte: dayAhead } },
-        select: { id: true, dueAt: true, pet: { select: { name: true, ownerId: true } } },
+    // Open reminders whose due instant is already before tomorrow. careNoticeDay keeps only the due date and the date seven days later.
+    const open = await prisma.careReminder.findMany({
+        where: { completedAt: null, dueAt: { lt: tomorrowStart } },
+        select: {
+            id: true,
+            kind: true,
+            dueAt: true,
+            petId: true,
+            pet: { select: { name: true, ownerId: true } },
+        },
     });
+    const due = open.flatMap((reminder) => {
+        const when = careNoticeDay(reminder.dueAt, now);
+        return when ? [{ ...reminder, when }] : [];
+    });
+
+    // A booked visit that lists the same service suppresses today's notice. A missed day is not sent later.
+    const booked = due.length === 0 ? [] : await prisma.appointment.findMany({
+        where: { status: "BOOKED", petId: { in: [...new Set(due.map((reminder) => reminder.petId))] } },
+        select: { petId: true, services: true },
+    });
+    const covered = new Set(booked.flatMap((appointment) =>
+        appointment.services.map((service) => `${appointment.petId}:${service}`),
+    ));
+
+    let reminderCount = 0;
     for (const reminder of due) {
-        const overdue = reminder.dueAt <= now;
+        if (covered.has(`${reminder.petId}:${reminder.kind}`)) continue;
+        reminderCount += 1;
+        const followUp = reminder.when === "plus7";
         await notify(
             reminder.pet.ownerId,
-            overdue ? "Care is overdue" : "Care is due tomorrow",
+            followUp ? "Care is still due" : "Care is due today",
             `${reminder.pet.name} has a vaccination or treatment to book.`,
-            `care:${reminder.id}:${overdue ? "overdue" : "soon"}`,
+            `care:${reminder.id}:${followUp ? "plus7" : "due"}`,
         );
     }
 
-    return Response.json({ skipped: false, today: todayCount, tomorrow: tomorrowCount, reminders: due.length }); // returning a 200 OK response with the number of today and tomorrow appointments and the number of care reminders
+    return Response.json({ skipped: false, today: todayCount, tomorrow: tomorrowCount, reminders: reminderCount }); // returning a 200 OK response with the number of today and tomorrow appointments and the number of care reminders
 }
