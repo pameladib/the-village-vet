@@ -9,7 +9,7 @@ Phase 1: Authentication & User Management
 * Admin account setup and management
 * Sign-out and session handling
 
-Access rules:
+Access rules: 
 
 * Admin: Full access to the application, including medical records.
 * Secondary Admin: Can manage appointments and the pet shop, and view client contact information, but cannot access medical records.
@@ -164,7 +164,7 @@ Phase 8: Notifications
 
 * Notify owners about appointment bookings
 * Notify owners about appointment cancellations and rescheduling
-* Send appointment reminders approximately two hours before the appointment
+* Send appointment reminders approximately one day prior and on the day of the appointment
 * Send health reminders ahead of vaccination or treatment due dates
 * Notify admins about new bookings
 * Notify admins about cancellations and rescheduling

@@ -6,6 +6,7 @@ import { saveClinicSettings } from "@/lib/actions/clinic";
 export default function ClinicSettingsForm({
     phone,
     whatsapp,
+    email,
     address,
     mapsUrl,
     emergencyPhone,
@@ -13,6 +14,7 @@ export default function ClinicSettingsForm({
 }: {
     phone: string;
     whatsapp: string;
+    email: string;
     address: string;
     mapsUrl: string;
     emergencyPhone: string;
@@ -29,6 +31,7 @@ export default function ClinicSettingsForm({
                 const result = await saveClinicSettings({
                     phone: String(form.get("phone") ?? ""),
                     whatsapp: String(form.get("whatsapp") ?? ""),
+                    email: String(form.get("email") ?? ""),
                     address: String(form.get("address") ?? ""),
                     mapsUrl: String(form.get("mapsUrl") ?? ""),
                     emergencyPhone: String(form.get("emergencyPhone") ?? ""),
@@ -39,6 +42,7 @@ export default function ClinicSettingsForm({
         >
             <input name="phone" defaultValue={phone} placeholder="Phone" className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
             <input name="whatsapp" defaultValue={whatsapp} placeholder="WhatsApp" className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
+            <input name="email" type="email" defaultValue={email} placeholder="Email" className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
             <input name="address" defaultValue={address} placeholder="Address" className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
             <input name="mapsUrl" defaultValue={mapsUrl} placeholder="https://maps.google.com/..." className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
             <input name="emergencyPhone" defaultValue={emergencyPhone} placeholder="Emergency phone, if the clinic has one" className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />

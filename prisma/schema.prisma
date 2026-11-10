@@ -363,6 +363,7 @@ model ClinicSetting {
   id             String  @id @default("clinic")
   phone          String?
   whatsapp       String?
+  email          String?
   address        String?
   mapsUrl        String?
   // Left empty until the clinic provides an after-hours emergency number. The app must not invent one.

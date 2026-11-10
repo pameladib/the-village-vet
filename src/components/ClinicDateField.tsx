@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { intlLocale } from "@/lib/intl-locale";
+import type { Copy, Locale } from "@/lib/i18n";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -22,10 +24,14 @@ export default function ClinicDateField({
     value,
     min,
     onChange,
+    locale = "en",
+    copy,
 }: {
     value: string;
     min: string;
     onChange: (date: string) => void;
+    locale?: Locale;
+    copy?: Copy;
 }) {
     const start = parseIso(value || min);
     const [visible, setVisible] = useState({ year: start.year, month: start.month });
@@ -34,11 +40,15 @@ export default function ClinicDateField({
     const firstWeekday = new Date(Date.UTC(visible.year, visible.month - 1, 1)).getUTCDay();
     const leading = (firstWeekday + 6) % 7;
     const daysInMonth = new Date(Date.UTC(visible.year, visible.month, 0)).getUTCDate();
-    const monthLabel = new Intl.DateTimeFormat("en-GB", {
+    const monthLabel = new Intl.DateTimeFormat(intlLocale(locale), {
         month: "long",
         year: "numeric",
         timeZone: "UTC",
     }).format(new Date(Date.UTC(visible.year, visible.month - 1, 1)));
+    const dayNumber = new Intl.NumberFormat(intlLocale(locale), { useGrouping: false });
+    const weekdays = copy
+        ? [copy.weekdayMon, copy.weekdayTue, copy.weekdayWed, copy.weekdayThu, copy.weekdayFri, copy.weekdaySat, copy.weekdaySun]
+        : WEEKDAYS;
 
     function shiftMonth(delta: number) {
         const next = new Date(Date.UTC(visible.year, visible.month - 1 + delta, 1));
@@ -55,23 +65,23 @@ export default function ClinicDateField({
                     type="button"
                     onClick={() => shiftMonth(-1)}
                     disabled={atMinMonth}
-                    aria-label="Previous month"
+                    aria-label={copy?.calPrev ?? "Previous month"}
                     className="rounded-lg p-1.5 text-emerald-800 hover:bg-emerald-50 disabled:opacity-30 dark:text-emerald-200 dark:hover:bg-emerald-950"
                 >
-                    <ChevronLeft className="size-4" strokeWidth={1.5} />
+                    <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
                 </button>
                 <p className="text-sm font-medium text-emerald-950 dark:text-emerald-50">{monthLabel}</p>
                 <button
                     type="button"
                     onClick={() => shiftMonth(1)}
-                    aria-label="Next month"
+                    aria-label={copy?.calNext ?? "Next month"}
                     className="rounded-lg p-1.5 text-emerald-800 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-950"
                 >
-                    <ChevronRight className="size-4" strokeWidth={1.5} />
+                    <ChevronRight className="size-4 rtl:rotate-180" strokeWidth={1.5} />
                 </button>
             </div>
             <div className="mt-3 grid grid-cols-7 text-center text-xs font-medium text-emerald-800 dark:text-emerald-200">
-                {WEEKDAYS.map((day) => (
+                {weekdays.map((day) => (
                     <span key={day}>{day}</span>
                 ))}
             </div>
@@ -92,7 +102,7 @@ export default function ClinicDateField({
                             type="button"
                             disabled={disabled}
                             onClick={() => onChange(iso)}
-                            aria-label={closed ? `${iso}, clinic closed` : iso}
+                            aria-label={closed ? `${iso}, ${copy?.calClosed ?? "clinic closed"}` : iso}
                             className={`rounded-lg py-1.5 text-sm ${
                                 selected
                                     ? "bg-emerald-800 font-medium text-white"
@@ -103,7 +113,7 @@ export default function ClinicDateField({
                                         : "text-emerald-950 hover:bg-emerald-100 dark:text-emerald-50 dark:hover:bg-emerald-950"
                             }`}
                         >
-                            {day}
+                            {dayNumber.format(day)}
                         </button>
                     );
                 })}

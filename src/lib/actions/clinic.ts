@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth/session";
 const settingsSchema = z.object({
     phone: z.string().trim().max(40).optional(),
     whatsapp: z.string().trim().max(40).optional(),
+    email: z.string().trim().max(200).optional(),
     address: z.string().trim().max(300).optional(),
     mapsUrl: z.string().trim().max(500).optional(),
     emergencyPhone: z.string().trim().max(40).optional(),
@@ -30,12 +31,17 @@ export async function saveClinicSettings(input: unknown) {
     if (parsed.data.mapsUrl && !parsed.data.mapsUrl.startsWith("https://")) {
         return { success: false as const, formErrors: ["The map link must start with https://."] };
     }
+    const email = emptyToNull(parsed.data.email);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { success: false as const, formErrors: ["Enter a valid email address."] };
+    }
 
     await prisma.clinicSetting.upsert({
         where: { id: "clinic" },
         update: {
             phone: emptyToNull(parsed.data.phone),
             whatsapp: emptyToNull(parsed.data.whatsapp),
+            email,
             address: emptyToNull(parsed.data.address),
             mapsUrl: emptyToNull(parsed.data.mapsUrl),
             emergencyPhone: emptyToNull(parsed.data.emergencyPhone),
@@ -45,6 +51,7 @@ export async function saveClinicSettings(input: unknown) {
             id: "clinic",
             phone: emptyToNull(parsed.data.phone),
             whatsapp: emptyToNull(parsed.data.whatsapp),
+            email,
             address: emptyToNull(parsed.data.address),
             mapsUrl: emptyToNull(parsed.data.mapsUrl),
             emergencyPhone: emptyToNull(parsed.data.emergencyPhone),
@@ -52,6 +59,6 @@ export async function saveClinicSettings(input: unknown) {
         },
     });
 
-    revalidatePath("/clinic");
+    revalidatePath("/", "layout");
     return { success: true as const };
 }

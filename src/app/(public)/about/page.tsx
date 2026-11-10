@@ -1,0 +1,29 @@
+import Image from "next/image";
+import { clinicVisitPhoto } from "@/components/public/photos";
+import { getClinicSettings } from "@/lib/clinic/public";
+import { getLocale, messages } from "@/lib/i18n";
+
+export default async function AboutPage() {
+    const copy = messages(await getLocale());
+    const settings = await getClinicSettings();
+    const about = settings?.about?.trim();
+
+    return (
+        <main className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-2 lg:py-24">
+            <div className="max-w-xl">
+                <h1 className="text-5xl text-emerald-950">{copy.aboutHeading}</h1>
+                <p className="mt-6 text-lg leading-8 text-stone-700">{about || copy.aboutLead}</p>
+                {!about && <p className="mt-4 text-base leading-7 text-stone-600">{copy.aboutBodyLong}</p>}
+            </div>
+            <div className="relative min-h-[24rem] overflow-hidden rounded-2xl bg-stone-100">
+                <Image
+                    src={clinicVisitPhoto}
+                    alt="A veterinarian in a white coat holding a cat in a bright room."
+                    fill
+                    sizes="(min-width: 1024px) 40vw, 100vw"
+                    className="object-cover"
+                />
+            </div>
+        </main>
+    );
+}

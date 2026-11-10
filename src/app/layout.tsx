@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Sans_Arabic } from "next/font/google";
-import SiteHeader from "@/components/SiteHeader";
-import { getLocale, messages } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,9 +23,8 @@ export const metadata: Metadata = {
   description: "Appointments, pet records, and the clinic shop.",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
-  const copy = messages(locale);
 
   return (
     <html
@@ -34,8 +32,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={`${geistSans.variable} ${geistMono.variable} ${arabic.variable} h-full antialiased`}
     >
-      <body className={`min-h-full flex flex-col ${locale === "ar" ? "font-[family-name:var(--font-arabic)]" : ""}`}>
-        <SiteHeader copy={copy} locale={locale} />
+      <body className={`flex min-h-full flex-col ${locale === "ar" ? "font-[family-name:var(--font-arabic)]" : ""}`}>
         {children}
       </body>
     </html>

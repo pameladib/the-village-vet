@@ -9,7 +9,7 @@ export default function SiteHeader({ copy, locale }: { copy: Copy; locale: Local
                 {copy.clinicName}
             </Link>
             <nav className="flex flex-wrap items-center gap-3 text-sm text-emerald-900 dark:text-emerald-100">
-                <Link href="/clinic">{copy.clinic}</Link>
+                <Link href="/find-us">{copy.clinic}</Link>
                 <Link href="/shop">{copy.shop}</Link>
                 <Link href="/dashboard">{copy.dashboard}</Link>
                 <LocaleSwitch locale={locale} label={copy.language} />

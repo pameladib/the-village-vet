@@ -4,6 +4,8 @@ import { useState } from "react";
 import { authClient } from "@/lib/auth/auth-client";
 import type { SuccessContext } from "@better-fetch/fetch";
 import { useRouter } from "next/navigation";
+import LocaleSwitch from "@/components/LocaleSwitch";
+import type { Copy, Locale } from "@/lib/i18n";
 
 const inputClassName =
     "w-full min-w-0 rounded-lg border bg-white px-3 py-2.5 text-sm text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 dark:bg-stone-950 dark:text-stone-50";
@@ -21,28 +23,28 @@ type LogInFields = {
     password: string;
 };
 
-function logInFieldErrors(form: LogInFields) {
+function logInFieldErrors(form: LogInFields, copy: Copy) {
     const errors: Partial<LogInFields> = {};
     const username = form.username.trim();
 
-    if (!username) errors.username = "Enter your username.";
-    else if (username.length < 3) errors.username = "Use at least 3 characters.";
-    else if (username.length > 30) errors.username = "Use 30 characters or fewer.";
-    else if (!/^[a-zA-Z0-9_.]+$/.test(username)) errors.username = "Use only letters, numbers, dots, and underscores.";
-    if (!form.password.trim()) errors.password = "Enter your password.";
+    if (!username) errors.username = copy.errUsernameRequired;
+    else if (username.length < 3) errors.username = copy.errUsernameShort;
+    else if (username.length > 30) errors.username = copy.errUsernameLong;
+    else if (!/^[a-zA-Z0-9_.]+$/.test(username)) errors.username = copy.errUsernameChars;
+    if (!form.password.trim()) errors.password = copy.errPasswordRequired;
 
     return errors;
 }
 
-function logInRequestMessage(error: { code?: string }) {
-    if (error.code === "INVALID_USERNAME_OR_PASSWORD") return "That username and password don't match.";
-    if (error.code === "USERNAME_TOO_SHORT") return "Use at least 3 characters.";
-    if (error.code === "USERNAME_TOO_LONG") return "Use 30 characters or fewer.";
-    if (error.code === "INVALID_USERNAME") return "Use only letters, numbers, dots, and underscores.";
-    return "We couldn't log you in. Try again.";
+function logInRequestMessage(error: { code?: string }, copy: Copy) {
+    if (error.code === "INVALID_USERNAME_OR_PASSWORD") return copy.errLoginMismatch;
+    if (error.code === "USERNAME_TOO_SHORT") return copy.errUsernameShort;
+    if (error.code === "USERNAME_TOO_LONG") return copy.errUsernameLong;
+    if (error.code === "INVALID_USERNAME") return copy.errUsernameChars;
+    return copy.errLoginFailed;
 }
 
-export default function LogInForm() {
+export default function LogInForm({ nextPath = "/dashboard", copy, locale }: { nextPath?: string; copy: Copy; locale: Locale }) {
     const [form, setForm] = useState<LogInFields>({
         username: "",
         password: ""
@@ -55,7 +57,7 @@ export default function LogInForm() {
     async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
         e.preventDefault();
 
-        const nextFieldErrors = logInFieldErrors(form);
+        const nextFieldErrors = logInFieldErrors(form, copy);
         setFieldErrors(nextFieldErrors);
         setFormError(null);
         if (Object.keys(nextFieldErrors).length > 0) return;
@@ -68,16 +70,16 @@ export default function LogInForm() {
                 password: form.password
             }, {
                 onSuccess: (_ctx: SuccessContext) => {
-                    router.push("/dashboard");
+                    router.push(nextPath);
                 }
             });
 
             if (error) {
-                setFormError(logInRequestMessage(error));
+                setFormError(logInRequestMessage(error, copy));
                 setSubmitting(false);
             }
         } catch {
-            setFormError("We couldn't log you in. Try again.");
+            setFormError(copy.errLoginFailed);
             setSubmitting(false);
         }
     }
@@ -101,22 +103,25 @@ export default function LogInForm() {
                     <div className="absolute bottom-0 -left-16 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
                 </div>
 
-                <p className="relative text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
-                    The Village Vet
-                </p>
+                <div className="relative flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
+                        {copy.clinicName}
+                    </p>
+                    <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-700 px-2.5 py-1 text-xs text-emerald-50 hover:bg-emerald-900" />
+                </div>
 
                 <div className="relative mt-4 w-full min-w-0 lg:mt-0 lg:max-w-md">
                     <h1 className="max-w-full text-3xl leading-tight font-semibold tracking-tight text-white lg:text-5xl">
-                        Welcome back
+                        {copy.welcome}
                     </h1>
                     <p className="mt-3 max-w-full text-sm leading-6 text-emerald-100/90 lg:mt-5 lg:text-lg lg:leading-7">
-                        Log in to see your pets and keep their details with the clinic.
+                        {copy.signInLead}
                     </p>
                 </div>
 
                 <ul className="relative hidden space-y-3 text-sm text-emerald-100/80 lg:block">
-                    <li>Visits, weight, and vaccinations in one place</li>
-                    <li>Your pet&apos;s record, ready when you arrive</li>
+                    <li>{copy.signInPointRecords}</li>
+                    <li>{copy.signInPointReady}</li>
                 </ul>
             </section>
 
@@ -126,23 +131,23 @@ export default function LogInForm() {
                     className="w-full max-w-md min-w-0 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8 dark:border-stone-800 dark:bg-stone-900"
                 >
                     <h2 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">
-                        Log in
+                        {copy.logIn}
                     </h2>
             
 
                     <div className="mt-8 space-y-4">
                         <div>
                             <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
-                                Username
+                                {copy.username}
                             </label>
                             <input id="username" type="text" name="username" value={form.username} onChange={handleChange} autoComplete="username" placeholder="pamela.smith" className={`${inputClassName} ${fieldErrors.username ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.username && <p className={fieldErrorClassName}>{fieldErrors.username}</p>}
                         </div>
                         <div>
                             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
-                                Password
+                                {copy.password}
                             </label>
-                            <input id="password" type="password" name="password" value={form.password} onChange={handleChange} autoComplete="current-password" placeholder="Password" className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
+                            <input id="password" type="password" name="password" value={form.password} onChange={handleChange} autoComplete="current-password" placeholder={copy.password} className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.password && <p className={fieldErrorClassName}>{fieldErrors.password}</p>}
                         </div>
                     </div>
@@ -158,15 +163,15 @@ export default function LogInForm() {
                         disabled={submitting}
                         className="mt-6 w-full cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] active:bg-emerald-950 disabled:cursor-not-allowed disabled:bg-emerald-800/70 disabled:active:scale-100 dark:bg-emerald-700 dark:hover:bg-emerald-600 dark:active:bg-emerald-800 dark:disabled:bg-emerald-700/60"
                     >
-                        {submitting ? "Logging in…" : "Log In"}
+                        {submitting ? copy.loggingIn : copy.logIn}
                     </button>
                     <p className="mt-5 text-center text-sm text-stone-500 dark:text-stone-400">
-                        Don&apos;t have an account?{" "}
+                        {copy.noAccount}{" "}
                         <a
                             href="/sign-up"
                             className="font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
                         >
-                            Sign up
+                            {copy.signUp}
                         </a>
                     </p>
                 </form>
@@ -174,10 +179,10 @@ export default function LogInForm() {
 
             <footer className="bg-emerald-950 px-6 py-8 text-emerald-50 lg:hidden">
                 <p className="text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
-                    The Village Vet
+                    {copy.clinicName}
                 </p>
                 <p className="mt-3 max-w-sm text-sm leading-6 text-emerald-100/85">
-                    Neighborhood care for the cats and dogs you look after.
+                    {copy.authFooter}
                 </p>
             </footer>
         </div>

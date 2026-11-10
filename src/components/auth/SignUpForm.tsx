@@ -4,6 +4,8 @@ import { authClient } from "@/lib/auth/auth-client";
 import type { SuccessContext } from "@better-fetch/fetch";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import LocaleSwitch from "@/components/LocaleSwitch";
+import type { Copy, Locale } from "@/lib/i18n";
 
 const inputClassName =
     "w-full min-w-0 rounded-lg border bg-white px-3 py-2.5 text-sm text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 dark:bg-stone-950 dark:text-stone-50";
@@ -23,42 +25,42 @@ type SignUpFields = {
     password: string;
 };
 
-function usernameError(username: string) {
+function usernameError(username: string, copy: Copy) {
     const value = username.trim();
-    if (!value) return "Enter your username.";
-    if (value.length < 3) return "Use at least 3 characters.";
-    if (value.length > 30) return "Use 30 characters or fewer.";
-    if (!/^[a-zA-Z0-9_.]+$/.test(value)) return "Use only letters, numbers, dots, and underscores.";
+    if (!value) return copy.errUsernameRequired;
+    if (value.length < 3) return copy.errUsernameShort;
+    if (value.length > 30) return copy.errUsernameLong;
+    if (!/^[a-zA-Z0-9_.]+$/.test(value)) return copy.errUsernameChars;
 }
 
-function signUpFieldErrors(form: SignUpFields) {
+function signUpFieldErrors(form: SignUpFields, copy: Copy) {
     const errors: Partial<SignUpFields> = {};
 
-    if (!form.name.trim()) errors.name = "Enter your name.";
-    const username = usernameError(form.username);
+    if (!form.name.trim()) errors.name = copy.errNameRequired;
+    const username = usernameError(form.username, copy);
     if (username) errors.username = username;
-    if (!form.phoneNumber.trim()) errors.phoneNumber = "Enter your phone number.";
-    if (!form.password.trim()) errors.password = "Create a password.";
-    else if (form.password.length < 8) errors.password = "Use at least 8 characters.";
+    if (!form.phoneNumber.trim()) errors.phoneNumber = copy.errPhoneRequired;
+    if (!form.password.trim()) errors.password = copy.errPasswordCreate;
+    else if (form.password.length < 8) errors.password = copy.errPasswordShort;
 
     return errors;
 }
 
-function signUpRequestMessage(error: { code?: string; message?: string }) {
+function signUpRequestMessage(error: { code?: string; message?: string }, copy: Copy) {
     if (error.code === "USERNAME_IS_ALREADY_TAKEN" || error.code === "USER_ALREADY_EXISTS" || error.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL") {
-        return "That username is taken. Try another.";
+        return copy.errUsernameTaken;
     }
-    if (error.code === "USERNAME_TOO_SHORT") return "Use at least 3 characters.";
-    if (error.code === "USERNAME_TOO_LONG") return "Use 30 characters or fewer.";
-    if (error.code === "INVALID_USERNAME") return "Use only letters, numbers, dots, and underscores.";
-    if (error.code === "PASSWORD_TOO_SHORT") return "Use at least 8 characters.";
-    if (error.code === "PASSWORD_TOO_LONG") return "Use 128 characters or fewer.";
+    if (error.code === "USERNAME_TOO_SHORT") return copy.errUsernameShort;
+    if (error.code === "USERNAME_TOO_LONG") return copy.errUsernameLong;
+    if (error.code === "INVALID_USERNAME") return copy.errUsernameChars;
+    if (error.code === "PASSWORD_TOO_SHORT") return copy.errPasswordShort;
+    if (error.code === "PASSWORD_TOO_LONG") return copy.errPasswordLong;
     if (error.message && error.code) return `${error.message} (${error.code})`;
     if (error.message) return error.message;
-    return "We couldn't create your account. Check your details and try again.";
+    return copy.errSignUpFailed;
 }
 
-export default function SignUpForm() {
+export default function SignUpForm({ copy, locale }: { copy: Copy; locale: Locale }) {
     const [form, setForm] = useState<SignUpFields>({
         name: "",
         username: "",
@@ -74,7 +76,7 @@ export default function SignUpForm() {
     async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
         e.preventDefault();
 
-        const nextFieldErrors = signUpFieldErrors(form);
+        const nextFieldErrors = signUpFieldErrors(form, copy);
         setFieldErrors(nextFieldErrors);
         setFormError(null);
         if (Object.keys(nextFieldErrors).length > 0) return;
@@ -96,11 +98,11 @@ export default function SignUpForm() {
             });
 
             if (error) {
-                setFormError(signUpRequestMessage(error));
+                setFormError(signUpRequestMessage(error, copy));
                 setSubmitting(false);
             }
         } catch {
-            setFormError("The sign-up request did not finish. Try again.");
+            setFormError(copy.errSignUpRequest);
             setSubmitting(false);
         }
     }
@@ -125,18 +127,21 @@ export default function SignUpForm() {
                     <div className="absolute bottom-0 -left-16 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
                 </div>
 
-                <p className="relative text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
-                    The Village Vet
-                </p>
+                <div className="relative flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
+                        {copy.clinicName}
+                    </p>
+                    <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-700 px-2.5 py-1 text-xs text-emerald-50 hover:bg-emerald-900" />
+                </div>
 
                 <div className="relative mt-4 w-full min-w-0 lg:mt-0 lg:max-w-md">
                     <h1 className="max-w-full text-3xl leading-tight font-semibold tracking-tight text-white lg:text-5xl">
-                        Welcome to
+                        {copy.signUpWelcome}
                         <br />
-                        The Village Vet
+                        {copy.clinicName}
                     </h1>
                     <p className="mt-3 max-w-full text-sm leading-6 text-emerald-100/90 lg:mt-5 lg:text-lg lg:leading-7">
-                        A neighborhood clinic for the cats and dogs you look after. Create an account and keep their details with us.
+                        {copy.signUpLead}
                     </p>
                 </div>
 
@@ -148,36 +153,36 @@ export default function SignUpForm() {
                     className="w-full max-w-md min-w-0 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8 dark:border-stone-800 dark:bg-stone-900"
                 >
                     <h2 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">
-                        Create your account
+                        {copy.signUpTitle}
                     </h2>
 
                     <div className="mt-8 space-y-4">
                         <div>
                             <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
-                                Name
+                                {copy.nameLabel}
                             </label>
-                            <input id="name" name="name" value={form.name} onChange={handleChange} autoComplete="name" placeholder="Your name" className={`${inputClassName} ${fieldErrors.name ? invalidInputClassName : validInputClassName}`} />
+                            <input id="name" name="name" value={form.name} onChange={handleChange} autoComplete="name" placeholder={copy.namePlaceholder} className={`${inputClassName} ${fieldErrors.name ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.name && <p className={fieldErrorClassName}>{fieldErrors.name}</p>}
                         </div>
                         <div>
                             <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
-                                Username
+                                {copy.username}
                             </label>
                             <input id="username" type="text" name="username" value={form.username} onChange={handleChange} autoComplete="username" placeholder="pamela.smith" className={`${inputClassName} ${fieldErrors.username ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.username && <p className={fieldErrorClassName}>{fieldErrors.username}</p>}
                         </div>
                         <div>
                             <label htmlFor="phoneNumber" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
-                                Phone number
+                                {copy.phone}
                             </label>
                             <input id="phoneNumber" type="tel" name="phoneNumber" value={form.phoneNumber} onChange={handleChange} autoComplete="tel" placeholder="07XX XXX XXX" className={`${inputClassName} ${fieldErrors.phoneNumber ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.phoneNumber && <p className={fieldErrorClassName}>{fieldErrors.phoneNumber}</p>}
                         </div>
                         <div>
                             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
-                                Password
+                                {copy.password}
                             </label>
-                            <input id="password" type="password" name="password" value={form.password} onChange={handleChange} autoComplete="new-password" placeholder="Create a password" className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
+                            <input id="password" type="password" name="password" value={form.password} onChange={handleChange} autoComplete="new-password" placeholder={copy.passwordCreatePlaceholder} className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.password && <p className={fieldErrorClassName}>{fieldErrors.password}</p>}
                         </div>
                     </div>
@@ -193,15 +198,15 @@ export default function SignUpForm() {
                         disabled={submitting}
                         className="mt-6 w-full cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] active:bg-emerald-950 disabled:cursor-not-allowed disabled:bg-emerald-800/70 disabled:active:scale-100 dark:bg-emerald-700 dark:hover:bg-emerald-600 dark:active:bg-emerald-800 dark:disabled:bg-emerald-700/60"
                     >
-                        {submitting ? "Creating account…" : "Create account"}
+                        {submitting ? copy.creatingAccount : copy.createAccount}
                     </button>
                     <p className="mt-5 text-center text-sm text-stone-500 dark:text-stone-400">
-                        Already have an account?{" "}
+                        {copy.haveAccount}{" "}
                         <Link
-                            href="/"
+                            href="/login"
                             className="font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
                         >
-                            Log In
+                            {copy.logIn}
                         </Link>
                     </p>
                 </form>
@@ -209,10 +214,10 @@ export default function SignUpForm() {
 
             <footer className="bg-emerald-950 px-6 py-8 text-emerald-50 lg:hidden">
                 <p className="text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
-                    The Village Vet
+                    {copy.clinicName}
                 </p>
                 <p className="mt-3 max-w-sm text-sm leading-6 text-emerald-100/85">
-                    Neighborhood care for your beloved pets.
+                    {copy.signUpFooter}
                 </p>
             </footer>
         </div>

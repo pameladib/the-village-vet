@@ -35,7 +35,7 @@ export default function AppError({
             Try again
           </button>
           <Link
-            href="/"
+            href="/login"
             className="text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-200"
           >
             Go to sign in
