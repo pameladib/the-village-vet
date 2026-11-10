@@ -165,6 +165,19 @@ function addMinutes(instant: Date, minutes: number) {
     return new Date(instant.getTime() + minutes * 60_000);
 }
 
+export function appointmentsCoveredByBlock<T extends { type: AppointmentType; startAt: Date; duration: number }>(
+    scope: BlockScope,
+    blockStart: Date,
+    blockEnd: Date,
+    appointments: T[],
+) {
+    return appointments.filter((appointment) => {
+        if (!blockApplies(scope, appointment.type)) return false;
+        const end = addMinutes(appointment.startAt, appointment.duration);
+        return overlaps(appointment.startAt, end, blockStart, blockEnd);
+    });
+}
+
 export function getAvailableStarts(
     appointmentType: AppointmentType,
     species: Species,

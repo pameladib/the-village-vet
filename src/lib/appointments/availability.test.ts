@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { careNoticeDay, getAvailableStarts, hourInBeirut } from "./availability.ts";
+import { appointmentsCoveredByBlock, careNoticeDay, getAvailableStarts, hourInBeirut } from "./availability.ts";
 
 const monday = "2027-01-04";
 const saturday = "2027-01-02";
@@ -99,6 +99,16 @@ describe("separate calendars and blocks", () => {
         const checkup = at(monday, "09:00");
         const next = labels(getAvailableStarts("VETERINARY_VISIT", "CAT", monday, [{ type: "VETERINARY_VISIT", startAt: checkup, duration: 30 } as never], []));
         assert.equal(next[0], "09:30");
+    });
+
+    it("finds booked appointments a new block would cover", () => {
+        const visit = { type: "VETERINARY_VISIT" as const, startAt: at(monday, "10:00"), duration: 30 };
+        const grooming = { type: "GROOMING" as const, startAt: at(monday, "10:00"), duration: 120 };
+        const start = at(monday, "09:00");
+        const end = at(monday, "11:00");
+        assert.deepEqual(appointmentsCoveredByBlock("CLINIC", start, end, [visit, grooming]), [visit]);
+        assert.deepEqual(appointmentsCoveredByBlock("GROOMING", start, end, [visit, grooming]), [grooming]);
+        assert.deepEqual(appointmentsCoveredByBlock("CLINIC", end, at(monday, "12:00"), [visit, grooming]), []);
     });
 
     it("applies a clinic block to vet visits and leaves grooming open", () => {

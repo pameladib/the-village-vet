@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import LogOutButton from "@/components/auth/LogOutButton";
 import LocaleSwitch from "@/components/LocaleSwitch";
 import type { Copy, Locale } from "@/lib/i18n";
 
@@ -58,6 +59,9 @@ export default function PublicHeader({
                     <Link href={accountHref} className="hidden text-sm font-semibold text-emerald-950 hover:text-emerald-800 sm:inline">
                         {accountLabel}
                     </Link>
+                    {loggedIn && (
+                        <LogOutButton label={copy.logOut} className="hidden text-sm font-semibold text-emerald-950 hover:text-emerald-800 disabled:opacity-60 sm:inline" />
+                    )}
                     <button
                         type="button"
                         aria-expanded={open}
@@ -88,6 +92,9 @@ export default function PublicHeader({
                     <Link href={accountHref} onClick={() => setOpen(false)} className="px-2 py-2 text-sm font-semibold text-emerald-950">
                         {accountLabel}
                     </Link>
+                    {loggedIn && (
+                        <LogOutButton label={copy.logOut} className="px-2 py-2 text-start text-sm font-semibold text-emerald-950" />
+                    )}
                 </nav>
             )}
         </header>

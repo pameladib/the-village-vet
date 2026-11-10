@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LogOutButton from "@/components/auth/LogOutButton";
 import LocaleSwitch from "@/components/LocaleSwitch";
 import type { Copy, Locale } from "@/lib/i18n";
 
@@ -12,6 +13,7 @@ export default function SiteHeader({ copy, locale }: { copy: Copy; locale: Local
                 <Link href="/find-us">{copy.clinic}</Link>
                 <Link href="/shop">{copy.shop}</Link>
                 <Link href="/dashboard">{copy.dashboard}</Link>
+                <LogOutButton label={copy.logOut} className="hover:text-emerald-700 disabled:opacity-60 dark:hover:text-emerald-300" />
                 <LocaleSwitch locale={locale} label={copy.language} />
             </nav>
         </header>
