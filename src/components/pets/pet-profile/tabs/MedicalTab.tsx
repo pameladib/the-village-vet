@@ -1,5 +1,6 @@
 import { CirclePlus, ClipboardList, History, Pill, TriangleAlert, Utensils } from "lucide-react";
-import DocumentList from "@/components/pets/DocumentList";
+import DocumentList, { type PetDocument } from "@/components/pets/DocumentList";
+import type { Copy, Locale } from "@/lib/i18n";
 import type { PetProfileData } from "../PetProfile";
 
 function formatCalendarDate(date: Date) {
@@ -29,10 +30,14 @@ export default function MedicalTab({
     pet,
     documents,
     canUpload,
+    copy,
+    locale,
 }: {
     pet: PetProfileData;
-    documents: { id: string; title: string }[];
+    documents: PetDocument[];
     canUpload: boolean;
+    copy: Copy;
+    locale: Locale;
 }) {
     const cards = [
         { label: "Spayed/Neutered", value: formatSpayed(pet), icon: <CirclePlus className="size-4" strokeWidth={1.75} /> },
@@ -45,6 +50,7 @@ export default function MedicalTab({
 
     return (
         <div className="flex flex-col gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
             {cards.map((card) => (
                 <div key={card.label} className="rounded-2xl bg-stone-100 px-3.5 py-3.5 dark:bg-stone-900">
                     <div className="flex items-center gap-2">
@@ -58,7 +64,8 @@ export default function MedicalTab({
                     </p>
                 </div>
             ))}
-            <DocumentList petId={pet.id} documents={documents} canUpload={canUpload} />
+            </div>
+            <DocumentList petId={pet.id} documents={documents} canUpload={canUpload} copy={copy} locale={locale} />
         </div>
     );
 }

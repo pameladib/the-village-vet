@@ -4,6 +4,7 @@ import { authClient } from "@/lib/auth/auth-client";
 import type { SuccessContext } from "@better-fetch/fetch";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import PasswordInput from "@/components/auth/PasswordInput";
 import LocaleSwitch from "@/components/LocaleSwitch";
 import type { Copy, Locale } from "@/lib/i18n";
 
@@ -182,7 +183,7 @@ export default function SignUpForm({ copy, locale }: { copy: Copy; locale: Local
                             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
                                 {copy.password}
                             </label>
-                            <input id="password" type="password" name="password" value={form.password} onChange={handleChange} autoComplete="new-password" placeholder={copy.passwordCreatePlaceholder} className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
+                            <PasswordInput id="password" name="password" value={form.password} onChange={handleChange} autoComplete="new-password" placeholder={copy.passwordCreatePlaceholder} showLabel={copy.showPassword} hideLabel={copy.hidePassword} className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.password && <p className={fieldErrorClassName}>{fieldErrors.password}</p>}
                         </div>
                     </div>

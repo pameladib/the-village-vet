@@ -8,6 +8,7 @@ export async function uploadToSignedUrl(signedUrl: string, file: File) {
         method: "PUT",
         headers: { "x-upsert": "false" },
         body,
+        signal: AbortSignal.timeout(60_000),
     });
     if (!response.ok) throw new Error("Could not store the file.");
 }

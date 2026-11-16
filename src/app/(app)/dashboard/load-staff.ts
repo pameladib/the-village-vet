@@ -1,66 +1,46 @@
-import { clinicDayRange, todayInBeirut } from "@/lib/appointments/availability";
+// Staff pages share these queries. The dashboard only asks for today's visits and the counts it summarizes.
+
+import { beirutInstant, clinicDayRange, todayInBeirut } from "@/lib/appointments/availability";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
+import type { AppointmentType, GroomingService, VisitService } from "../../../../generated/prisma/client";
 
-// Clinic-wide dashboard for the veterinarian and the assistant.
-export async function loadStaffDashboard(userId: string, role: string, rawQuery: string) {
-    const query = rawQuery.trim();
-    const today = todayInBeirut();
-    const range = clinicDayRange(today);
-    const clinical = canSeeClinicalRecords(role);
-    const now = new Date();
+export type StaffVisit = {
+    id: string;
+    petId: string;
+    type: AppointmentType;
+    services: VisitService[];
+    groomingService: GroomingService | null;
+    startAt: Date;
+    petName: string;
+    ownerName: string;
+    phone: string;
+};
 
-    const [todayVisits, upcoming, matches, reminders, pendingOrders, lowStock, notices] = await Promise.all([
-        range
-            ? prisma.appointment.findMany({
-                where: { status: "BOOKED", startAt: { gte: range.open, lt: range.close } },
-                orderBy: { startAt: "asc" },
-                include: { pet: { select: { id: true, name: true } }, owner: { select: { name: true, phoneNumber: true } } },
-            })
-            : [],
-        prisma.appointment.findMany({
-            where: { status: "BOOKED", startAt: { gte: now } },
-            orderBy: { startAt: "asc" },
-            take: 30,
-            include: { pet: { select: { id: true, name: true } }, owner: { select: { name: true, phoneNumber: true } } },
-        }),
-        query.length >= 2
-            ? prisma.user.findMany({
-                where: {
-                    role: "OWNER",
-                    OR: [
-                        { name: { contains: query, mode: "insensitive" } },
-                        { phoneNumber: { contains: query } },
-                        { pets: { some: { name: { contains: query, mode: "insensitive" } } } },
-                    ],
-                },
-                select: { id: true, name: true, phoneNumber: true, pets: { select: { id: true, name: true } } },
-                take: 20,
-            })
-            : [],
-        clinical
-            ? prisma.careReminder.findMany({
-                where: { completedAt: null },
-                orderBy: { dueAt: "asc" },
-                take: 40,
-                include: { pet: { select: { name: true, owner: { select: { name: true } } } } },
-            })
-            : [],
-        prisma.shopOrder.count({ where: { status: "PENDING" } }),
-        prisma.product.findMany({
-            where: { stock: { lte: 2 } },
-            select: { id: true, name: true, stock: true },
-            orderBy: { stock: "asc" },
-            take: 20,
-        }),
-        prisma.notification.findMany({
-            where: { userId },
-            orderBy: { createdAt: "desc" },
-            take: 20,
-        }),
-    ]);
+export type StaffReminder = {
+    id: string;
+    kind: string;
+    dose: string | null;
+    dueAt: Date;
+    petName: string;
+    ownerName: string;
+};
 
-    const toVisit = (visit: (typeof todayVisits)[number]) => ({
+const visitInclude = {
+    pet: { select: { id: true, name: true } },
+    owner: { select: { name: true, phoneNumber: true } },
+} as const;
+
+function toVisit(visit: {
+    id: string;
+    type: AppointmentType;
+    services: VisitService[];
+    groomingService: GroomingService | null;
+    startAt: Date;
+    pet: { id: string; name: string };
+    owner: { name: string; phoneNumber: string };
+}): StaffVisit {
+    return {
         id: visit.id,
         petId: visit.pet.id,
         type: visit.type,
@@ -70,23 +50,120 @@ export async function loadStaffDashboard(userId: string, role: string, rawQuery:
         petName: visit.pet.name,
         ownerName: visit.owner.name,
         phone: visit.owner.phoneNumber,
-    });
+    };
+}
+
+export async function loadStaffDashboard(role: string) {
+    const range = clinicDayRange(todayInBeirut());
+    const clinical = canSeeClinicalRecords(role);
+    const todayStart = beirutInstant(todayInBeirut(), 0, 0);
+
+    const [todayVisits, pendingOrders, lowStock, overdueCare, upcomingCare] = await Promise.all([
+        range
+            ? prisma.appointment.findMany({
+                where: { status: "BOOKED", startAt: { gte: range.open, lt: range.close } },
+                orderBy: { startAt: "asc" },
+                include: visitInclude,
+            })
+            : [],
+        prisma.shopOrder.count({ where: { status: "PENDING" } }),
+        prisma.product.findMany({ select: { stock: true, lowStockAt: true } }),
+        clinical
+            ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { lt: todayStart } } })
+            : 0,
+        clinical
+            ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { gte: todayStart } } })
+            : 0,
+    ]);
 
     return {
         clinical,
-        query,
+        today: todayVisits.map(toVisit),
+        pendingOrders,
+        lowStock: lowStock.filter((product) => product.stock <= product.lowStockAt).length,
+        overdueCare,
+        upcomingCare,
+    };
+}
+
+export async function loadStaffAppointments() {
+    const range = clinicDayRange(todayInBeirut());
+    const now = new Date();
+    const [todayVisits, upcoming] = await Promise.all([
+        range
+            ? prisma.appointment.findMany({
+                where: { status: "BOOKED", startAt: { gte: range.open, lt: range.close } },
+                orderBy: { startAt: "asc" },
+                include: visitInclude,
+            })
+            : [],
+        prisma.appointment.findMany({
+            where: { status: "BOOKED", startAt: { gte: now } },
+            orderBy: { startAt: "asc" },
+            take: 30,
+            include: visitInclude,
+        }),
+    ]);
+    return {
         today: todayVisits.map(toVisit),
         upcoming: upcoming.map(toVisit),
-        matches,
-        reminders: reminders.map((reminder) => ({
-            id: reminder.id,
-            kind: reminder.kind,
-            dueAt: reminder.dueAt,
-            petName: reminder.pet.name,
-            ownerName: reminder.pet.owner.name,
-        })),
-        pendingOrders,
-        lowStock,
-        notices,
     };
+}
+
+const pageSize = 10;
+
+export async function loadPatients(rawQuery: string, rawPage: string | undefined) {
+    const query = rawQuery.trim();
+    const where = query
+        ? {
+            OR: [
+                { name: { contains: query, mode: "insensitive" as const } },
+                { owner: { name: { contains: query, mode: "insensitive" as const } } },
+                { owner: { phoneNumber: { contains: query } } },
+            ],
+        }
+        : {};
+    const total = await prisma.pet.count({ where });
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    const requested = Number.parseInt(rawPage ?? "1", 10);
+    const page = Number.isFinite(requested) ? Math.min(Math.max(1, requested), pages) : 1;
+    const pets = await prisma.pet.findMany({
+        where,
+        select: {
+            id: true,
+            name: true,
+            species: true,
+            breed: true,
+            owner: { select: { id: true, name: true, phoneNumber: true } },
+        },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+    });
+    return { query, pets, page, pages };
+}
+
+export async function loadCareReminders() {
+    const reminders = await prisma.careReminder.findMany({
+        where: { completedAt: null },
+        orderBy: { dueAt: "asc" },
+        take: 40,
+        include: { pet: { select: { name: true, owner: { select: { name: true } } } } },
+    });
+    return reminders.map((reminder) => ({
+        id: reminder.id,
+        kind: reminder.kind,
+        dose: reminder.dose,
+        dueAt: reminder.dueAt,
+        petName: reminder.pet.name,
+        ownerName: reminder.pet.owner.name,
+    }));
+}
+
+export async function loadLowStock() {
+    const products = await prisma.product.findMany({
+        select: { id: true, name: true, nameAr: true, stock: true, lowStockAt: true },
+        orderBy: { stock: "asc" },
+    });
+    return products.filter((product) => product.stock <= product.lowStockAt).slice(0, 20);
 }

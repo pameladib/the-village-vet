@@ -66,6 +66,13 @@ function groomingServices(copy: Copy) {
 
 type BookablePet = { id: string; name: string; species: Species };
 
+const bookableServices = ["CHECKUP", "VACCINATION", "DEWORMING", "FLEA_TREATMENT", "FOLLOW_UP"] as const;
+
+function initialService(service?: string) {
+    const match = bookableServices.find((value) => value === service);
+    return match ? [match] : [];
+}
+
 const fieldClassName =
     "w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm text-emerald-950 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-50";
 
@@ -88,7 +95,7 @@ function formatSlot(startIso: string, duration: number, locale: Locale) {
     return `${time.format(start)}–${time.format(end)}`;
 }
 
-export default function NewAppointmentForm({ pets, today, emptyMessage, copy, locale }: { pets: BookablePet[]; today: string; emptyMessage?: string; copy: Copy; locale: Locale }) {
+export default function NewAppointmentForm({ pets, today, emptyMessage, copy, locale, petId: requestedPetId, service }: { pets: BookablePet[]; today: string; emptyMessage?: string; copy: Copy; locale: Locale; petId?: string; service?: string }) {
     const types = appointmentTypes(copy);
     const servicesForVisit = visitServices(copy);
     const groomingChoices = groomingServices(copy);
@@ -102,9 +109,9 @@ export default function NewAppointmentForm({ pets, today, emptyMessage, copy, lo
     const form = useForm<BookingForm>({
         resolver: zodResolver(bookingSchema),
         defaultValues: {
-            petId: pets[0]?.id ?? "",
+            petId: pets.some((pet) => pet.id === requestedPetId) ? requestedPetId : pets[0]?.id ?? "",
             type: "VETERINARY_VISIT",
-            services: [],
+            services: initialService(service),
             date: "",
             start: "",
         },

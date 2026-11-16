@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Village Vet</title>
+    <style>
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #F8FAF9; color: #064e3b; font-family: sans-serif; }
+        main { max-width: 28rem; padding: 1.5rem; }
+        h1 { font-size: 1.25rem; margin: 0; }
+        p { color: #57534e; line-height: 1.5; }
+        section + section { margin-top: 1.5rem; }
+    </style>
+</head>
+<body>
+    <main>
+        <section lang="en" id="offline-en">
+            <h1>You are offline</h1>
+            <p>The Village Vet needs a connection for records, orders, and your account.</p>
+        </section>
+        <section lang="ar" dir="rtl" id="offline-ar">
+            <h1>أنتم غير متصلين</h1>
+            <p>يحتاج البيطري في القرية إلى اتصال لعرض السجلات والطلبات والحساب.</p>
+        </section>
+    </main>
+    <script>
+        const locale = document.cookie.split("; ").find((row) => row.startsWith("locale="))?.split("=")[1];
+        if (locale === "ar") document.getElementById("offline-en").hidden = true;
+        if (locale === "en") document.getElementById("offline-ar").hidden = true;
+    </script>
+</body>
+</html>

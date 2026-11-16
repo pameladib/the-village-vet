@@ -1,4 +1,5 @@
 import NewPetForm from "@/components/pets/new/NewPetForm";
+import { formatDateOnly } from "@/lib/clinic/vaccines";
 import { requireRole } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import type { PetForm } from "@/lib/validations/pet";
@@ -57,6 +58,10 @@ export default async function EditPetPage({
             },
             vaccinations: { select: { type: true, administeredAt: true } },
             treatments: { select: { type: true, administeredAt: true } },
+            careReminders: {
+                where: { completedAt: null },
+                select: { kind: true, dueAt: true },
+            },
         },
     });
 
@@ -64,7 +69,8 @@ export default async function EditPetPage({
 
     // we must convert the pet's existing data that we got from the database into the format the form expects so we can have the values filled in in the edit form
 
-    const { weightRecords, estimatedAgeValue, vaccinations, treatments, photoUrl, ...petFields } = pet; // spreading the pet object to separate the properties that need special handling, and pack the rest of the properties into petFields
+    const { weightRecords, estimatedAgeValue, vaccinations, treatments, careReminders, photoUrl, ...petFields } = pet;
+    const dueOn = Object.fromEntries(careReminders.map((reminder) => [reminder.kind, formatDateOnly(reminder.dueAt)]));
 
     const defaultValues: PetForm = { // defaultValues is the object containing the initial values of our form; it must match the structure of the form
         name: petFields.name, // required field (cannot be null) so we can pass it as is
@@ -83,10 +89,13 @@ export default async function EditPetPage({
             type: vaccination.type,
             administeredAt: toDateInput(vaccination.administeredAt),
         })),
+        vaccineNextDueAt: dueOn.VACCINATION ?? "",
         treatments: treatments.map((treatment) => ({
             type: treatment.type,
             administeredAt: toDateInput(treatment.administeredAt),
         })),
+        dewormingNextDueAt: dueOn.DEWORMING ?? "",
+        fleaNextDueAt: dueOn.FLEA_TREATMENT ?? "",
         allergies: textValue(petFields.allergies),
         medicalConditions: textValue(petFields.medicalConditions),
         medications: textValue(petFields.medications),

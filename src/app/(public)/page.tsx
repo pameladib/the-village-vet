@@ -3,13 +3,18 @@ import Link from "next/link";
 import ClinicGallery from "@/components/public/ClinicGallery";
 import { clinicHomePhoto, clinicVisitPhoto } from "@/components/public/photos";
 import { ServiceGrid } from "@/components/public/services";
+import { getClinicSettings } from "@/lib/clinic/public";
 import { getLocale, messages } from "@/lib/i18n";
+
+const clinicMapsUrl = "https://maps.app.goo.gl/VgbXYipPXhcg4y8i8";
 
 const bookHref = "/appointments/new";
 
 export default async function HomePage() {
     const locale = await getLocale(); // get the locale from the cookie
     const copy = messages(locale); // get the corresponding copy for the locale based on the locale we got from the cookie
+    const settings = await getClinicSettings();
+    const mapsUrl = settings?.mapsUrl?.trim() || clinicMapsUrl;
 
     return (
         <main>
@@ -56,9 +61,17 @@ export default async function HomePage() {
                         <h2 className="text-4xl text-emerald-950">{copy.aboutHeading}</h2>
                         <p className="mt-5 text-lg leading-8 text-stone-700">{copy.aboutLead}</p>
                         <p className="mt-4 text-base leading-7 text-stone-600">{copy.aboutBodyLong}</p>
-                        <Link href="/about" className="mt-6 inline-block text-sm font-semibold text-emerald-900 underline decoration-emerald-800/40 underline-offset-4 hover:decoration-emerald-800">
-                            {copy.learnMore}
-                        </Link>
+                        <p className="mt-6 text-sm font-medium text-stone-500">{copy.addressHeading}</p>
+                        <p className="mt-1 text-xl text-emerald-950">{copy.aboutLocality}</p>
+                        <p className="text-base text-stone-600">{copy.aboutArea}</p>
+                        <div className="mt-6 flex flex-wrap items-center gap-4">
+                            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-full bg-emerald-900 px-5 py-3 text-sm font-medium text-white transition duration-200 hover:bg-emerald-950">
+                                {copy.getDirections}
+                            </a>
+                            <Link href="/about" className="text-sm font-semibold text-emerald-900 underline decoration-emerald-800/40 underline-offset-4 hover:decoration-emerald-800">
+                                {copy.learnMore}
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </section>

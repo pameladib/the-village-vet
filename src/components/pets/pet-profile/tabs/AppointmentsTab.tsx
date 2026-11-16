@@ -42,20 +42,43 @@ function AppointmentCard({ appointment }: { appointment: ProfileAppointment }) {
     );
 }
 
-export default function AppointmentsTab({ pet }: { pet: PetProfileData }) {
-    if (pet.appointments.length === 0) {
+function AppointmentList({ appointments, empty }: { appointments: ProfileAppointment[]; empty: string }) {
+    if (appointments.length === 0) {
         return (
             <p className="rounded-2xl bg-stone-100 px-3.5 py-3.5 text-sm text-stone-400 dark:bg-stone-900 dark:text-stone-500">
-                No upcoming appointments
+                {empty}
             </p>
         );
     }
 
     return (
         <div className="flex flex-col gap-3">
-            {pet.appointments.map((appointment) => (
+            {appointments.map((appointment) => (
                 <AppointmentCard key={appointment.id} appointment={appointment} />
             ))}
+        </div>
+    );
+}
+
+export default function AppointmentsTab({ pet }: { pet: PetProfileData }) {
+    const now = Date.now();
+    const upcoming = pet.appointments
+        .filter((appointment) => startTime(appointment.startAt) >= now)
+        .sort((left, right) => startTime(left.startAt) - startTime(right.startAt));
+    const previous = pet.appointments
+        .filter((appointment) => startTime(appointment.startAt) < now)
+        .sort((left, right) => startTime(right.startAt) - startTime(left.startAt));
+
+    return (
+        <div className="flex flex-col gap-6">
+            <section>
+                <h3 className="mb-2 text-sm font-medium text-emerald-900 dark:text-emerald-200">Upcoming</h3>
+                <AppointmentList appointments={upcoming} empty="No upcoming appointments" />
+            </section>
+            <section>
+                <h3 className="mb-2 text-sm font-medium text-emerald-900 dark:text-emerald-200">Previous</h3>
+                <AppointmentList appointments={previous} empty="No previous appointments" />
+            </section>
         </div>
     );
 }

@@ -30,7 +30,9 @@ model User {
   appointments  Appointment[]
   scheduleBlocks ScheduleBlock[] // periods blocked by admin
   notifications Notification[]
+  pushSubscriptions PushSubscription[]
   shopOrders    ShopOrder[]
+  stockMovements StockMovement[]
 
   @@unique([email])
   @@map("user")
@@ -133,6 +135,8 @@ model Treatment {
   id             String          @id @default(uuid())
   type           TreatmentType
   administeredAt DateTime?
+  // True when the vet cleared the next due date, so a later pet save does not invent one.
+  followUpCleared Boolean        @default(false)
   petId          String
   careReminder   CareReminder?
   pet            Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
@@ -226,6 +230,8 @@ model Vaccination {
   id             String          @id @default(uuid())
   administeredAt DateTime?
   type           VaccinationType
+  // True when the vet cleared the next due date, so a later pet save does not invent one.
+  followUpCleared Boolean        @default(false)
   careReminder   CareReminder?
   petId          String
   pet            Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
@@ -359,6 +365,21 @@ model Notification {
   @@map("notification")
 }
 
+model PushSubscription {
+  id       String @id @default(uuid())
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscription")
+}
+
 model ClinicSetting {
   id             String  @id @default("clinic")
   phone          String?
@@ -366,7 +387,7 @@ model ClinicSetting {
   email          String?
   address        String?
   mapsUrl        String?
-  // Left empty until the clinic provides an after-hours emergency number. The app must not invent one.
+  // Kept for older rows. The clinic uses the public phone number for emergencies.
   emergencyPhone String?
   about          String?
 
@@ -391,31 +412,56 @@ model MedicalDocument {
 model ProductCategory {
   id       String    @id @default(uuid())
   name     String    @unique
+  nameAr   String
+  position Int       @default(0)
   products Product[]
 
   @@map("product_category")
 }
 
 model Product {
-  id          String          @id @default(uuid())
-  name        String
-  description String?
+  id            String          @id @default(uuid())
+  name          String
+  nameAr        String
+  description   String?
+  descriptionAr String?
   // Whole Lebanese pounds. The clinic has not asked for another currency.
-  price       Int
-  stock       Int             @default(0)
-  photoUrl    String?
-  available   Boolean         @default(true)
-  categoryId  String
-  category    ProductCategory @relation(fields: [categoryId], references: [id])
-  orderItems  OrderItem[]
+  price         Int
+  stock         Int             @default(0)
+  // Available units at or below this number are low stock. Zero is out of stock.
+  lowStockAt    Int             @default(2)
+  photoUrl      String?
+  available     Boolean         @default(true)
+  categoryId    String
+  category      ProductCategory @relation(fields: [categoryId], references: [id])
+  orderItems    OrderItem[]
+  movements     StockMovement[]
 
   @@index([categoryId])
   @@map("product")
 }
 
+// Staff adjustments to the sellable quantity. Order reservations stay on the order items.
+model StockMovement {
+  id        String   @id @default(uuid())
+  type      String
+  delta     Int
+  note      String?
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  staffId   String
+  staff     User     @relation(fields: [staffId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@map("stock_movement")
+}
+
 enum ShopOrderStatus {
   PENDING
   APPROVED
+  PREPARING
+  OUT_FOR_DELIVERY
   REJECTED
   FULFILLED
 }
@@ -423,8 +469,12 @@ enum ShopOrderStatus {
 model ShopOrder {
   id        String          @id @default(uuid())
   status    ShopOrderStatus @default(PENDING)
-  // Payment is arranged at the clinic. This is not an online payment.
-  payment   String          @default("CASH_ON_DELIVERY")
+  // Payment is arranged with the clinic. This is not an online charge.
+  payment          String          @default("CASH")
+  fulfillment      String          @default("PICKUP")
+  deliveryAddress  String?
+  deliveryPhone    String?
+  deliveryNote     String?
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])

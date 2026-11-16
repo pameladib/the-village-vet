@@ -4,7 +4,7 @@ import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { petSchema, type PetForm } from "@/lib/validations/pet";
 import { zodResolver } from "@hookform/resolvers/zod";
 import BasicPetInfo from "./BasicPetInfo";
-import MedicalPetInfo from "./MedicalPetInfo";
+import MedicalPetInfo, { CarePetInfo } from "./MedicalPetInfo";
 import { useState } from "react";
 import { createPet, updatePet } from "@/lib/actions/pet";
 import { confirmPetPhoto, preparePetPhotoUpload } from "@/lib/actions/photo";
@@ -45,10 +45,10 @@ const basicFields = [
 ] as const;
 
 const activeStepClassName =
-  "flex-1 bg-emerald-800 px-3 py-2 text-center font-medium text-white dark:bg-emerald-700";
+  "flex-1 cursor-pointer bg-emerald-800 px-2 py-2 text-center text-xs font-medium leading-4 text-white sm:text-sm dark:bg-emerald-700";
 
 const inactiveStepClassName =
-  "flex-1 bg-stone-100 px-3 py-2 text-center text-stone-500 dark:bg-stone-800 dark:text-stone-400";
+  "flex-1 cursor-pointer bg-stone-100 px-2 py-2 text-center text-xs leading-4 text-stone-500 transition hover:bg-stone-200 hover:text-stone-800 sm:text-sm dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-700 dark:hover:text-stone-100";
 
 
 /* 
@@ -58,7 +58,7 @@ defaultValues, photoUrl and id are for updating a pet (id is to identify the pet
 for this reason we made all 5 props optional so we can pass them as needed or leave them out when not needed
 */ 
 export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photoUrl, id, allowClinical = false }: { isFirstPet?: boolean; ownerName?: string; defaultValues?: PetForm; photoUrl?: string | null; id?: string; allowClinical?: boolean }) {
-  const [step, setStep] = useState(1); // 1 for Basic Info, 2 for Medical Info
+  const [step, setStep] = useState(1); // 1 basic, 2 medical, 3 vaccinations and treatments
   const [formError, setFormError] = useState<string | null>(null);
   const [petId, setPetId] = useState(id);
   const router = useRouter();
@@ -69,30 +69,30 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
     defaultValues: defaultValues ?? { // for edit, use the defaultValues props. if it's null, it means we're calling the form for adding a new pet, in which case we use the object after ?? 
       vaccinations: [], // vaccinations and treatments are required arrays in the Zod schema so we must initialize them to empty array [] in case the user leaves them empty (so Zod does not reject them)
       treatments: [],
+      vaccineNextDueAt: "",
+      dewormingNextDueAt: "",
+      fleaNextDueAt: "",
     }
   });
   const species = useWatch({ control: form.control, name: "species" });
   const isSubmitting = form.formState.isSubmitting;
 
-  async function handleContinue() {
-    const basicStepIsValid = await form.trigger(basicFields);
-    if (!basicStepIsValid) return;
-
-    if (form.getValues("species") === "CAT") {
-      const vaccinations = form.getValues("vaccinations") ?? [];
-      if (vaccinations.some((vaccination) => vaccination.type === "THIRD")) {
-        form.setValue(
-          "vaccinations",
-          vaccinations.filter((vaccination) => vaccination.type !== "THIRD"),
-        );
+  async function goToStep(next: number) {
+    if (next === step || next < 1 || next > 3) return;
+    if (step === 1 && next > 1) {
+      const basicStepIsValid = await form.trigger(basicFields);
+      if (!basicStepIsValid) return;
+      if (form.getValues("species") === "CAT") {
+        const vaccinations = form.getValues("vaccinations") ?? [];
+        if (vaccinations.some((vaccination) => vaccination.type === "THIRD")) {
+          form.setValue(
+            "vaccinations",
+            vaccinations.filter((vaccination) => vaccination.type !== "THIRD"),
+          );
+        }
       }
     }
-
-    setStep((prevStep) => prevStep + 1);
-  }
-
-  function handleBack() {
-    setStep((prevStep) => prevStep - 1);
+    setStep(next);
   }
 
   async function onSubmit(data: PetForm) { // this function only runs when the values are valid because form.handleSubmit already runs the Zod checks before it calls onSubmit
@@ -157,26 +157,23 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
             </h1>
           )}
           <div className="mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400">
-            {defaultValues ? ( 
-              <p>Update this pet’s details.</p>
-            ) : (
-               step === 1 ? (
-                <p>Let&apos;s start with some basic information about your pet.</p>
-               ) : (
-                <p>Add the medical details.</p>
-               ) 
-              
-            )
-            }
+            {step === 1 && (
+              <p>{defaultValues ? "Update the basic details." : "Let’s start with some basic information about your pet."}</p>
+            )}
+            {step === 2 && <p>{defaultValues ? "Update the medical details." : "Add the medical details."}</p>}
+            {step === 3 && <p>Add vaccinations and treatments. Both can be left empty.</p>}
           </div>
           {allowClinical && (
-          <div className="mt-6 mb-6 flex overflow-hidden rounded-lg border border-stone-200 text-sm dark:border-stone-700">
-            <div className={step === 1 ? activeStepClassName : inactiveStepClassName}>
-              Basic Information
-            </div>
-            <div className={step === 2 ? activeStepClassName : inactiveStepClassName}>
-              Medical Information
-            </div>
+          <div className="mt-6 mb-6 flex overflow-hidden rounded-lg border border-stone-200 dark:border-stone-700">
+            <button type="button" onClick={() => goToStep(1)} className={step === 1 ? activeStepClassName : inactiveStepClassName}>
+              Basic
+            </button>
+            <button type="button" onClick={() => goToStep(2)} className={step === 2 ? activeStepClassName : inactiveStepClassName}>
+              Medical
+            </button>
+            <button type="button" onClick={() => goToStep(3)} className={step === 3 ? activeStepClassName : inactiveStepClassName}>
+              Vaccines & treatments
+            </button>
           </div>
           )}
           <form
@@ -190,12 +187,13 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
                 lockIdentity={Boolean(id) && !allowClinical}
               />
             )}
-            {step === 2 && <MedicalPetInfo species={species} />}
+            {step === 2 && <MedicalPetInfo />}
+            {step === 3 && <CarePetInfo species={species} />}
 
             {step === 1 && allowClinical && (
               <button
                 type="button"
-                onClick={handleContinue}
+                onClick={() => goToStep(2)}
                 className="mt-6 w-full cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] active:bg-emerald-950 dark:bg-emerald-700 dark:hover:bg-emerald-600 dark:active:bg-emerald-800"
               >
                 Continue
@@ -222,28 +220,44 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
                 I&apos;ll add my pet later
               </button>
             )}
-            {step === 2 && (
+            {(step === 2 || step === 3) && (
               <>
                 {formError && <p className="mt-6 text-sm text-red-700 dark:text-red-300">{formError}</p>}
                 <div className="mt-6 flex gap-3">
                   <button
                     type="button"
-                    onClick={handleBack}
+                    onClick={() => goToStep(step - 1)}
                     className="w-full cursor-pointer rounded-lg border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-800 transition hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-800"
                   >
                     Back
                   </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] active:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-emerald-700 dark:hover:bg-emerald-600 dark:active:bg-emerald-800"
-                  >
-                    {defaultValues ? (
-                      isSubmitting ? "Saving..." : "Save changes"
-                    ) : (
-                      isSubmitting ? "Adding..." : "Add pet"
-                    ) }
-                  </button>
+                  {step === 2 && (
+                    <button
+                      key="continue-care"
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        goToStep(3);
+                      }}
+                      className="w-full cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] active:bg-emerald-950 dark:bg-emerald-700 dark:hover:bg-emerald-600 dark:active:bg-emerald-800"
+                    >
+                      Continue
+                    </button>
+                  )}
+                  {step === 3 && (
+                    <button
+                      key="save-pet"
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] active:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-emerald-700 dark:hover:bg-emerald-600 dark:active:bg-emerald-800"
+                    >
+                      {defaultValues ? (
+                        isSubmitting ? "Saving..." : "Save changes"
+                      ) : (
+                        isSubmitting ? "Adding..." : "Add pet"
+                      ) }
+                    </button>
+                  )}
                 </div>
               </>
             )}

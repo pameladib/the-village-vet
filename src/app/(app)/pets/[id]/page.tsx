@@ -1,7 +1,9 @@
 import PetProfile from "@/components/pets/pet-profile/PetProfile";
+import { careTiming } from "@/lib/appointments/availability";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/session";
+import { getLocale, messages } from "@/lib/i18n";
 
 export default async function PetProfilePage({
   params,
@@ -36,13 +38,19 @@ export default async function PetProfilePage({
       vaccinations: { select: { id: true, type: true, administeredAt: true } },
       treatments: { select: { id: true, type: true, administeredAt: true } },
       appointments: {
-        where: { status: "BOOKED", startAt: { gte: new Date() } },
-        orderBy: { startAt: "asc" },
+        where: { status: { not: "CANCELLED" } },
+        orderBy: { startAt: "desc" },
         select: { id: true, type: true, services: true, groomingService: true, startAt: true, duration: true },
       },
+      owner: { select: { name: true, phoneNumber: true } },
       documents: {
         orderBy: { createdAt: "desc" },
-        select: { id: true, title: true },
+        select: { id: true, title: true, contentType: true, createdAt: true },
+      },
+      careReminders: {
+        where: { completedAt: null },
+        orderBy: { dueAt: "asc" },
+        select: { id: true, kind: true, dueAt: true, dose: true, vaccinationId: true, treatmentId: true },
       },
     },
   });
@@ -55,7 +63,8 @@ export default async function PetProfilePage({
   Client components do not support Decimal props so we must convert the Decimal object into a normal JS number before passing it to PetProfile
   We cannot just remove it because the pet profile needs to display the age
   */
-  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, documents, ...petFields } = pet;
+  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, documents, careReminders, owner, ...petFields } = pet;
+  const locale = await getLocale();
 
   const profilePet = {
     ...petFields, // using spread to copy the existing properties of the pet object into a new object
@@ -69,8 +78,22 @@ export default async function PetProfilePage({
   return (
     <PetProfile
       pet={profilePet}
-      documents={documents}
+      documents={documents.map((document) => ({
+        id: document.id,
+        title: document.title,
+        contentType: document.contentType,
+        createdAt: document.createdAt.toISOString(),
+      }))}
       canUpload
+      canRecord={session.user.role === "ADMIN"}
+      reminders={careReminders.map((reminder) => ({
+        ...reminder,
+        status: careTiming(reminder.dueAt),
+      }))}
+      backHref={session.user.role === "ADMIN" ? "/admin/patients" : "/dashboard"}
+      owner={session.user.role === "ADMIN" ? { name: owner.name, phone: owner.phoneNumber } : undefined}
+      copy={messages(locale)}
+      locale={locale}
     />
   );
 }

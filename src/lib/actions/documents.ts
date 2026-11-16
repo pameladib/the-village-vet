@@ -13,7 +13,7 @@ import {
     objectKey,
     prepareDocument,
 } from "@/lib/storage/files";
-import { createUploadUrl, readStoredPrefix, removeStoredObject, StorageNotConfiguredError } from "@/lib/storage/supabase";
+import { createUploadUrl, ensurePrivateBucket, readStoredPrefix, removeStoredObject, StorageNotConfiguredError } from "@/lib/storage/supabase";
 
 type Failure = { success: false; formErrors: string[] };
 
@@ -25,11 +25,15 @@ async function editablePet(petId: string): Promise<{ petId: string } | Failure> 
         return { success: false, formErrors: ["You cannot add documents for this pet."] };
     }
     if (!z.uuid().safeParse(petId).success) return { success: false, formErrors: ["That pet was not found."] };
-    const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { id: true, ownerId: true } });
-    if (!pet || !canUploadMedicalDocument(session.user.role, session.user.id, pet.ownerId)) {
-        return { success: false, formErrors: ["You cannot add documents for this pet."] };
+    try {
+        const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { id: true, ownerId: true } });
+        if (!pet || !canUploadMedicalDocument(session.user.role, session.user.id, pet.ownerId)) {
+            return { success: false, formErrors: ["You cannot add documents for this pet."] };
+        }
+        return { petId: pet.id };
+    } catch {
+        return { success: false, formErrors: ["Could not save the document."] };
     }
-    return { petId: pet.id };
 }
 
 function titleOf(value: string) {
@@ -49,6 +53,7 @@ export async function prepareMedicalDocumentUpload(petId: string, input: { title
 
     try {
         const key = objectKey(allowed.petId, check.extension);
+        await ensurePrivateBucket(MEDICAL_DOCUMENTS_BUCKET);
         const signedUrl = await createUploadUrl(MEDICAL_DOCUMENTS_BUCKET, key);
         return { success: true as const, key, signedUrl };
     } catch (error) {

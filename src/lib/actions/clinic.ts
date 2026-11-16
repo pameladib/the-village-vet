@@ -11,7 +11,6 @@ const settingsSchema = z.object({
     email: z.string().trim().max(200).optional(),
     address: z.string().trim().max(300).optional(),
     mapsUrl: z.string().trim().max(500).optional(),
-    emergencyPhone: z.string().trim().max(40).optional(),
     about: z.string().trim().max(2000).optional(),
 });
 
@@ -44,7 +43,6 @@ export async function saveClinicSettings(input: unknown) {
             email,
             address: emptyToNull(parsed.data.address),
             mapsUrl: emptyToNull(parsed.data.mapsUrl),
-            emergencyPhone: emptyToNull(parsed.data.emergencyPhone),
             about: emptyToNull(parsed.data.about),
         },
         create: {
@@ -54,7 +52,6 @@ export async function saveClinicSettings(input: unknown) {
             email,
             address: emptyToNull(parsed.data.address),
             mapsUrl: emptyToNull(parsed.data.mapsUrl),
-            emergencyPhone: emptyToNull(parsed.data.emergencyPhone),
             about: emptyToNull(parsed.data.about),
         },
     });

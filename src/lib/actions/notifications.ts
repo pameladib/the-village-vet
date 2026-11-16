@@ -17,6 +17,6 @@ export async function markNotificationRead(id: string) {
         where: { id, userId: session.user.id, readAt: null },
         data: { readAt: new Date() },
     });
-    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true as const };
 }

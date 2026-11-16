@@ -92,7 +92,7 @@ export default function GeneralTab({ pet }: { pet: PetProfileData }) {
     ];
 
     return (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {cards.map((card) => (
                 <div key={card.label} className="rounded-2xl bg-stone-100 px-3.5 py-3.5 dark:bg-stone-900">
                     <div className="flex items-center gap-2">

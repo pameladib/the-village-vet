@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 export default async function NewAppointmentPage({
     searchParams,
 }: {
-    searchParams: Promise<{ q?: string; petId?: string }>;
+    searchParams: Promise<{ q?: string; petId?: string; service?: string }>;
 }) {
     let session;
     try {
@@ -24,7 +24,7 @@ export default async function NewAppointmentPage({
         throw error;
     }
 
-    const { q = "", petId = "" } = await searchParams;
+    const { q = "", petId = "", service = "" } = await searchParams;
     const locale = await getLocale();
     const copy = messages(locale);
     const staff = session.user.role !== "OWNER";
@@ -49,7 +49,7 @@ export default async function NewAppointmentPage({
                     <button className="rounded-lg bg-emerald-800 px-3 py-2 text-sm font-medium text-white">{copy.bookFind}</button>
                 </form>
             )}
-            <NewAppointmentForm pets={pets} today={todayInBeirut()} emptyMessage={staff ? copy.bookSearchEmpty : undefined} copy={copy} locale={locale} />
+            <NewAppointmentForm pets={pets} today={todayInBeirut()} emptyMessage={staff ? copy.bookSearchEmpty : undefined} copy={copy} locale={locale} petId={petId} service={service} />
         </>
     );
 }

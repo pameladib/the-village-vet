@@ -1,3 +1,4 @@
+import { careTiming } from "@/lib/appointments/availability";
 import { prisma } from "@/lib/prisma";
 import { appointmentWithPetInclude } from "@/lib/types/appointments";
 import { petCardSelect } from "@/lib/types/pets";
@@ -17,16 +18,14 @@ export async function loadOwnerDashboard(userId: string, name: string) {
         prisma.careReminder.findMany({
             where: { completedAt: null, pet: { ownerId: userId } },
             orderBy: { dueAt: "asc" },
-            include: { pet: { select: { name: true } } },
+            include: { pet: { select: { id: true, name: true } } },
         }),
         prisma.notification.findMany({
-            where: { userId },
+            where: { userId, readAt: null },
             orderBy: { createdAt: "desc" },
             take: 20,
         }),
     ]);
-
-    const now = Date.now();
 
     return {
         pets,
@@ -35,14 +34,18 @@ export async function loadOwnerDashboard(userId: string, name: string) {
         reminders: reminders.map((reminder) => ({
             id: reminder.id,
             kind: reminder.kind,
+            dose: reminder.dose,
             dueAt: reminder.dueAt.toISOString(),
+            petId: reminder.pet.id,
             petName: reminder.pet.name,
-            overdue: reminder.dueAt.getTime() < now,
+            status: careTiming(reminder.dueAt),
         })),
         notices: notices.map((notice) => ({
             id: notice.id,
             title: notice.title,
             body: notice.body,
+            dedupeKey: notice.dedupeKey,
+            createdAt: notice.createdAt.toISOString(),
             readAt: notice.readAt?.toISOString() ?? null,
         })),
     };

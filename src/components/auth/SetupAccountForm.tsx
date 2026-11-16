@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/auth-client";
+import PasswordInput from "@/components/auth/PasswordInput";
 import { consumeOwnerInvite } from "@/lib/actions/invite";
 
 export default function SetupAccountForm({ token, name, phoneNumber }: { token: string; name: string; phoneNumber: string }) {
@@ -43,7 +44,7 @@ export default function SetupAccountForm({ token, name, phoneNumber }: { token: 
         >
             <p className="text-sm text-stone-700 dark:text-stone-200">{name} · {phoneNumber}</p>
             <input value={username} onChange={(event) => setUsername(event.target.value)} required minLength={3} placeholder="Username" className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
-            <input value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} type="password" placeholder="Password" className="rounded-lg border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
+            <PasswordInput value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} placeholder="Password" showLabel="Show password" hideLabel="Hide password" className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-950" />
             {error && <p className="text-sm text-red-700">{error}</p>}
             <button type="submit" disabled={pending} className="w-fit rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60">
                 {pending ? "Creating…" : "Create account"}

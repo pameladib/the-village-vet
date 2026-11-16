@@ -8,6 +8,7 @@ supabase.ts signs a URL. The browser uploads or downloads the file directly.
 import { z } from "zod";
 
 export const PET_PHOTOS_BUCKET = "pet-photos";
+export const PRODUCT_PHOTOS_BUCKET = "product-photos";
 export const MEDICAL_DOCUMENTS_BUCKET = "medical-documents";
 
 export const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
@@ -99,4 +100,11 @@ export function isPetObjectKey(petId: string, key: string, extension: string) {
 export function petPhotoSrc(petId: string, photoUrl: string | null | undefined) {
     if (!photoUrl || !isSafeObjectKey(photoUrl)) return null;
     return `/pets/${petId}/photo`;
+}
+
+export function productPhotoSrc(productId: string, photoUrl: string | null | undefined) {
+    if (!photoUrl) return null;
+    if (photoUrl.startsWith("/images/") || photoUrl.startsWith("https://")) return photoUrl;
+    if (isSafeObjectKey(photoUrl)) return `/shop/media/${productId}`;
+    return null;
 }

@@ -58,12 +58,15 @@ export const medicalPetSchema = z.object({
       administeredAt: optionalAdministeredAt,
     })
   ),
+  vaccineNextDueAt: optionalAdministeredAt,
   treatments: z.array(
     z.object({
       type: z.enum(["DEWORMING", "FLEA_TICK"]),
       administeredAt: optionalAdministeredAt,
     }
   )),
+  dewormingNextDueAt: optionalAdministeredAt,
+  fleaNextDueAt: optionalAdministeredAt,
 
   allergies: z.string().optional(),
   medicalConditions: z.string().optional(),

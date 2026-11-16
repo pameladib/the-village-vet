@@ -39,6 +39,6 @@ export function whatsappHref(value: string) {
 export function returnPath(value: string | undefined) {
     if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "/dashboard";
     const path = value.split("?")[0];
-    if (path.startsWith("/appointments") || path.startsWith("/dashboard") || path.startsWith("/pets") || path.startsWith("/shop")) return value;
+    if (path.startsWith("/appointments") || path.startsWith("/dashboard") || path.startsWith("/pets") || path.startsWith("/shop") || path.startsWith("/profile")) return value;
     return "/dashboard";
 }

@@ -1,24 +1,41 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AddToCartButton from "@/components/shop/AddToCartButton";
+import ProductPhoto from "@/components/shop/ProductPhoto";
+import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { formatLbp, shopText } from "@/lib/shop/catalog";
+import { productPhotoSrc } from "@/lib/storage/files";
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const product = await prisma.product.findFirst({
         where: { id, available: true },
-        include: { category: { select: { name: true } } },
+        include: { category: { select: { name: true, nameAr: true } } },
     });
     if (!product) notFound();
 
+    const locale = await getLocale();
+    const copy = messages(locale);
+    const name = shopText(locale, product.name, product.nameAr);
+    const description = shopText(locale, product.description, product.descriptionAr);
+
     return (
-        <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
-            <Link href="/shop" className="text-sm text-emerald-800">Shop</Link>
-            <p className="mt-4 text-xs uppercase tracking-wide text-stone-500">{product.category.name}</p>
-            <h1 className="mt-1 text-2xl font-semibold">{product.name}</h1>
-            {product.description && <p className="mt-2 text-sm text-stone-700">{product.description}</p>}
-            <p className="mt-3 text-sm">{product.price} LBP</p>
-            <AddToCartButton productId={product.id} name={product.name} price={product.price} stock={product.stock} />
+        <main className="bg-[#f6f1e8]">
+            <div className="mx-auto grid w-full max-w-5xl gap-8 px-5 py-8 lg:grid-cols-2 lg:py-12">
+                <div className="relative aspect-square overflow-hidden rounded-[2rem] bg-[#efe8dc]">
+                    <ProductPhoto src={productPhotoSrc(product.id, product.photoUrl)} alt={name} sizes="(min-width: 1024px) 36rem, 100vw" />
+                </div>
+                <div className="flex flex-col justify-center">
+                    <Link href="/shop" className="text-sm font-medium text-emerald-800">{copy.shopBackStore}</Link>
+                    <p className="mt-6 text-xs font-medium tracking-[0.16em] text-emerald-800 uppercase">{shopText(locale, product.category.name, product.category.nameAr)}</p>
+                    <h1 className="mt-2 text-4xl text-emerald-950">{name}</h1>
+                    {description && <p className="mt-4 max-w-md text-base leading-7 text-stone-600">{description}</p>}
+                    <p className="mt-6 text-2xl text-emerald-950">{formatLbp(product.price, locale)} {copy.lbp}</p>
+                    <p className="mt-2 text-sm text-stone-500">{product.stock > 0 ? copy.shopStockIn : copy.shopOut}</p>
+                    <AddToCartButton productId={product.id} name={name} price={product.price} stock={product.stock} image={productPhotoSrc(product.id, product.photoUrl)} copy={copy} />
+                </div>
+            </div>
         </main>
     );
 }

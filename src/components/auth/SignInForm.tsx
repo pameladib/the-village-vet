@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { authClient } from "@/lib/auth/auth-client";
 import type { SuccessContext } from "@better-fetch/fetch";
-import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/auth/PasswordInput";
 import LocaleSwitch from "@/components/LocaleSwitch";
+import { loginFailureReason } from "@/lib/actions/login";
 import type { Copy, Locale } from "@/lib/i18n";
 
 const inputClassName =
@@ -37,7 +38,6 @@ function logInFieldErrors(form: LogInFields, copy: Copy) {
 }
 
 function logInRequestMessage(error: { code?: string }, copy: Copy) {
-    if (error.code === "INVALID_USERNAME_OR_PASSWORD") return copy.errLoginMismatch;
     if (error.code === "USERNAME_TOO_SHORT") return copy.errUsernameShort;
     if (error.code === "USERNAME_TOO_LONG") return copy.errUsernameLong;
     if (error.code === "INVALID_USERNAME") return copy.errUsernameChars;
@@ -51,15 +51,16 @@ export default function LogInForm({ nextPath = "/dashboard", copy, locale }: { n
     });
     const [fieldErrors, setFieldErrors] = useState<Partial<LogInFields>>({});
     const [formError, setFormError] = useState<string | null>(null);
+    const [passwordHint, setPasswordHint] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    const router = useRouter();
     async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
         e.preventDefault();
 
         const nextFieldErrors = logInFieldErrors(form, copy);
         setFieldErrors(nextFieldErrors);
         setFormError(null);
+        setPasswordHint(false);
         if (Object.keys(nextFieldErrors).length > 0) return;
 
         setSubmitting(true);
@@ -70,12 +71,24 @@ export default function LogInForm({ nextPath = "/dashboard", copy, locale }: { n
                 password: form.password
             }, {
                 onSuccess: (_ctx: SuccessContext) => {
-                    router.push(nextPath);
+                    window.location.assign(nextPath);
                 }
             });
 
             if (error) {
-                setFormError(logInRequestMessage(error, copy));
+                if (error.code === "INVALID_USERNAME_OR_PASSWORD") {
+                    const reason = await loginFailureReason(form.username);
+                    if (reason === "password") {
+                        setFieldErrors({ password: copy.errLoginPassword });
+                        setPasswordHint(true);
+                    } else if (reason === "username") {
+                        setFieldErrors({ username: copy.errLoginUsername });
+                    } else {
+                        setFormError(copy.errLoginFailed);
+                    }
+                } else {
+                    setFormError(logInRequestMessage(error, copy));
+                }
                 setSubmitting(false);
             }
         } catch {
@@ -93,6 +106,7 @@ export default function LogInForm({ nextPath = "/dashboard", copy, locale }: { n
         });
         setFieldErrors((current) => ({ ...current, [name]: undefined }));
         setFormError(null);
+        if (name === "password" || name === "username") setPasswordHint(false);
     }
 
     return (
@@ -147,8 +161,9 @@ export default function LogInForm({ nextPath = "/dashboard", copy, locale }: { n
                             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-stone-800 dark:text-stone-200">
                                 {copy.password}
                             </label>
-                            <input id="password" type="password" name="password" value={form.password} onChange={handleChange} autoComplete="current-password" placeholder={copy.password} className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
+                            <PasswordInput id="password" name="password" value={form.password} onChange={handleChange} autoComplete="current-password" placeholder={copy.password} showLabel={copy.showPassword} hideLabel={copy.hidePassword} className={`${inputClassName} ${fieldErrors.password ? invalidInputClassName : validInputClassName}`} />
                             {fieldErrors.password && <p className={fieldErrorClassName}>{fieldErrors.password}</p>}
+                            {passwordHint && <p className="mt-1.5 text-sm leading-5 text-stone-600 dark:text-stone-300">{copy.loginForgotPassword}</p>}
                         </div>
                     </div>
 

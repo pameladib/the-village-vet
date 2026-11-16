@@ -6,8 +6,8 @@
 // hourInBeirut() returns the current hour in Beirut time
 // todayInBeirut() returns the current date in Beirut time as a YYYY-MM-DD string
 
-import { beirutInstant, careNoticeDay, hourInBeirut, todayInBeirut } from "@/lib/appointments/availability";
-import { notify } from "@/lib/notifications"; // notify creates a new notification record in the database
+import { beirutInstant, calendarDateInBeirut, careNoticeDay, hourInBeirut, todayInBeirut } from "@/lib/appointments/availability";
+import { notify, notifyOwnerAndStaff } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma"; // prisma is the database client, which allows us to query the database
 
 function nextCalendarDate(date: string) { // takes a YYYY-MM-DD string and returns the next calendar date as a YYYY-MM-DD string (the next day)
@@ -65,11 +65,11 @@ export async function GET(request: Request) {
         if (sameDay) todayCount += 1; // if the appointment is today, we increment the todayCount variable
         else tomorrowCount += 1; // if the appointment is not today, we increment the tomorrowCount variable
 
-        await notify( // notify creates a new notification record in the database. It takes the following arguments: the user ID, the notification type, the notification message, and the dedupeKey.
+        await notify(
             appointment.ownerId,
             sameDay ? "Appointment today" : "Appointment tomorrow",
             sameDay ? "You have a visit today." : "You have a visit tomorrow.",
-            sameDay ? `appt-today:${appointment.id}` : `appt-tomorrow:${appointment.id}`, // the dedupeKey is used to avoid sending duplicate notifications for the same appointment.
+            sameDay ? `appt-today:${appointment.id}` : `appt-tomorrow:${appointment.id}`,
         );
 
         /* If the appointment is today:
@@ -113,11 +113,12 @@ export async function GET(request: Request) {
         if (covered.has(`${reminder.petId}:${reminder.kind}`)) continue;
         reminderCount += 1;
         const followUp = reminder.when === "plus7";
-        await notify(
+        const dueDay = calendarDateInBeirut(reminder.dueAt);
+        await notifyOwnerAndStaff(
             reminder.pet.ownerId,
             followUp ? "Care is still due" : "Care is due today",
             `${reminder.pet.name} has a vaccination or treatment to book.`,
-            `care:${reminder.id}:${followUp ? "plus7" : "due"}`,
+            `care:${reminder.id}:${dueDay}:${followUp ? "plus7" : "due"}`,
         );
     }
 

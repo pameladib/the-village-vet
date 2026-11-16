@@ -4,7 +4,7 @@ import { PetForm, petSchema } from "../validations/pet";
 import { requireRole } from "../auth/session";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { syncVaccineReminder } from "@/lib/clinic/reminders";
+import { applyRecordedFollowUps, syncVaccineReminder } from "@/lib/clinic/reminders";
 import { canChangePetPhoto } from "@/lib/auth/permissions";
 import { PET_PHOTOS_BUCKET, isSafeObjectKey } from "@/lib/storage/files";
 import { removeStoredObject } from "@/lib/storage/supabase";
@@ -16,6 +16,30 @@ async function discardPhoto(photoUrl: string | null) {
 
 function saveError() {
     return "Could not save this pet.";
+}
+
+function latestAdministration(rows: { administeredAt?: string }[]) {
+    return rows.reduce<string | undefined>((latest, row) => {
+        if (!row.administeredAt) return latest;
+        if (!latest || row.administeredAt > latest) return row.administeredAt;
+        return latest;
+    }, undefined);
+}
+
+function followUpError(
+    species: string,
+    vaccinations: { type: string; administeredAt?: string }[],
+    treatments: { type: string; administeredAt?: string }[],
+    followUps: { vaccine?: string; deworming?: string; flea?: string },
+) {
+    if (species === "CAT" && vaccinations.some((dose) => dose.type === "THIRD")) return "Cats do not have a third vaccine dose.";
+    const checks = [
+        [latestAdministration(vaccinations), followUps.vaccine],
+        [latestAdministration(treatments.filter((row) => row.type === "DEWORMING")), followUps.deworming],
+        [latestAdministration(treatments.filter((row) => row.type === "FLEA_TICK")), followUps.flea],
+    ];
+    if (checks.some(([given, due]) => given && due && due < given)) return "The next due date cannot be before the dose was given.";
+    return null;
 }
 
 function doseDateKey(date: Date | null) {
@@ -95,6 +119,13 @@ export async function createPet(data: PetForm) {
                 : Math.round(result.data.currentWeight) // else
             : null; // else return null
 
+    const followUp = followUpError(result.data.species, result.data.vaccinations, result.data.treatments, {
+        vaccine: result.data.vaccineNextDueAt,
+        deworming: result.data.dewormingNextDueAt,
+        flea: result.data.fleaNextDueAt,
+    });
+    if (followUp) return { success: false, formErrors: [followUp] };
+
     try {
         const created = await prisma.pet.create({
             data: {
@@ -123,18 +154,25 @@ export async function createPet(data: PetForm) {
                     create: result.data.vaccinations.map((vaccination) => ({
                         type: vaccination.type,
                         administeredAt: vaccination.administeredAt ? new Date(vaccination.administeredAt) : null,
+                        followUpCleared: true,
                     })),
                 },
                 treatments: {
                     create: result.data.treatments.map((treatment) => ({
                         type: treatment.type,
                         administeredAt: treatment.administeredAt ? new Date(treatment.administeredAt) : null,
+                        followUpCleared: true,
                     })),
                 },
                 ...(weightGrams != null ? { weightRecords: { create: { weightGrams } } } : {}),
             },
         });
 
+        await applyRecordedFollowUps(prisma, created.id, result.data.species, result.data.vaccinations, result.data.treatments, {
+            vaccine: result.data.vaccineNextDueAt,
+            deworming: result.data.dewormingNextDueAt,
+            flea: result.data.fleaNextDueAt,
+        });
         await syncVaccineReminder(prisma, created.id, result.data.species);
 
         return { success: true, id: created.id };
@@ -222,6 +260,13 @@ export async function updatePet(id: string, data: PetForm) {
     const ageChanged = estimatedAge !== previousAge || estimatedAgeUnit !== existing.estimatedAgeUnit;
     const estimatedAgeAt = estimatedAge == null ? null : ageChanged ? new Date() : existing.estimatedAgeAt;
 
+    const followUp = followUpError(result.data.species, result.data.vaccinations, result.data.treatments, {
+        vaccine: result.data.vaccineNextDueAt,
+        deworming: result.data.dewormingNextDueAt,
+        flea: result.data.fleaNextDueAt,
+    });
+    if (followUp) return { success: false, formErrors: [followUp] };
+
     const vaccinations = splitKeptAndNew(existing.vaccinations, result.data.vaccinations);
     const treatments = splitKeptAndNew(existing.treatments, result.data.treatments);
     if (result.data.removePhoto && !canChangePetPhoto(session.user.role)) {
@@ -284,6 +329,7 @@ export async function updatePet(id: string, data: PetForm) {
                         petId: id,
                         type: vaccination.type as "FIRST" | "SECOND" | "THIRD" | "ANNUAL",
                         administeredAt: vaccination.administeredAt,
+                        followUpCleared: true,
                     })),
                 });
             }
@@ -294,6 +340,7 @@ export async function updatePet(id: string, data: PetForm) {
                         petId: id,
                         type: treatment.type as "DEWORMING" | "FLEA_TICK",
                         administeredAt: treatment.administeredAt,
+                        followUpCleared: true,
                     })),
                 });
             }
@@ -314,6 +361,11 @@ export async function updatePet(id: string, data: PetForm) {
         await savePet(result.data.removePhoto ? null : undefined);
         if (result.data.removePhoto) await discardPhoto(existing.photoUrl).catch(() => undefined);
         // The pet is already saved. A failed reminder must not undo that save. The next save rebuilds it.
+        await applyRecordedFollowUps(prisma, id, form.species, result.data.vaccinations, result.data.treatments, {
+            vaccine: result.data.vaccineNextDueAt,
+            deworming: result.data.dewormingNextDueAt,
+            flea: result.data.fleaNextDueAt,
+        }).catch(() => undefined);
         await syncVaccineReminder(prisma, id, form.species).catch(() => undefined);
 
         return { success: true, id };

@@ -8,7 +8,10 @@ import GeneralTab from "./tabs/GeneralTab";
 import AppointmentsTab from "./tabs/AppointmentsTab";
 import VaccinationsTab from "./tabs/VaccinationsTab";
 import MedicalTab from "./tabs/MedicalTab";
+import SpeciesMark from "@/components/pets/SpeciesMark";
+import type { Copy, Locale } from "@/lib/i18n";
 import { petPhotoSrc } from "@/lib/storage/files";
+import type { PetDocument } from "@/components/pets/DocumentList";
 
 /* cannot use the Prisma generated Pet type because estimatedAgeValue is a Decimal while we are passing it as a normal JS number
 thus we must create a new type 
@@ -25,6 +28,16 @@ export type ProfileTreatment = {
     id: string;
     type: "DEWORMING" | "FLEA_TICK";
     administeredAt: Date | null;
+};
+
+export type ProfileReminder = {
+    id: string;
+    kind: "VACCINATION" | "DEWORMING" | "FLEA_TREATMENT";
+    dueAt: Date;
+    dose: string | null;
+    vaccinationId: string | null;
+    treatmentId: string | null;
+    status: "overdue" | "due" | "upcoming";
 };
 
 export type ProfileAppointment = {
@@ -44,7 +57,27 @@ export type PetProfileData = Omit<Pet, "estimatedAgeValue"> & { // keep every ot
     appointments: ProfileAppointment[];
 };
 
-export default function PetProfile({ pet, documents = [], canUpload = false }: { pet: PetProfileData; documents?: { id: string; title: string }[]; canUpload?: boolean }) {
+export default function PetProfile({
+    pet,
+    documents = [],
+    canUpload = false,
+    canRecord = false,
+    reminders = [],
+    backHref = "/dashboard",
+    owner,
+    copy,
+    locale = "en",
+}: {
+    pet: PetProfileData;
+    documents?: PetDocument[];
+    canUpload?: boolean;
+    canRecord?: boolean;
+    reminders?: ProfileReminder[];
+    backHref?: string;
+    owner?: { name: string; phone: string };
+    copy: Copy;
+    locale?: Locale;
+}) {
     const [activeTab, setActiveTab] = useState("general");
 
     const tabs = [ // this array lets us define the tabs once and generate the buttons dynamically instead of writing four buttons manually
@@ -55,49 +88,56 @@ export default function PetProfile({ pet, documents = [], canUpload = false }: {
     ]
 
     const breed = pet.breed?.trim();
+    const species = pet.species === "CAT" ? "Cat" : "Dog";
+    const photo = petPhotoSrc(pet.id, pet.photoUrl);
 
     return (
-        <div className="flex flex-1 justify-center bg-white px-4 py-6 dark:bg-stone-950 sm:px-6">
-            <div className="w-full max-w-md">
-                <header className="grid grid-cols-[5.75rem_1fr_5.75rem] items-center">
+        <div className="flex flex-1 justify-center px-4 py-6 sm:px-6">
+            <div className="w-full max-w-5xl">
+                <header className="flex items-center justify-between gap-3">
                     <Link
-                        href="/dashboard"
-                        className="justify-self-start inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition duration-200 hover:scale-[1.03] hover:border-emerald-700 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
+                        href={backHref}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
                     >
-                        <ChevronLeft className="size-4" strokeWidth={1.5} />
+                        <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
                         Back
                     </Link>
-                    <h1 className="text-center text-lg font-semibold tracking-tight text-stone-900 dark:text-stone-50">
-                        Profile
-                    </h1>
                     <Link
                         href={`/pets/${pet.id}/edit`}
-                        className="justify-self-end inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition duration-200 hover:scale-[1.03] hover:border-emerald-700 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
                     >
                         <SquarePen className="size-4" strokeWidth={1.5} />
                         Edit
                     </Link>
                 </header>
 
-                <div className="mt-8 flex flex-col items-center text-center">
-                    <div className="size-32 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950">
-                        {petPhotoSrc(pet.id, pet.photoUrl) ? (
-                            <img src={petPhotoSrc(pet.id, pet.photoUrl) ?? ""} alt="" className="size-full object-cover" />
+                <section className="mt-4 flex flex-col gap-4 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:flex-row sm:items-center dark:border-stone-800 dark:bg-stone-900">
+                    <div className="size-24 shrink-0 overflow-hidden rounded-2xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                        {photo ? (
+                            <img src={photo} alt="" className="size-full object-cover" />
                         ) : (
-                            <div className="flex size-full items-center justify-center text-4xl font-medium text-emerald-800 dark:text-emerald-200">
-                                {pet.name.slice(0, 1)}
+                            <div className="flex size-full items-center justify-center">
+                                <SpeciesMark species={pet.species} className="size-10" />
                             </div>
                         )}
                     </div>
-                    <h2 className="mt-4 text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">
-                        {pet.name}
-                    </h2>
-                    {breed && (
-                        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{breed}</p>
-                    )}
-                </div>
+                    <div className="min-w-0">
+                        <h1 className="truncate text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{pet.name}</h1>
+                        <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
+                            {species}
+                            {breed ? ` · ${breed}` : ""}
+                        </p>
+                        {owner && (
+                            <p className="mt-2 text-sm text-stone-500">
+                                Owner: {owner.name}
+                                <span className="px-2">·</span>
+                                Phone: {owner.phone}
+                            </p>
+                        )}
+                    </div>
+                </section>
 
-                <div className="mt-6 flex justify-center">
+                <div className="mt-6 flex justify-start">
                     <div className="flex w-max min-w-0 max-w-full gap-2 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {tabs.map((tab) => { // rendering the tab bar
                             const selected = activeTab === tab.id; // selected is a boolean variable that checks whether the current button is the selected one. If yes, it adds a visual effect
@@ -122,8 +162,8 @@ export default function PetProfile({ pet, documents = [], canUpload = false }: {
                 <div className="mt-3">
                     {activeTab === "general" && <GeneralTab pet={pet} />}
                     {activeTab === "appointments" && <AppointmentsTab pet={pet} />}
-                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} />}
-                    {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload} />}
+                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} reminders={reminders} canRecord={canRecord} copy={copy} locale={locale} />}
+                    {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload} copy={copy} locale={locale} />}
                 </div>
             </div>
         </div>

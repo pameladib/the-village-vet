@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { removePushSubscription } from "@/lib/actions/push";
 import { authClient } from "@/lib/auth/auth-client";
 
 export default function LogOutButton({ label, className }: { label: string; className?: string }) {
@@ -14,6 +15,16 @@ export default function LogOutButton({ label, className }: { label: string; clas
             disabled={pending}
             onClick={async () => {
                 setPending(true);
+                try {
+                    const registration = await navigator.serviceWorker?.getRegistration();
+                    const subscription = await registration?.pushManager?.getSubscription();
+                    if (subscription) {
+                        await removePushSubscription(subscription.endpoint);
+                        await subscription.unsubscribe();
+                    }
+                } catch {
+                    // Signing out still continues when this browser has no push subscription.
+                }
                 const { error } = await authClient.signOut();
                 if (error) {
                     setPending(false);

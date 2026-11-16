@@ -1,12 +1,16 @@
-import Link from "next/link";
+import { getLocale, messages } from "@/lib/i18n";
 import CartView from "@/components/shop/CartView";
 
-export default function CartPage() {
+export default async function CartPage() {
+    const locale = await getLocale();
+    const copy = messages(locale);
+
     return (
-        <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
-            <Link href="/shop" className="text-sm text-emerald-800">Shop</Link>
-            <h1 className="mt-3 text-2xl font-semibold">Cart</h1>
-            <CartView />
+        <main className="bg-[#f6f1e8]">
+            <div className="mx-auto w-full max-w-2xl px-5 py-10">
+                <h1 className="text-4xl text-emerald-950">{copy.shopCart}</h1>
+                <CartView copy={copy} locale={locale} />
+            </div>
         </main>
     );
 }

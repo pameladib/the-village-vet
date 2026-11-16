@@ -17,6 +17,17 @@ function storageEnv() {
     return { url, key };
 }
 
+export async function ensurePrivateBucket(bucket: string) {
+    const storage = serviceClient().storage;
+    const existing = await storage.getBucket(bucket);
+    if (existing.data) return;
+    const created = await storage.createBucket(bucket, { public: false });
+    if (created.error) {
+        const again = await storage.getBucket(bucket);
+        if (!again.data) throw new Error("Could not prepare the upload.");
+    }
+}
+
 function serviceClient() {
     const { url, key } = storageEnv();
     if (!client) {
@@ -63,6 +74,7 @@ export async function readStoredPrefix(bucket: string, key: string) {
             Range: "bytes=0-31",
         },
         cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
     });
     if (response.status !== 200 && response.status !== 206) {
         await response.body?.cancel().catch(() => undefined);

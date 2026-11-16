@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import OwnerDashboard from "@/components/dashboards/OwnerDashboard";
 import StaffDashboard from "@/components/dashboards/StaffDashboard";
 import { auth } from "@/lib/auth/auth";
+import { canManageScheduleBlocks } from "@/lib/auth/permissions";
 import { getLocale, messages } from "@/lib/i18n";
 import { loadOwnerDashboard } from "./load-owner";
 import { loadStaffDashboard } from "./load-staff";
@@ -23,10 +24,11 @@ export default async function DashboardPage({
 
     if (role === "ADMIN" || role === "SECONDARY_ADMIN") {
         const { q = "" } = await searchParams;
-        const data = await loadStaffDashboard(session.user.id, role, q);
-        return <StaffDashboard copy={copy} locale={locale} {...data} />;
+        if (q.trim()) redirect(`/admin/patients?q=${encodeURIComponent(q.trim())}`);
+        const data = await loadStaffDashboard(role);
+        return <StaffDashboard copy={copy} locale={locale} manageClinic={canManageScheduleBlocks(role)} {...data} />;
     }
 
     const data = await loadOwnerDashboard(session.user.id, session.user.name);
-    return <OwnerDashboard copy={copy} {...data} />;
+    return <OwnerDashboard copy={copy} locale={locale} {...data} />;
 }

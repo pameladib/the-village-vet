@@ -5,6 +5,7 @@ export const appointmentWithPetInclude = {
         select: {
             id: true,
             name: true,
+            species: true,
             photoUrl: true,
         },
     },

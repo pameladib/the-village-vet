@@ -127,6 +127,14 @@ function addCalendarDays(date: string, days: number) {
 }
 
 // "due" on the due date and "plus7" seven calendar days later. Any other day, including the days after a missed notice, returns null.
+export function careTiming(dueAt: Date, now = new Date()) {
+    const today = todayInBeirut(now);
+    const dueDay = calendarDateInBeirut(dueAt);
+    if (dueDay < today) return "overdue" as const;
+    if (dueDay === today) return "due" as const;
+    return "upcoming" as const;
+}
+
 export function careNoticeDay(dueAt: Date, now: Date) {
     const today = todayInBeirut(now);
     const dueDay = calendarDateInBeirut(dueAt);
@@ -135,14 +143,14 @@ export function careNoticeDay(dueAt: Date, now: Date) {
     return null;
 }
 
-// Open and close instants for one clinic day. Sunday has no range.
-export function clinicDayRange(date: string) {
-    const { year, month, day, weekday } = clinicDate(date);
-    if (weekday === 0) return null;
-    const close = weekday === 6 ? 14 * 60 : 18 * 60;
-    return {
-        open: atBeirut(year, month, day, 9 * 60),
-        close: atBeirut(year, month, day, close),
+// // this function calculates the opening and closing times of the clinic for a given date, taking into consideration the clinic's working days and the hours in Beirut time
+export function clinicDayRange(date: string) { // it receives the date as a string. e.g. clinicDayRange("2026-11-16");
+    const { year, month, day, weekday } = clinicDate(date); // clinicDate() is used to parse the date string and extract the year, month, day, and weekday
+    if (weekday === 0) return null; // the weekday value follows JavaScript's convention, where Sunday is 0 and Saturday is 6. If the given date falls on a Sunday, the function immediately returns null because the clinic is closed on Sundays.
+    const close = weekday === 6 ? 14 * 60 : 18 * 60; // ternary operator: if the date falls on a Saturday, the closing time is 2pm (14 * 60 minutes), otherwise it is 6pm (18 * 60 minutes). We multiply by 60 because the function represents time using minutes since midnight. e.g. 9 AM is 9 * 60 = 540 minutes
+    return { // returns an object with two JavaScript Date objects: open and close
+        open: atBeirut(year, month, day, 9 * 60), // opening time is always 9 AM
+        close: atBeirut(year, month, day, close), // closing time depends on the day of the week
     };
 }
 

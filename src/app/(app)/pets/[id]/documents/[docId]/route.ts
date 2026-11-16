@@ -6,7 +6,7 @@ import { createDownloadUrl } from "@/lib/storage/supabase";
 
 function downloadName(title: string, key: string) {
     const extension = key.split(".").pop() ?? "pdf";
-    const base = title.replaceAll(/[^A-Za-z0-9 ._-]+/g, "").trim().slice(0, 80);
+    const base = title.replaceAll(/[\u0000-\u001f\\/:*?"<>|]+/g, " ").replaceAll(/\s+/g, " ").trim().slice(0, 80);
     return `${base || "document"}.${extension}`;
 }
 
@@ -37,11 +37,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         return new Response("Not available", { status: 415 });
     }
 
+    const view = new URL(_request.url).searchParams.get("view") === "1";
     try {
         const signedUrl = await createDownloadUrl(
             MEDICAL_DOCUMENTS_BUCKET,
             document.storedName,
-            downloadName(document.title, document.storedName),
+            view ? undefined : downloadName(document.title, document.storedName),
         );
         return new Response(null, {
             status: 302,

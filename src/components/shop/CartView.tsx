@@ -1,69 +1,118 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { placeOrder } from "@/lib/actions/shop";
+import type { Copy, Locale } from "@/lib/i18n";
+import { formatLbp } from "@/lib/shop/catalog";
+import ProductPhoto from "./ProductPhoto";
 
-export type CartLine = { productId: string; name: string; quantity: number; price: number };
+export type CartLine = {
+    productId: string;
+    name: string;
+    quantity: number;
+    price: number;
+    image?: string | null;
+};
 
 const storageKey = "village-vet-cart";
+export const cartEvent = "village-vet-cart";
 
 export function readCart(): CartLine[] {
     if (typeof window === "undefined") return [];
     try {
         const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as CartLine[];
-        return Array.isArray(parsed) ? parsed : [];
+        return Array.isArray(parsed) ? parsed.filter((line) => line && typeof line.productId === "string") : [];
     } catch {
         return [];
     }
 }
 
-export function addToCart(line: CartLine) {
-    const cart = readCart();
-    const existing = cart.find((item) => item.productId === line.productId);
-    const next = existing
-        ? cart.map((item) => item.productId === line.productId ? { ...item, quantity: item.quantity + line.quantity } : item)
-        : [...cart, line];
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
+function writeCart(lines: CartLine[]) {
+    window.localStorage.setItem(storageKey, JSON.stringify(lines));
+    window.dispatchEvent(new Event(cartEvent));
 }
 
-export default function CartView() {
-    const router = useRouter();
+export function clearCart() {
+    window.localStorage.removeItem(storageKey);
+    window.dispatchEvent(new Event(cartEvent));
+}
+
+export function setCartQuantity(line: Omit<CartLine, "quantity">, quantity: number) {
+    const cart = readCart().filter((item) => item.productId !== line.productId);
+    const next = quantity < 1 ? cart : [...cart, { ...line, quantity: Math.min(20, quantity) }];
+    writeCart(next);
+}
+
+export function addToCart(line: CartLine) {
+    const current = readCart().find((item) => item.productId === line.productId)?.quantity ?? 0;
+    setCartQuantity(line, Math.min(20, current + line.quantity));
+}
+
+export default function CartView({ copy, locale }: { copy: Copy; locale: Locale }) {
     const [lines, setLines] = useState<CartLine[]>(() => readCart());
-    const [error, setError] = useState<string | null>(null);
-    const [pending, setPending] = useState(false);
+    const total = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+
+    function update(next: CartLine[]) {
+        setLines(next);
+        writeCart(next);
+    }
 
     return (
-        <div className="mt-6 flex flex-col gap-3">
-            {lines.length === 0 && <p className="text-sm text-stone-600">The cart is empty.</p>}
+        <div className="mt-8 flex flex-col gap-4">
+            {lines.length === 0 && (
+                <div className="rounded-3xl bg-white px-6 py-10 text-center ring-1 ring-stone-200">
+                    <p className="text-stone-600">{copy.shopCartEmpty}</p>
+                    <Link href="/shop" className="mt-4 inline-flex rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white">{copy.shopBackStore}</Link>
+                </div>
+            )}
             {lines.map((line) => (
-                <div key={line.productId} className="flex items-center justify-between rounded-xl border border-emerald-100 px-3 py-2 text-sm">
-                    <span>{line.name} × {line.quantity}</span>
-                    <span>{line.price * line.quantity} LBP</span>
+                <div key={line.productId} className="flex gap-4 rounded-3xl bg-white p-3 ring-1 ring-stone-200">
+                    <div className="relative size-24 shrink-0 overflow-hidden rounded-2xl bg-[#efe8dc]">
+                        <ProductPhoto src={line.image ?? null} alt="" sizes="96px" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                        <p className="font-medium text-emerald-950">{line.name}</p>
+                        <p className="mt-1 text-sm text-stone-500">{formatLbp(line.price, locale)} {copy.lbp}</p>
+                        <div className="mt-auto flex items-center justify-between gap-3 pt-3">
+                            <label className="inline-flex items-center gap-2 text-sm text-stone-600">
+                                <span className="sr-only">{copy.shopStockField}</span>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={line.quantity}
+                                    onChange={(event) => {
+                                        const quantity = Number(event.target.value);
+                                        if (!Number.isFinite(quantity)) return;
+                                        update(lines.map((item) => item.productId === line.productId ? { ...item, quantity: Math.min(20, Math.max(1, quantity)) } : item));
+                                    }}
+                                    className="w-16 rounded-full border border-stone-200 px-2 py-1 text-sm"
+                                />
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => update(lines.filter((item) => item.productId !== line.productId))}
+                                className="text-sm text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-emerald-900"
+                            >
+                                {copy.shopRemove}
+                            </button>
+                        </div>
+                    </div>
+                    <p className="text-sm font-medium text-emerald-950">{formatLbp(line.price * line.quantity, locale)} {copy.lbp}</p>
                 </div>
             ))}
-            {error && <p className="text-sm text-red-700">{error}</p>}
-            <p className="text-xs text-stone-500">Payment is cash when you collect the order. The clinic confirms the stock again when you submit.</p>
-            <button
-                type="button"
-                disabled={pending || lines.length === 0}
-                onClick={async () => {
-                    setPending(true);
-                    const result = await placeOrder({ items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })) });
-                    setPending(false);
-                    if (!result.success) {
-                        setError(result.formErrors[0] ?? "Could not place the order.");
-                        return;
-                    }
-                    window.localStorage.removeItem(storageKey);
-                    setLines([]);
-                    router.push("/shop/orders");
-                    router.refresh();
-                }}
-                className="w-fit rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-            >
-                {pending ? "Sending…" : "Place order"}
-            </button>
+            {lines.length > 0 && (
+                <div className="rounded-3xl bg-emerald-950 px-5 py-5 text-white">
+                    <div className="flex items-center justify-between text-sm">
+                        <span>{copy.shopTotal}</span>
+                        <span className="text-lg font-medium">{formatLbp(total, locale)} {copy.lbp}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-emerald-100">{copy.shopCartLead}</p>
+                    <Link href="/shop/checkout" className="mt-4 inline-flex rounded-full bg-white px-5 py-2.5 text-sm font-medium text-emerald-950 transition duration-200 hover:scale-[1.02] hover:bg-emerald-50 hover:shadow-md">
+                        {copy.shopProceed}
+                    </Link>
+                </div>
+            )}
         </div>
     );
 }
