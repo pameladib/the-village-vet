@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import LogOutButton from "@/components/auth/LogOutButton";
@@ -60,8 +59,8 @@ export default function PublicHeader({
                 <div className="ms-auto flex items-center gap-3 lg:ms-2">
                     <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50" />
                     {showProfile && (
-                        <Link href="/profile" aria-label={copy.profile} className="rounded-full p-1.5 text-emerald-950 hover:bg-stone-100">
-                            <UserRound className="size-5" strokeWidth={1.75} />
+                        <Link href="/profile" className="text-sm font-semibold text-emerald-950 hover:text-emerald-800">
+                            {copy.profile}
                         </Link>
                     )}
                     <Link href={accountHref} className="hidden text-sm font-semibold text-emerald-950 hover:text-emerald-800 sm:inline">

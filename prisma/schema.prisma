@@ -394,6 +394,20 @@ model ClinicSetting {
   @@map("clinic_setting")
 }
 
+// Homepage pictures chosen in clinic settings. HERO and ABOUT are single slots. GALLERY is the carousel, in position order.
+model ClinicPhoto {
+  id         String   @id @default(uuid())
+  kind       String
+  position   Int      @default(0)
+  storageKey String   @unique
+  captionEn  String   @default("")
+  captionAr  String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([kind, position])
+  @@map("clinic_photo")
+}
+
 model MedicalDocument {
   id          String   @id @default(uuid())
   title       String

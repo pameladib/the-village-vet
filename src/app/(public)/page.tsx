@@ -1,9 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import ClinicGallery from "@/components/public/ClinicGallery";
-import { clinicHomePhoto, clinicVisitPhoto } from "@/components/public/photos";
+import ClinicPicture from "@/components/public/ClinicPicture";
 import { ServiceGrid } from "@/components/public/services";
-import { getClinicSettings } from "@/lib/clinic/public";
+import { getClinicSettings, getPublicPhotos } from "@/lib/clinic/public";
 import { getLocale, messages } from "@/lib/i18n";
 
 const clinicMapsUrl = "https://maps.app.goo.gl/VgbXYipPXhcg4y8i8";
@@ -14,6 +13,7 @@ export default async function HomePage() {
     const locale = await getLocale(); // get the locale from the cookie
     const copy = messages(locale); // get the corresponding copy for the locale based on the locale we got from the cookie
     const settings = await getClinicSettings();
+    const photos = await getPublicPhotos(locale, copy);
     const mapsUrl = settings?.mapsUrl?.trim() || clinicMapsUrl;
 
     return (
@@ -35,27 +35,14 @@ export default async function HomePage() {
                     </div>
                 </div>
                 <div className="relative order-2 min-h-[28rem] overflow-hidden rounded-2xl bg-stone-100 sm:min-h-[34rem] lg:order-none">
-                    <Image
-                        src={clinicVisitPhoto}
-                        alt="A veterinarian in a white coat holding a cat in a bright room."
-                        fill
-                        priority
-                        sizes="(min-width: 1024px) 50vw, 100vw"
-                        className="object-cover"
-                    />
+                    <ClinicPicture src={photos.hero.src} alt={photos.hero.alt} priority sizes="(min-width: 1024px) 50vw, 100vw" />
                 </div>
             </section>
 
             <section className="bg-stone-50">
                 <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 py-20 lg:grid-cols-2">
                     <div className="relative min-h-[22rem] overflow-hidden rounded-2xl bg-stone-200 lg:min-h-[28rem]">
-                        <Image
-                            src={clinicHomePhoto}
-                            alt="A golden puppy running across a lawn."
-                            fill
-                            sizes="(min-width: 1024px) 40vw, 100vw"
-                            className="object-cover"
-                        />
+                        <ClinicPicture src={photos.about.src} alt={photos.about.alt} sizes="(min-width: 1024px) 40vw, 100vw" />
                     </div>
                     <div className="max-w-lg">
                         <h2 className="text-4xl text-emerald-950">{copy.aboutHeading}</h2>
@@ -86,7 +73,7 @@ export default async function HomePage() {
                 </div>
             </section>
 
-            <ClinicGallery copy={copy} locale={locale} />
+            <ClinicGallery copy={copy} locale={locale} photos={photos.gallery} />
 
             <section className="bg-emerald-900 text-white">
                 <div className="mx-auto flex min-h-[32rem] w-full max-w-6xl flex-col items-start justify-center gap-8 px-5 py-24">

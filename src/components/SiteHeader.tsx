@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { UserRound } from "lucide-react";
 import LogOutButton from "@/components/auth/LogOutButton";
 import LocaleSwitch from "@/components/LocaleSwitch";
 import NotificationBell from "@/components/NotificationBell";
@@ -22,14 +21,12 @@ export default function SiteHeader({
                 {copy.clinicName}
             </Link>
             <nav className="flex flex-wrap items-center gap-3 text-sm text-emerald-900 dark:text-emerald-100">
-                <Link href="/find-us">{copy.clinic}</Link>
+                <Link href="/">{copy.clinic}</Link>
                 <Link href="/shop">{copy.shop}</Link>
                 <Link href="/dashboard">{copy.dashboard}</Link>
                 {notices !== undefined && <NotificationBell copy={copy} locale={locale} items={notices} />}
                 {showProfile && (
-                    <Link href="/profile" aria-label={copy.profile} className="rounded-full p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-950">
-                        <UserRound className="size-5" strokeWidth={1.75} />
-                    </Link>
+                    <Link href="/profile">{copy.profile}</Link>
                 )}
                 <LogOutButton label={copy.logOut} className="hover:text-emerald-700 disabled:opacity-60 dark:hover:text-emerald-300" />
                 <LocaleSwitch locale={locale} label={copy.language} />

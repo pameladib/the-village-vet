@@ -9,6 +9,7 @@ import { z } from "zod";
 
 export const PET_PHOTOS_BUCKET = "pet-photos";
 export const PRODUCT_PHOTOS_BUCKET = "product-photos";
+export const CLINIC_PHOTOS_BUCKET = "clinic-photos";
 export const MEDICAL_DOCUMENTS_BUCKET = "medical-documents";
 
 export const PHOTO_MAX_BYTES = 5 * 1024 * 1024;

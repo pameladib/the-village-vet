@@ -1,17 +1,16 @@
 "use client";
 
-import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { clinicGallery } from "@/components/public/photos";
+import ClinicPicture from "@/components/public/ClinicPicture";
 import type { Copy, Locale } from "@/lib/i18n";
 
 const INTERVAL_MS = 4500;
 const SWIPE_PX = 40;
 
-export default function ClinicGallery({ copy, locale }: { copy: Copy; locale: Locale }) {
+export default function ClinicGallery({ copy, locale, photos }: { copy: Copy; locale: Locale; photos: { src: string; caption: string }[] }) {
     const rtl = locale === "ar";
-    const count = clinicGallery.length;
+    const count = photos.length;
     const [index, setIndex] = useState(0);
     const [hovered, setHovered] = useState(false);
     const [focused, setFocused] = useState(false);
@@ -32,7 +31,7 @@ export default function ClinicGallery({ copy, locale }: { copy: Copy; locale: Lo
     const paused = hovered || focused || touched;
 
     useEffect(() => {
-        if (!ready || paused || reduceMotion) return;
+        if (!ready || paused || reduceMotion || count === 0) return;
         const id = window.setTimeout(() => {
             setIndex((current) => (current + 1) % count);
         }, INTERVAL_MS);
@@ -53,6 +52,7 @@ export default function ClinicGallery({ copy, locale }: { copy: Copy; locale: Lo
     }
 
     // Arabic lays the row out from the right, so the track moves the opposite way.
+    if (count === 0) return null;
     const shift = { transform: `translate3d(${rtl ? index * 100 : -index * 100}%, 0, 0)` };
     const motion = reduceMotion ? "flex" : "flex transition-transform duration-700 ease-in-out";
 
@@ -98,15 +98,9 @@ export default function ClinicGallery({ copy, locale }: { copy: Copy; locale: Lo
                         }}
                     >
                         <div className={motion} style={shift}>
-                            {clinicGallery.map((photo, photoIndex) => (
+                            {photos.map((photo, photoIndex) => (
                                 <div key={photo.src} className="relative aspect-video w-full shrink-0 bg-stone-200" aria-hidden={photoIndex !== index}>
-                                    <Image
-                                        src={photo.src}
-                                        alt=""
-                                        fill
-                                        sizes="(min-width: 1152px) 72rem, 100vw"
-                                        className="object-cover"
-                                    />
+                                    <ClinicPicture src={photo.src} alt={photo.caption} sizes="(min-width: 1152px) 72rem, 100vw" />
                                 </div>
                             ))}
                         </div>
@@ -131,20 +125,20 @@ export default function ClinicGallery({ copy, locale }: { copy: Copy; locale: Lo
 
                 <div className="overflow-hidden">
                     <div className={motion} style={shift}>
-                        {clinicGallery.map((photo, photoIndex) => (
+                        {photos.map((photo, photoIndex) => (
                             <p
-                                key={photo.caption}
+                                key={`${photo.src}-caption`}
                                 className="w-full shrink-0 pt-4 text-center text-lg text-emerald-950"
                                 aria-hidden={photoIndex !== index}
                             >
-                                {copy[photo.caption]}
+                                {photo.caption}
                             </p>
                         ))}
                     </div>
                 </div>
 
                 <div className="mt-5 flex items-center justify-center gap-2">
-                    {clinicGallery.map((photo, photoIndex) => (
+                    {photos.map((photo, photoIndex) => (
                         <button
                             key={photo.src}
                             type="button"

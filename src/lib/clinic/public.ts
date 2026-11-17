@@ -1,9 +1,56 @@
 import { cache } from "react";
+import { clinicGallery, clinicHomePhoto, clinicVisitPhoto } from "@/components/public/photos";
+import type { Copy, Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
 export const getClinicSettings = cache(() =>
     prisma.clinicSetting.findUnique({ where: { id: "clinic" } }),
 );
+
+export type PublicPhoto = { src: string; alt: string };
+export type GallerySlide = { src: string; caption: string };
+
+const stockHero = {
+    src: clinicVisitPhoto,
+    altEn: "A veterinarian in a white coat holding a cat in a bright room.",
+    altAr: "طبيبة بيطرية بمعطف أبيض تحمل قطة في غرفة مضيئة.",
+};
+const stockAbout = {
+    src: clinicHomePhoto,
+    altEn: "A golden puppy running across a lawn.",
+    altAr: "جرْو ذهبي يركض على العشب.",
+};
+
+function publishedSrc(row: { id: string; storageKey: string }) {
+    const version = row.storageKey.split("/").pop() ?? row.id;
+    return `/clinic-media/${row.id}?v=${encodeURIComponent(version)}`;
+}
+
+function captionFor(row: { captionEn: string; captionAr: string }, locale: Locale, fallback: string) {
+    const preferred = locale === "ar" ? row.captionAr : row.captionEn;
+    const other = locale === "ar" ? row.captionEn : row.captionAr;
+    return preferred.trim() || other.trim() || fallback;
+}
+
+export async function getPublicPhotos(locale: Locale, copy: Copy): Promise<{ hero: PublicPhoto; about: PublicPhoto; gallery: GallerySlide[] }> {
+    const rows = await prisma.clinicPhoto.findMany({ orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
+    const hero = rows.find((row) => row.kind === "HERO");
+    const about = rows.find((row) => row.kind === "ABOUT");
+    const slides = rows.filter((row) => row.kind === "GALLERY");
+    return {
+        hero: {
+            src: hero ? publishedSrc(hero) : stockHero.src,
+            alt: locale === "ar" ? stockHero.altAr : stockHero.altEn,
+        },
+        about: {
+            src: about ? publishedSrc(about) : stockAbout.src,
+            alt: locale === "ar" ? stockAbout.altAr : stockAbout.altEn,
+        },
+        gallery: slides.length > 0
+            ? slides.map((slide) => ({ src: publishedSrc(slide), caption: captionFor(slide, locale, "") }))
+            : clinicGallery.map((photo) => ({ src: photo.src, caption: copy[photo.caption] })),
+    };
+}
 
 export function phoneHref(value: string) {
     const compact = value.replace(/[^\d+]/g, "");

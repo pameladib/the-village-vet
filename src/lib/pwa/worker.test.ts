@@ -34,6 +34,7 @@ describe("service worker cache policy", () => {
         assert.equal(isStaticAsset("/images/shop/shop-dog-kibble.jpg"), true);
         assert.equal(isStaticAsset("/icon-192.png"), true);
         assert.equal(isStaticAsset("/offline.html"), true);
+        assert.equal(isStaticAsset("/clinic-media/1"), false);
         assert.equal(isStaticAsset("/shop"), false);
         assert.equal(isStaticAsset("/"), false);
         assert.equal(isPrivatePath("/shop"), false);

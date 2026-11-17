@@ -1,11 +1,12 @@
-import Image from "next/image";
-import { clinicVisitPhoto } from "@/components/public/photos";
-import { getClinicSettings } from "@/lib/clinic/public";
+import ClinicPicture from "@/components/public/ClinicPicture";
+import { getClinicSettings, getPublicPhotos } from "@/lib/clinic/public";
 import { getLocale, messages } from "@/lib/i18n";
 
 export default async function AboutPage() {
-    const copy = messages(await getLocale());
+    const locale = await getLocale();
+    const copy = messages(locale);
     const settings = await getClinicSettings();
+    const photos = await getPublicPhotos(locale, copy);
     const about = settings?.about?.trim();
 
     return (
@@ -16,13 +17,7 @@ export default async function AboutPage() {
                 {!about && <p className="mt-4 text-base leading-7 text-stone-600">{copy.aboutBodyLong}</p>}
             </div>
             <div className="relative min-h-[24rem] overflow-hidden rounded-2xl bg-stone-100">
-                <Image
-                    src={clinicVisitPhoto}
-                    alt="A veterinarian in a white coat holding a cat in a bright room."
-                    fill
-                    sizes="(min-width: 1024px) 40vw, 100vw"
-                    className="object-cover"
-                />
+                <ClinicPicture src={photos.about.src} alt={photos.about.alt} sizes="(min-width: 1024px) 40vw, 100vw" />
             </div>
         </main>
     );
