@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import AppToaster from "@/components/AppToaster";
 import SiteHeader from "@/components/SiteHeader";
 import { auth } from "@/lib/auth/auth";
 import { enforcePasswordChange } from "@/lib/auth/password-change";
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex min-h-full flex-1 flex-col bg-[#F8FAF9] dark:bg-stone-950">
             <SiteHeader copy={copy} locale={locale} showProfile={session?.user.role === "OWNER"} showEmergency={session?.user.role === "OWNER"} notices={notices} />
             {children}
+            <AppToaster />
         </div>
     );
 }

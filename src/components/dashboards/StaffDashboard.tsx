@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { CalendarDays, CalendarPlus, ClipboardPlus, HeartPulse, Package, ShoppingBag } from "lucide-react";
+import { CalendarDays, CalendarPlus, ClipboardList, ClipboardPlus, Package, ShoppingBag } from "lucide-react";
 import EnablePush from "@/components/EnablePush";
 import InstallPrompt from "@/components/InstallPrompt";
+import VisitAddedNotice from "@/components/dashboards/VisitAddedNotice";
 import StaffShell from "@/components/dashboards/StaffShell";
 import Page from "@/components/Page";
-import type { StaffVisit } from "@/app/(app)/dashboard/load-staff";
+import type { FollowUpCounts, StaffVisit } from "@/app/(app)/dashboard/load-staff";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
+import { attentionFollowUpCount, followUpAttention } from "@/lib/visits/follow-up";
 
 export default function StaffDashboard({
     copy,
@@ -17,8 +19,9 @@ export default function StaffDashboard({
     pendingOrders,
     lowStock,
     overdueCare,
-    upcomingCare,
     awaitingCount,
+    followUps,
+    visitAdded = false,
 }: {
     copy: Copy;
     locale: Locale;
@@ -28,8 +31,9 @@ export default function StaffDashboard({
     pendingOrders: number;
     lowStock: number;
     overdueCare: number;
-    upcomingCare: number;
     awaitingCount: number;
+    followUps: FollowUpCounts;
+    visitAdded?: boolean;
 }) {
     const count = new Intl.NumberFormat(intlLocale(locale));
     const dateLabel = new Intl.DateTimeFormat(intlLocale(locale), {
@@ -42,21 +46,32 @@ export default function StaffDashboard({
     const greeting = hour < 12 ? copy.goodMorning : hour < 17 ? copy.goodAfternoon : copy.goodEvening;
     const headerAction = "inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-900 px-5 py-3 text-sm font-medium text-white hover:bg-emerald-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:bg-emerald-950";
 
+    const followUpTotal = attentionFollowUpCount(followUps);
+    const followUpDetail = followUpAttention({ overdue: followUps.overdue, due: followUps.due, upcoming: 0 }, {
+        overdue: (value) => copy.followUpCountOverdue.replaceAll("{count}", count.format(value)),
+        due: (value) => copy.followUpCountDue.replaceAll("{count}", count.format(value)),
+        upcoming: (value) => copy.followUpCountUpcoming.replaceAll("{count}", count.format(value)),
+        oneDue: copy.followUpOneDue,
+        oneUpcoming: copy.followUpOneUpcoming,
+        manyUpcoming: (value) => copy.followUpManyUpcoming.replaceAll("{count}", count.format(value)),
+    });
     const summaries = [
-        { href: "/admin/appointments", label: copy.todayAppointments, value: today.length, icon: CalendarDays },
+        { href: "/admin/appointments?tab=today", label: copy.todayAppointments, value: today.length, icon: CalendarDays },
+        ...(clinical ? [{ href: "/admin/follow-ups?tab=today", label: copy.followUps, value: followUpTotal, icon: ClipboardList }] : []),
         { href: "/admin/orders?status=pending", label: copy.pendingOrders, value: pendingOrders, icon: ShoppingBag },
-        ...(clinical ? [{ href: "/admin/care?tab=upcoming", label: copy.upcomingCare, value: upcomingCare, icon: HeartPulse }] : []),
-        { href: "/admin/inventory", label: copy.lowStockProducts, value: lowStock, icon: Package },
+        { href: "/admin/inventory?status=low", label: copy.lowStockProducts, value: lowStock, icon: Package },
     ];
     const alerts = [
         pendingOrders > 0 ? { href: "/admin/orders?status=pending", label: copy.attentionOrders, value: pendingOrders } : null,
-        lowStock > 0 ? { href: "/admin/inventory", label: copy.attentionStock, value: lowStock } : null,
         clinical && overdueCare > 0 ? { href: "/admin/care?tab=overdue", label: copy.overdueCareSection, value: overdueCare } : null,
+        clinical && followUpTotal > 0 ? { href: "/admin/follow-ups?tab=today", label: copy.followUpAttention, value: followUpTotal, detail: followUpDetail, block: true } : null,
         awaitingCount > 0 ? { href: "/admin/appointments?tab=awaiting", label: copy.attentionAppointments, value: awaitingCount } : null,
-    ].filter((alert): alert is { href: string; label: string; value: number } => alert !== null);
+        lowStock > 0 ? { href: "/admin/inventory?status=low", label: copy.attentionStock, value: lowStock } : null,
+    ].flatMap((alert) => alert ? [alert] : []);
 
     return (
         <StaffShell copy={copy} clinical={clinical} manageClinic={manageClinic}>
+            <VisitAddedNotice message={copy.visitAdded} armed={visitAdded} />
             <Page width="wide">
                 <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -84,7 +99,7 @@ export default function StaffDashboard({
                 <InstallPrompt copy={copy} />
                 <EnablePush copy={copy} />
 
-                <section className={`mt-6 grid grid-cols-2 gap-3 ${summaries.length > 3 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+                <section className={`mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 ${summaries.length > 3 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
                     {summaries.map((item) => (
                         <Link key={item.label} href={item.href} className="rounded-2xl bg-white px-4 py-3 transition hover:bg-emerald-50 dark:bg-stone-900 dark:hover:bg-stone-800">
                             <span className="flex items-center justify-between gap-2 text-sm text-stone-500">
@@ -100,17 +115,37 @@ export default function StaffDashboard({
                     <section className="mt-8">
                         <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.needsAttention}</h2>
                         <ul className="mt-3 flex flex-col gap-2">
-                            {alerts.map((alert) => (
-                                <li key={alert.href} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 dark:bg-stone-900">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-stone-900 dark:text-stone-50">{alert.label}</p>
-                                        <p className="text-sm text-stone-500">{count.format(alert.value)}</p>
-                                    </div>
-                                    <Link href={alert.href} className="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium text-emerald-900 transition hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-950">
-                                        {copy.review}
-                                    </Link>
-                                </li>
-                            ))}
+                            {alerts.map((alert) => {
+                                const body = (
+                                    <>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-stone-900 dark:text-stone-50">{alert.label}</p>
+                                            <p className="text-sm text-stone-500">{count.format(alert.value)}</p>
+                                            {alert.detail && <p className="text-sm text-stone-500">{alert.detail}</p>}
+                                        </div>
+                                        <span className="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium text-emerald-900 dark:text-emerald-200">{copy.review}</span>
+                                    </>
+                                );
+                                return (
+                                    <li key={alert.href}>
+                                        {alert.block ? (
+                                            <Link href={alert.href} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 transition hover:bg-emerald-50 dark:bg-stone-900 dark:hover:bg-stone-800">
+                                                {body}
+                                            </Link>
+                                        ) : (
+                                            <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 dark:bg-stone-900">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-stone-900 dark:text-stone-50">{alert.label}</p>
+                                                    <p className="text-sm text-stone-500">{count.format(alert.value)}</p>
+                                                </div>
+                                                <Link href={alert.href} className="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium text-emerald-900 transition hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-950">
+                                                    {copy.review}
+                                                </Link>
+                                            </div>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </section>
                 )}

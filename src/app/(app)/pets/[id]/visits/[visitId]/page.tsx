@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import DeleteVisit from "@/components/visits/DeleteVisit";
-import RecordOnVisit from "@/components/visits/RecordOnVisit";
 import VisitForm from "@/components/visits/VisitForm";
 import { appointmentDetail } from "@/lib/appointments/labels";
 import { calendarDateInBeirut } from "@/lib/appointments/availability";
@@ -23,15 +22,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
     const visit = await prisma.medicalVisit.findFirst({
         where: { id: visitId, petId: id },
         include: {
-            pet: {
-                select: {
-                    id: true,
-                    name: true,
-                    ownerId: true,
-                    species: true,
-                    vaccinations: { select: { id: true, type: true } },
-                },
-            },
+            pet: { select: { id: true, name: true, ownerId: true } },
             vaccinations: { select: { id: true, type: true, administeredAt: true }, orderBy: { administeredAt: "desc" } },
             treatments: { select: { id: true, type: true, administeredAt: true }, orderBy: { administeredAt: "desc" } },
         },
@@ -50,12 +41,6 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
         year: "numeric",
         ...(visit.appointmentId ? { hour: "2-digit" as const, minute: "2-digit" as const, hourCycle: "h23" as const } : {}),
     }).format(visit.visitedAt);
-    const usedPrimary = new Set(visit.pet.vaccinations.filter((row) => row.type !== "ANNUAL").map((row) => row.type));
-    const speciesDoses = visit.pet.species === "DOG"
-        ? ["FIRST", "SECOND", "THIRD", "ANNUAL"] as const
-        : ["FIRST", "SECOND", "ANNUAL"] as const;
-    const doses = speciesDoses.filter((dose) => dose === "ANNUAL" || !usedPrimary.has(dose));
-    const annuals = visit.pet.vaccinations.filter((row) => row.type === "ANNUAL").length;
     const linked = Boolean(visit.appointmentId);
 
     return (
@@ -109,17 +94,6 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
                     </ul>
                 )}
             </section>
-
-            {canWrite && (
-                <RecordOnVisit
-                    petId={visit.pet.id}
-                    species={visit.pet.species}
-                    annualsBefore={annuals}
-                    doses={[...doses]}
-                    visitId={visit.id}
-                    copy={copy}
-                />
-            )}
 
             {canWrite && visit.vaccinations.length === 0 && visit.treatments.length === 0 && (
                 <DeleteVisit visitId={visit.id} petId={visit.pet.id} copy={copy} />

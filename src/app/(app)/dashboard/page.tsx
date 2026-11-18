@@ -11,7 +11,7 @@ import { loadStaffDashboard } from "./load-staff";
 export default async function DashboardPage({
     searchParams,
 }: {
-    searchParams: Promise<{ q?: string }>;
+    searchParams: Promise<{ q?: string; visit?: string }>;
 }) {
     const session = await auth.api.getSession({
         headers: await headers(),
@@ -23,10 +23,10 @@ export default async function DashboardPage({
     const role = session.user.role;
 
     if (role === "ADMIN" || role === "SECONDARY_ADMIN") {
-        const { q = "" } = await searchParams;
+        const { q = "", visit } = await searchParams;
         if (q.trim()) redirect(`/admin/patients?q=${encodeURIComponent(q.trim())}`);
         const data = await loadStaffDashboard(role);
-        return <StaffDashboard copy={copy} locale={locale} manageClinic={canManageScheduleBlocks(role)} {...data} />;
+        return <StaffDashboard copy={copy} locale={locale} manageClinic={canManageScheduleBlocks(role)} visitAdded={visit === "saved"} {...data} />;
     }
 
     const data = await loadOwnerDashboard(session.user.id, session.user.name);

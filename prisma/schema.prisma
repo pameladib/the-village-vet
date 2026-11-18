@@ -119,6 +119,7 @@ model Pet {
   medicalVisits     MedicalVisit[]
   appointments      Appointment[]
   careReminders     CareReminder[]
+  visitFollowUps    VisitFollowUp[]
   documents         MedicalDocument[]
 
   ownerId String
@@ -295,6 +296,7 @@ model MedicalVisit {
 
   vaccinations Vaccination[]
   treatments   Treatment[]
+  followUp     VisitFollowUp?
 
   @@index([petId])
   @@map("medical_visit")
@@ -304,6 +306,33 @@ enum ReminderType {
   VACCINATION
   DEWORMING
   FLEA_TREATMENT
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+// A dashboard reminder for the vet. It is not part of the pet's medical history and it does not send a notification.
+model VisitFollowUp {
+  id          String         @id @default(uuid())
+  dueOn       DateTime
+  notes       String?
+  status      FollowUpStatus @default(PENDING)
+  completedAt DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  petId String
+  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  medicalVisitId String       @unique
+  medicalVisit   MedicalVisit @relation(fields: [medicalVisitId], references: [id], onDelete: Cascade)
+
+  @@index([status, dueOn])
+  @@index([petId])
+  @@map("visit_follow_up")
 }
 
 model ScheduleBlock {

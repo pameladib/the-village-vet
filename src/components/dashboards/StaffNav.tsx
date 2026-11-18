@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
     CalendarDays,
     CalendarOff,
+    ClipboardList,
     HeartPulse,
     Image as ImageIcon,
     LayoutDashboard,
@@ -22,16 +23,19 @@ type Item = {
     label: string;
     icon: typeof LayoutDashboard;
     exact?: boolean;
+    badge?: number;
 };
 
 export default function StaffNav({
     copy,
     clinical,
     manageClinic,
+    followUpCount = 0,
 }: {
     copy: Copy;
     clinical: boolean;
     manageClinic: boolean;
+    followUpCount?: number;
 }) {
     const pathname = usePathname();
     const groups: { label: string; items: Item[] }[] = [
@@ -41,7 +45,12 @@ export default function StaffNav({
                 { href: "/dashboard", label: copy.dashboard, icon: LayoutDashboard, exact: true },
                 { href: "/admin/appointments", label: copy.appointments, icon: CalendarDays },
                 { href: "/admin/patients", label: copy.patients, icon: PawPrint },
-                ...(clinical ? [{ href: "/admin/care", label: copy.careManagement, icon: HeartPulse }] : []),
+                ...(clinical
+                    ? [
+                        { href: "/admin/care", label: copy.careManagement, icon: HeartPulse },
+                        { href: "/admin/follow-ups", label: copy.followUpReminders, icon: ClipboardList, badge: followUpCount },
+                    ]
+                    : []),
             ],
         },
         {
@@ -88,7 +97,12 @@ export default function StaffNav({
                                     }`}
                                 >
                                     <Icon className="size-4 shrink-0" />
-                                    {item.label}
+                                    <span className="min-w-0">{item.label}</span>
+                                    {item.badge ? (
+                                        <span className={`ms-auto inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${current ? "bg-white text-emerald-900" : "bg-emerald-900 text-white"}`}>
+                                            {item.badge}
+                                        </span>
+                                    ) : null}
                                 </Link>
                             );
                         })}

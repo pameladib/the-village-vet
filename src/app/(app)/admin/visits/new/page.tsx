@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import VisitForm from "@/components/visits/VisitForm";
 import { requireRole } from "@/lib/auth/session";
+import { availableVaccineDoses } from "@/lib/clinic/vaccines";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
@@ -12,7 +13,13 @@ export default async function NewDashboardVisitPage() {
     }
 
     const pets = await prisma.pet.findMany({
-        select: { id: true, name: true, species: true, owner: { select: { name: true, phoneNumber: true } } },
+        select: {
+            id: true,
+            name: true,
+            species: true,
+            owner: { select: { name: true, phoneNumber: true } },
+            vaccinations: { select: { type: true, administeredAt: true } },
+        },
         orderBy: [{ name: "asc" }, { id: "asc" }],
     });
     const locale = await getLocale();
@@ -25,7 +32,15 @@ export default async function NewDashboardVisitPage() {
                 copy={copy}
                 mode={{
                     kind: "walkin",
-                    pets: pets.map((pet) => ({ id: pet.id, name: pet.name, species: pet.species, ownerName: pet.owner.name, ownerPhone: pet.owner.phoneNumber })),
+                    pets: pets.map((pet) => ({
+                        id: pet.id,
+                        name: pet.name,
+                        species: pet.species,
+                        ownerName: pet.owner.name,
+                        ownerPhone: pet.owner.phoneNumber,
+                        doses: [...availableVaccineDoses(pet.species, pet.vaccinations)],
+                        annualsBefore: pet.vaccinations.filter((row) => row.type === "ANNUAL" && row.administeredAt).length,
+                    })),
                 }}
             />
         </main>

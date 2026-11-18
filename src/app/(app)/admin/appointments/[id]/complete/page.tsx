@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import VisitForm from "@/components/visits/VisitForm";
+import { calendarDateInBeirut } from "@/lib/appointments/availability";
 import { appointmentDetail } from "@/lib/appointments/labels";
 import { requireRole } from "@/lib/auth/session";
+import { availableVaccineDoses } from "@/lib/clinic/vaccines";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
@@ -19,7 +21,7 @@ export default async function CompleteVisitPage({ params }: { params: Promise<{ 
     const appointment = await prisma.appointment.findUnique({
         where: { id },
         include: {
-            pet: { select: { id: true, name: true } },
+            pet: { select: { id: true, name: true, species: true, vaccinations: { select: { type: true, administeredAt: true } } } },
             medicalVisit: { select: { id: true } },
         },
     });
@@ -51,6 +53,12 @@ export default async function CompleteVisitPage({ params }: { params: Promise<{ 
                     petName: appointment.pet.name,
                     when,
                     detail: appointmentDetail(appointment.type, appointment.services, appointment.groomingService, copy),
+                    visitDay: calendarDateInBeirut(appointment.startAt),
+                    care: {
+                        species: appointment.pet.species,
+                        doses: [...availableVaccineDoses(appointment.pet.species, appointment.pet.vaccinations)],
+                        annualsBefore: appointment.pet.vaccinations.filter((row) => row.type === "ANNUAL" && row.administeredAt).length,
+                    },
                 }}
             />
         </main>

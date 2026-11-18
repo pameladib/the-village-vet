@@ -3,6 +3,7 @@
 import { beirutInstant, clinicDayRange, todayInBeirut } from "@/lib/appointments/availability";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
+import { followUpBuckets } from "@/lib/visits/follow-up";
 import type { AppointmentType, GroomingService, VisitService } from "../../../../generated/prisma/client";
 
 export type StaffVisit = {
@@ -29,6 +30,12 @@ export type StaffReminder = {
     ownerName: string;
     species: "CAT" | "DOG";
     annualsBefore: number;
+};
+
+export type FollowUpCounts = {
+    overdue: number;
+    due: number;
+    upcoming: number;
 };
 
 const visitInclude = {
@@ -64,7 +71,7 @@ export async function loadStaffDashboard(role: string) {
     const clinical = canSeeClinicalRecords(role);
     const todayStart = beirutInstant(todayInBeirut(), 0, 0);
 
-    const [todayVisits, pendingOrders, lowStock, overdueCare, upcomingCare, awaitingCount] = await Promise.all([
+    const [todayVisits, pendingOrders, lowStock, overdueCare, awaitingCount, pendingFollowUps] = await Promise.all([
         range
             ? prisma.appointment.findMany({
                 where: { status: "BOOKED", startAt: { gte: range.open, lt: range.close } },
@@ -77,10 +84,13 @@ export async function loadStaffDashboard(role: string) {
         clinical
             ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { lt: todayStart } } })
             : 0,
-        clinical
-            ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { gte: todayStart } } })
-            : 0,
         prisma.appointment.count({ where: { status: "BOOKED", startAt: { lt: new Date() } } }),
+        clinical
+            ? prisma.visitFollowUp.findMany({
+                where: { status: "PENDING" },
+                select: { status: true, dueOn: true },
+            })
+            : [],
     ]);
 
     return {
@@ -89,8 +99,11 @@ export async function loadStaffDashboard(role: string) {
         pendingOrders,
         lowStock: lowStock.filter((product) => product.stock <= product.lowStockAt).length,
         overdueCare,
-        upcomingCare,
         awaitingCount,
+        followUps: (() => {
+            const groups = followUpBuckets(pendingFollowUps);
+            return { overdue: groups.overdue.length, due: groups.due.length, upcoming: groups.upcoming.length };
+        })(),
     };
 }
 

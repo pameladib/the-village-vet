@@ -110,6 +110,14 @@ export function annualNumbers<T extends { id: string; type: string; administered
     return new Map(annuals.map((record, index) => [record.id, index + 1]));
 }
 
+export function availableVaccineDoses(species: Species, recorded: { type: string }[]) {
+    const order = species === "DOG"
+        ? ["FIRST", "SECOND", "THIRD", "ANNUAL"] as const
+        : ["FIRST", "SECOND", "ANNUAL"] as const;
+    const used = new Set(recorded.filter((row) => row.type !== "ANNUAL").map((row) => row.type));
+    return order.filter((dose) => dose === "ANNUAL" || !used.has(dose));
+}
+
 export function doseConflict(
     species: Species,
     existing: { id: string; type: string; administeredAt: string | null }[],

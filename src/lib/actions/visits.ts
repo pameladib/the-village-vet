@@ -5,7 +5,9 @@ import { z } from "zod";
 import { beirutInstant, todayInBeirut } from "@/lib/appointments/availability";
 import { orderedVisitServices } from "@/lib/appointments/labels";
 import { requireRole } from "@/lib/auth/session";
+import { addVisitTreatment, addVisitVaccination } from "@/lib/clinic/visit-care";
 import { prisma } from "@/lib/prisma";
+import { followUpDueOn } from "@/lib/visits/follow-up";
 import { canCompleteClinical, canMarkGroomingDone, canMarkMissed } from "@/lib/visits/rules";
 import type { AppointmentType, VisitService } from "../../../generated/prisma/client";
 
@@ -31,6 +33,7 @@ async function staff() {
 function refresh(petId: string, visitId?: string) {
     revalidatePath("/dashboard");
     revalidatePath("/admin/appointments");
+    revalidatePath("/admin/care");
     revalidatePath(`/pets/${petId}`);
     revalidatePath(`/admin/patients/${petId}`);
     if (visitId) revalidatePath(`/pets/${petId}/visits/${visitId}`);
@@ -49,11 +52,45 @@ function duplicateVisit(error: unknown) {
     return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
-export async function completeAppointment(appointmentId: string, notes: string) {
+const vaccineInput = z.object({
+    type: z.enum(["FIRST", "SECOND", "THIRD", "ANNUAL"]),
+    administeredAt: z.string(),
+    nextDueAt: z.string(),
+}).nullable().optional();
+
+const treatmentInput = z.object({
+    type: z.enum(["DEWORMING", "FLEA_TICK"]),
+    administeredAt: z.string(),
+    nextDueAt: z.string(),
+}).nullable().optional();
+
+type VisitCare = {
+    vaccination?: { type: "FIRST" | "SECOND" | "THIRD" | "ANNUAL"; administeredAt: string; nextDueAt: string } | null;
+    treatment?: { type: "DEWORMING" | "FLEA_TICK"; administeredAt: string; nextDueAt: string } | null;
+};
+
+function visitCareCode(error: unknown) {
+    if (!(error instanceof Error) || error.message !== "visit-care") return null;
+    const code = error.cause;
+    if (code === "duplicate" || code === "species" || code === "due" || code === "doseDate") return code;
+    return null;
+}
+
+function storedFollowUp(value: { date: string; notes: string } | null | undefined) {
+    if (!value) return null;
+    const dueOn = followUpDueOn(value.date);
+    const notes = value.notes.trim();
+    if (!dueOn || notes.length > 1000) return false as const;
+    return { dueOn, notes: notes || null };
+}
+
+export async function completeAppointment(appointmentId: string, notes: string, followUp?: { date: string; notes: string } | null, care?: VisitCare) {
     if (!await clinician()) return { success: false as const, error: "denied" as const };
     const parsedId = z.uuid().safeParse(appointmentId);
     const parsedNotes = notesSchema.safeParse(notes);
+    const reminder = storedFollowUp(followUp);
     if (!parsedId.success || !parsedNotes.success) return { success: false as const, error: "notes" as const };
+    if (reminder === false) return { success: false as const, error: "followUp" as const };
 
     try {
         const saved = await prisma.$transaction(async (tx) => {
@@ -83,8 +120,11 @@ export async function completeAppointment(appointmentId: string, notes: string) 
                     notes: parsedNotes.data || null,
                     type: appointment.type,
                     services: appointment.type === "VETERINARY_VISIT" ? orderedVisitServices(appointment.services) : [],
+                    ...(reminder ? { followUp: { create: { petId: appointment.petId, dueOn: reminder.dueOn, notes: reminder.notes } } } : {}),
                 },
             });
+            if (care?.vaccination) await addVisitVaccination(tx, { petId: appointment.petId, medicalVisitId: visit.id, ...care.vaccination });
+            if (care?.treatment) await addVisitTreatment(tx, { petId: appointment.petId, medicalVisitId: visit.id, ...care.treatment });
             return { visitId: visit.id, petId: appointment.petId };
         });
         if ("error" in saved) {
@@ -99,6 +139,8 @@ export async function completeAppointment(appointmentId: string, notes: string) 
         revalidatePath(`/admin/appointments/${parsedId.data}`);
         return { success: true as const, visitId: saved.visitId, petId: saved.petId };
     } catch (error) {
+        const careError = visitCareCode(error);
+        if (careError) return { success: false as const, error: careError };
         if (!duplicateVisit(error)) return { success: false as const, error: "closed" as const };
         const existing = await prisma.medicalVisit.findUnique({
             where: { appointmentId: parsedId.data },
@@ -109,7 +151,7 @@ export async function completeAppointment(appointmentId: string, notes: string) 
     }
 }
 
-export async function createWalkIn(input: { petId: string; date: string; type: "VETERINARY_VISIT" | "OPERATION"; services: VisitService[]; notes: string }) {
+export async function createWalkIn(input: { petId: string; date: string; type: "VETERINARY_VISIT" | "OPERATION"; services: VisitService[]; notes: string; followUp?: { date: string; notes: string } | null; vaccination?: VisitCare["vaccination"]; treatment?: VisitCare["treatment"] }) {
     if (!await clinician()) return { success: false as const, error: "denied" as const };
     const parsed = z.object({
         petId: z.uuid(),
@@ -117,26 +159,43 @@ export async function createWalkIn(input: { petId: string; date: string; type: "
         type: z.enum(["VETERINARY_VISIT", "OPERATION"]),
         services: z.array(visitServices),
         notes: notesSchema,
+        followUp: z.object({ date: z.string(), notes: z.string() }).nullable().optional(),
+        vaccination: vaccineInput,
+        treatment: treatmentInput,
     }).safeParse(input);
     if (!parsed.success) return { success: false as const, error: "notes" as const };
     const visitedAt = walkInInstant(parsed.data.date);
     if (!visitedAt) return { success: false as const, error: "date" as const };
+    const reminder = storedFollowUp(parsed.data.followUp);
+    if (reminder === false) return { success: false as const, error: "followUp" as const };
 
     const pet = await prisma.pet.findUnique({ where: { id: parsed.data.petId }, select: { id: true } });
     if (!pet) return { success: false as const, error: "closed" as const };
 
-    const visit = await prisma.medicalVisit.create({
-        data: {
-            petId: pet.id,
-            visitedAt,
-            notes: parsed.data.notes || null,
-            type: parsed.data.type,
-            services: parsed.data.type === "VETERINARY_VISIT" ? orderedVisitServices(parsed.data.services) : [],
-        },
-        select: { id: true },
-    });
-    refresh(pet.id, visit.id);
-    return { success: true as const, visitId: visit.id, petId: pet.id };
+    try {
+        const visit = await prisma.$transaction(async (tx) => {
+            const created = await tx.medicalVisit.create({
+                data: {
+                    petId: pet.id,
+                    visitedAt,
+                    notes: parsed.data.notes || null,
+                    type: parsed.data.type,
+                    services: parsed.data.type === "VETERINARY_VISIT" ? orderedVisitServices(parsed.data.services) : [],
+                    ...(reminder ? { followUp: { create: { petId: pet.id, dueOn: reminder.dueOn, notes: reminder.notes } } } : {}),
+                },
+                select: { id: true },
+            });
+            if (parsed.data.vaccination) await addVisitVaccination(tx, { petId: pet.id, medicalVisitId: created.id, ...parsed.data.vaccination });
+            if (parsed.data.treatment) await addVisitTreatment(tx, { petId: pet.id, medicalVisitId: created.id, ...parsed.data.treatment });
+            return created;
+        });
+        refresh(pet.id, visit.id);
+        return { success: true as const, visitId: visit.id, petId: pet.id };
+    } catch (error) {
+        const careError = visitCareCode(error);
+        if (careError) return { success: false as const, error: careError };
+        return { success: false as const, error: "closed" as const };
+    }
 }
 
 export async function updateVisit(input: { visitId: string; notes: string; date?: string; type?: "VETERINARY_VISIT" | "OPERATION"; services?: VisitService[] }) {

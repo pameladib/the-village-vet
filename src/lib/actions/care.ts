@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { todayInBeirut } from "@/lib/appointments/availability";
 import { requireRole } from "@/lib/auth/session";
+import { doseDates, applyReminderPlan } from "@/lib/clinic/visit-care";
 import { dateOnlyUtc, doseConflict, formatDateOnly, nextVaccineDue, planFollowUp } from "@/lib/clinic/vaccines";
 import { prisma } from "@/lib/prisma";
 
@@ -24,15 +24,6 @@ const treatmentSchema = z.object({
     administeredAt: z.string(),
     nextDueAt: z.string(),
 });
-
-function dates(administeredAt: string, nextDueAt: string) {
-    const given = dateOnlyUtc(administeredAt);
-    if (!given || administeredAt > todayInBeirut()) return { error: "date" as const };
-    if (!nextDueAt) return { given, due: null };
-    const due = dateOnlyUtc(nextDueAt);
-    if (!due || nextDueAt < administeredAt) return { error: "due" as const };
-    return { given, due };
-}
 
 async function veterinarian() {
     try {
@@ -62,7 +53,7 @@ export async function saveVaccination(input: unknown) {
     if (!await veterinarian()) return { success: false as const, error: "denied" as const };
     const parsed = vaccinationSchema.safeParse(input);
     if (!parsed.success) return { success: false as const, error: "date" as const };
-    const when = dates(parsed.data.administeredAt, parsed.data.nextDueAt);
+    const when = doseDates(parsed.data.administeredAt, parsed.data.nextDueAt);
     if ("error" in when) return { success: false as const, error: when.error };
 
     const pet = await prisma.pet.findUnique({
@@ -130,32 +121,15 @@ export async function saveVaccination(input: unknown) {
                 openForKind: open && open.id !== linked?.id ? open : linked?.completedAt == null ? open : null,
                 nextDue: when.due,
             });
-            const dose = suggested?.dose ?? parsed.data.type;
-            if (plan.type === "delete") await tx.careReminder.delete({ where: { id: plan.id } });
-            if (plan.type === "update" && when.due) {
-                await tx.careReminder.update({
-                    where: { id: plan.id },
-                    data: { dueAt: when.due, dose, overridden },
-                });
-            }
-            if (plan.type === "complete") {
-                await tx.careReminder.update({ where: { id: plan.id }, data: { completedAt: when.given } });
-            }
-            if (plan.type === "replace") {
-                await tx.careReminder.update({ where: { id: plan.completeId }, data: { completedAt: when.given } });
-            }
-            if ((plan.type === "create" || plan.type === "replace") && when.due) {
-                await tx.careReminder.create({
-                    data: {
-                        petId: pet.id,
-                        kind: "VACCINATION",
-                        dueAt: when.due,
-                        dose,
-                        overridden,
-                        vaccinationId: saved.id,
-                    },
-                });
-            }
+            await applyReminderPlan(tx, plan, {
+                petId: pet.id,
+                kind: "VACCINATION",
+                due: when.due,
+                dose: suggested?.dose ?? parsed.data.type,
+                overridden,
+                given: when.given,
+                link: { vaccinationId: saved.id },
+            });
         });
     } catch {
         return { success: false as const, error: "save" as const };
@@ -169,7 +143,7 @@ export async function saveTreatment(input: unknown) {
     if (!await veterinarian()) return { success: false as const, error: "denied" as const };
     const parsed = treatmentSchema.safeParse(input);
     if (!parsed.success) return { success: false as const, error: "date" as const };
-    const when = dates(parsed.data.administeredAt, parsed.data.nextDueAt);
+    const when = doseDates(parsed.data.administeredAt, parsed.data.nextDueAt);
     if ("error" in when) return { success: false as const, error: when.error };
 
     const pet = await prisma.pet.findUnique({
@@ -218,31 +192,15 @@ export async function saveTreatment(input: unknown) {
                 openForKind: open && open.id !== linked?.id ? open : linked?.completedAt == null ? open : null,
                 nextDue: when.due,
             });
-            if (plan.type === "delete") await tx.careReminder.delete({ where: { id: plan.id } });
-            if (plan.type === "update" && when.due) {
-                await tx.careReminder.update({
-                    where: { id: plan.id },
-                    data: { dueAt: when.due, dose: parsed.data.type, overridden: true },
-                });
-            }
-            if (plan.type === "complete") {
-                await tx.careReminder.update({ where: { id: plan.id }, data: { completedAt: when.given } });
-            }
-            if (plan.type === "replace") {
-                await tx.careReminder.update({ where: { id: plan.completeId }, data: { completedAt: when.given } });
-            }
-            if ((plan.type === "create" || plan.type === "replace") && when.due) {
-                await tx.careReminder.create({
-                    data: {
-                        petId: pet.id,
-                        kind,
-                        dueAt: when.due,
-                        dose: parsed.data.type,
-                        overridden: true,
-                        treatmentId: saved.id,
-                    },
-                });
-            }
+            await applyReminderPlan(tx, plan, {
+                petId: pet.id,
+                kind,
+                due: when.due,
+                dose: parsed.data.type,
+                overridden: true,
+                given: when.given,
+                link: { treatmentId: saved.id },
+            });
         });
     } catch {
         return { success: false as const, error: "save" as const };
