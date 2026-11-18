@@ -21,7 +21,7 @@ describe("order lifecycle", () => {
         assert.equal(stageState("PREPARING", "PENDING", "PICKUP"), "complete");
     });
 
-    it("does not offer the other fulfilment path", () => {
+    it("does not offer the other fulfillment path", () => {
         assert.equal(adminMoves("OUT_FOR_DELIVERY", "PICKUP").length, 0);
         assert.equal(adminMoves("READY_FOR_PICKUP", "DELIVERY").length, 0);
         assert.deepEqual(progressStages("DELIVERY"), ["PENDING", "APPROVED", "OUT_FOR_DELIVERY", "FULFILLED"]);
