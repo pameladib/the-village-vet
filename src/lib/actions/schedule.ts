@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/session";
 import { appointmentsCoveredByBlock, beirutInstant } from "@/lib/appointments/availability";
 import { appointmentDetail } from "@/lib/appointments/labels";
+import { getLocale, messages } from "@/lib/i18n";
 
 const blockSchema = z.object({
     date: z.iso.date(),
@@ -57,12 +58,13 @@ export async function createBlock(input: unknown) {
         });
         const conflicts = appointmentsCoveredByBlock(parsed.data.scope, startAt, endAt, booked);
         if (conflicts.length > 0) {
+            const copy = messages(await getLocale());
             return {
                 success: false as const,
                 conflicts: conflicts.map((appointment) => ({
                     id: appointment.id,
                     petName: appointment.pet.name,
-                    detail: appointmentDetail(appointment.type, appointment.services, appointment.groomingService),
+                    detail: appointmentDetail(appointment.type, appointment.services, appointment.groomingService, copy),
                     startAt: appointment.startAt.toISOString(),
                     duration: appointment.duration,
                 })),
@@ -70,16 +72,20 @@ export async function createBlock(input: unknown) {
         }
     }
 
-    await prisma.scheduleBlock.create({
+    const block = await prisma.scheduleBlock.create({
         data: {
             startAt,
             endAt,
             scope: parsed.data.scope,
             createdById: session.user.id,
         },
+        select: { id: true, startAt: true, endAt: true, scope: true },
     });
     revalidatePath("/admin/blocks");
-    return { success: true as const };
+    return {
+        success: true as const,
+        block: { id: block.id, startAt: block.startAt.toISOString(), endAt: block.endAt.toISOString(), scope: block.scope },
+    };
 }
 
 export async function deleteBlock(id: string) {

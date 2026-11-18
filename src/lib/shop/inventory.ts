@@ -1,7 +1,7 @@
 // Sellable stock lives on product.stock. An open order has already taken its quantity out of that number.
 // Reserved units are the order lines still in progress, so physical stock is what is left plus what is held.
 
-export const openOrderStatuses = ["PENDING", "APPROVED", "PREPARING", "OUT_FOR_DELIVERY"] as const;
+export const openOrderStatuses = ["PENDING", "APPROVED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"] as const;
 
 export type StockState = "in" | "low" | "out";
 

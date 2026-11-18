@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import SetupAccountForm from "@/components/auth/SetupAccountForm";
+import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
 export default async function SetupPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
@@ -11,11 +12,13 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
         })
         : null;
 
+    const copy = messages(await getLocale());
+
     if (!invite) {
         return (
             <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
-                <h1 className="text-2xl font-semibold">This link is not valid</h1>
-                <p className="mt-2 text-sm text-stone-600">Ask the clinic for a new setup link.</p>
+                <h1 className="text-2xl font-semibold">{copy.setupInvalid}</h1>
+                <p className="mt-2 text-sm text-stone-600">{copy.setupInvalidBody}</p>
             </main>
         );
     }
@@ -24,8 +27,8 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
 
     return (
         <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
-            <h1 className="text-2xl font-semibold">Create your account</h1>
-            <SetupAccountForm token={token} name={stored.name} phoneNumber={stored.phoneNumber} />
+            <h1 className="text-2xl font-semibold">{copy.setupTitle}</h1>
+            <SetupAccountForm token={token} name={stored.name} phoneNumber={stored.phoneNumber} copy={copy} />
         </main>
     );
 }

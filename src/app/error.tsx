@@ -1,7 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+const text = {
+  en: {
+    title: "Something went wrong",
+    lead: "We couldn't finish loading this page. Try again, or go back to sign in.",
+    retry: "Try again",
+    signIn: "Go to sign in",
+  },
+  ar: {
+    title: "حدث خطأ",
+    lead: "تعذّر إكمال تحميل هذه الصفحة. أعيدوا المحاولة، أو عودوا إلى تسجيل الدخول.",
+    retry: "أعيدوا المحاولة",
+    signIn: "الانتقال إلى تسجيل الدخول",
+  },
+};
 
 export default function AppError({
   error,
@@ -10,9 +25,14 @@ export default function AppError({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  const [arabic, setArabic] = useState(false);
+
   useEffect(() => {
     console.error(error);
+    setArabic(document.documentElement.lang === "ar");
   }, [error]);
+
+  const copy = arabic ? text.ar : text.en;
 
   return (
     <div className="flex flex-1 items-center justify-center bg-emerald-50 px-4 py-10 dark:bg-stone-950 sm:px-6">
@@ -21,10 +41,10 @@ export default function AppError({
           The Village Vet
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">
-          Something went wrong
+          {copy.title}
         </h1>
         <p className="mt-3 text-sm leading-6 text-stone-600 dark:text-stone-300">
-          We couldn&apos;t finish loading this page. Try again, or go back to sign in.
+          {copy.lead}
         </p>
         <div className="mt-6 flex flex-col items-center gap-3">
           <button
@@ -32,13 +52,13 @@ export default function AppError({
             onClick={() => retry()}
             className="cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition duration-200 hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 dark:bg-emerald-700 dark:hover:bg-emerald-600"
           >
-            Try again
+            {copy.retry}
           </button>
           <Link
             href="/login"
             className="text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-200"
           >
-            Go to sign in
+            {copy.signIn}
           </Link>
         </div>
       </div>

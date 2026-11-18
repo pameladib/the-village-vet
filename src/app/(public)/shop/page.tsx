@@ -6,7 +6,9 @@ import ProductPhoto from "@/components/shop/ProductPhoto";
 import ShopControls from "@/components/shop/ShopControls";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import { formatLbp, parseShopQuery, shopHref, shopText } from "@/lib/shop/catalog";
+import { parseShopQuery, shopHref, shopText } from "@/lib/shop/catalog";
+import { presentPrice } from "@/lib/shop/money";
+import { getDisplayCurrency, getPricing } from "@/lib/shop/pricing";
 import { productPhotoSrc } from "@/lib/storage/files";
 
 function first(value: string | string[] | undefined) {
@@ -21,7 +23,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
         sort: first(raw.sort),
         stock: first(raw.stock),
     });
-    const locale = await getLocale();
+    const [locale, pricing, display] = await Promise.all([getLocale(), getPricing(), getDisplayCurrency()]);
     const copy = messages(locale);
     const categories = await prisma.productCategory.findMany({ orderBy: { position: "asc" } });
     const selected = categories.find((category) => category.id === filters.cat);
@@ -44,7 +46,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
         orderBy: filters.sort === "price-asc" ? { price: "asc" } : filters.sort === "price-desc" ? { price: "desc" } : locale === "ar" ? { nameAr: "asc" } : { name: "asc" },
     });
 
-    const pill = "shrink-0 rounded-full px-4 py-2 text-sm whitespace-nowrap";
+    const pill = "shrink-0 rounded-full border px-4 py-2 text-sm whitespace-nowrap";
 
     return (
         <main className="bg-[#f6f1e8]">
@@ -68,14 +70,14 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
 
                 <nav aria-label={copy.shopTitle} className="sticky top-16 z-10 -mx-5 mt-6 overflow-x-auto bg-[#f6f1e8]/95 px-5 py-3 backdrop-blur">
                     <div className="flex w-max gap-2">
-                        <Link href={shopHref({ ...filters, cat: "" })} className={`${pill} ${filters.cat ? "bg-white text-emerald-950 ring-1 ring-stone-200" : "bg-emerald-900 text-white"}`}>
+                        <Link href={shopHref({ ...filters, cat: "" })} className={`${pill} ${filters.cat ? "border-stone-200 bg-white text-emerald-950" : "border-emerald-900 bg-emerald-900 text-white"}`}>
                             {copy.shopAll}
                         </Link>
                         {categories.map((category) => (
                             <Link
                                 key={category.id}
                                 href={shopHref({ ...filters, cat: category.id })}
-                                className={`${pill} ${filters.cat === category.id ? "bg-emerald-900 text-white" : "bg-white text-emerald-950 ring-1 ring-stone-200 hover:ring-emerald-700"}`}
+                                className={`${pill} ${filters.cat === category.id ? "border-emerald-900 bg-emerald-900 text-white" : "border-stone-200 bg-white text-emerald-950 hover:border-emerald-700"}`}
                             >
                                 {shopText(locale, category.name, category.nameAr)}
                             </Link>
@@ -104,7 +106,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
                                     <Link href={`/shop/${product.id}`} className="mt-1 font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
                                     {description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-stone-500">{description}</p>}
                                     <div className="mt-auto flex items-end justify-between gap-2 pt-4">
-                                        <p className="text-sm font-medium text-emerald-950">{formatLbp(product.price, locale)} {copy.lbp}</p>
+                                        <p className="text-sm font-medium text-emerald-950">{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</p>
                                         <AddToCartButton productId={product.id} name={name} price={product.price} stock={product.stock} image={productPhotoSrc(product.id, product.photoUrl)} copy={copy} compact />
                                     </div>
                                 </div>

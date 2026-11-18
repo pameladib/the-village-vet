@@ -1,10 +1,11 @@
 import { CirclePlus, ClipboardList, History, Pill, TriangleAlert, Utensils } from "lucide-react";
 import DocumentList, { type PetDocument } from "@/components/pets/DocumentList";
 import type { Copy, Locale } from "@/lib/i18n";
+import { intlLocale } from "@/lib/intl-locale";
 import type { PetProfileData } from "../PetProfile";
 
-function formatCalendarDate(date: Date) {
-    return new Intl.DateTimeFormat("en-GB", {
+function formatCalendarDate(date: Date, locale: Locale) {
+    return new Intl.DateTimeFormat(intlLocale(locale), {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -12,12 +13,12 @@ function formatCalendarDate(date: Date) {
     }).format(date);
 }
 
-function formatSpayed(pet: PetProfileData) {
+function formatSpayed(pet: PetProfileData, copy: Copy, locale: Locale) {
     if (pet.spayedNeutered === "YES") {
-        return pet.spayedNeuteredAt ? `Yes · ${formatCalendarDate(pet.spayedNeuteredAt)}` : "Yes";
+        return pet.spayedNeuteredAt ? `${copy.yes} · ${formatCalendarDate(pet.spayedNeuteredAt, locale)}` : copy.yes;
     }
-    if (pet.spayedNeutered === "NO") return "No";
-    if (pet.spayedNeutered === "UNKNOWN") return "Unknown";
+    if (pet.spayedNeutered === "NO") return copy.no;
+    if (pet.spayedNeutered === "UNKNOWN") return copy.unknown;
     return null;
 }
 
@@ -40,12 +41,12 @@ export default function MedicalTab({
     locale: Locale;
 }) {
     const cards = [
-        { label: "Spayed/Neutered", value: formatSpayed(pet), icon: <CirclePlus className="size-4" strokeWidth={1.75} /> },
-        { label: "Allergies", value: note(pet.allergies), icon: <TriangleAlert className="size-4" strokeWidth={1.75} /> },
-        { label: "Medical conditions", value: note(pet.medicalConditions), icon: <ClipboardList className="size-4" strokeWidth={1.75} /> },
-        { label: "Medications", value: note(pet.medications), icon: <Pill className="size-4" strokeWidth={1.75} /> },
-        { label: "Diet", value: note(pet.diet), icon: <Utensils className="size-4" strokeWidth={1.75} /> },
-        { label: "Previous history", value: note(pet.previousHistory), icon: <History className="size-4" strokeWidth={1.75} /> },
+        { label: copy.petSpay, value: formatSpayed(pet, copy, locale), icon: <CirclePlus className="size-4" strokeWidth={1.75} /> },
+        { label: copy.petAllergies, value: note(pet.allergies), icon: <TriangleAlert className="size-4" strokeWidth={1.75} /> },
+        { label: copy.petConditions, value: note(pet.medicalConditions), icon: <ClipboardList className="size-4" strokeWidth={1.75} /> },
+        { label: copy.petMedications, value: note(pet.medications), icon: <Pill className="size-4" strokeWidth={1.75} /> },
+        { label: copy.petDiet, value: note(pet.diet), icon: <Utensils className="size-4" strokeWidth={1.75} /> },
+        { label: copy.petHistory, value: note(pet.previousHistory), icon: <History className="size-4" strokeWidth={1.75} /> },
     ];
 
     return (
@@ -60,7 +61,7 @@ export default function MedicalTab({
                         <span className="text-sm font-medium leading-tight text-stone-600 dark:text-stone-300">{card.label}</span>
                     </div>
                     <p className={card.value ? "mt-4 whitespace-pre-wrap text-base font-medium leading-6 text-stone-900 dark:text-stone-50" : "mt-4 text-base font-medium leading-6 text-stone-400 dark:text-stone-500"}>
-                        {card.value ?? "Not provided"}
+                        {card.value ?? copy.notProvided}
                     </p>
                 </div>
             ))}

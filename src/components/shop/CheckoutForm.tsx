@@ -4,19 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { placeOrder } from "@/lib/actions/shop";
 import type { Copy, Locale } from "@/lib/i18n";
-import { formatLbp } from "@/lib/shop/catalog";
-import { clearCart, readCart, type CartLine } from "./CartView";
+import { formatMoney, type Currency } from "@/lib/shop/money";
+import { clearCart, readCart, useQuotedLines, type CartLine } from "./CartView";
 
 const field = "mt-1 w-full rounded-2xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-emerald-700";
 
-export default function CheckoutForm({ copy, locale, phone }: { copy: Copy; locale: Locale; phone: string }) {
+export default function CheckoutForm({ copy, locale, phone, currency }: { copy: Copy; locale: Locale; phone: string; currency: Currency }) {
     const router = useRouter();
     const [lines] = useState<CartLine[]>(() => readCart());
+    const prices = useQuotedLines(lines, currency);
     const [fulfillment, setFulfillment] = useState<"PICKUP" | "DELIVERY">("PICKUP");
     const [payment, setPayment] = useState<"CASH" | "WHISH">("CASH");
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
-    const total = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+    const total = lines.reduce((sum, line) => sum + (prices?.[line.productId] ?? 0) * line.quantity, 0);
 
     if (lines.length === 0) {
         return <p className="mt-8 text-stone-600">{copy.shopCartEmpty}</p>;
@@ -51,7 +52,7 @@ export default function CheckoutForm({ copy, locale, phone }: { copy: Copy; loca
                     return;
                 }
                 clearCart();
-                router.replace("/shop/orders");
+                router.replace(`/shop/orders/${result.id}`);
             }}
         >
             <fieldset className="grid gap-3 sm:grid-cols-2">
@@ -96,7 +97,7 @@ export default function CheckoutForm({ copy, locale, phone }: { copy: Copy; loca
             <div className="rounded-3xl bg-emerald-950 px-5 py-5 text-white">
                 <div className="flex items-center justify-between text-sm">
                     <span>{copy.shopTotal}</span>
-                    <span className="text-lg font-medium">{formatLbp(total, locale)} {copy.lbp}</span>
+                    <span className="text-lg font-medium">{prices ? formatMoney(total, currency, locale) : ""}</span>
                 </div>
                 {error && <p className="mt-3 text-sm text-amber-100">{error}</p>}
                 <button type="submit" disabled={pending} className="mt-4 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-emerald-950 transition duration-200 hover:scale-[1.02] hover:bg-emerald-50 hover:shadow-md disabled:opacity-60">

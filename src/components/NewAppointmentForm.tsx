@@ -64,7 +64,7 @@ function groomingServices(copy: Copy) {
     ];
 }
 
-type BookablePet = { id: string; name: string; species: Species };
+type BookablePet = { id: string; name: string; species: Species; ownerName?: string; ownerPhone?: string };
 
 const bookableServices = ["CHECKUP", "VACCINATION", "DEWORMING", "FLEA_TREATMENT", "FOLLOW_UP"] as const;
 
@@ -95,12 +95,14 @@ function formatSlot(startIso: string, duration: number, locale: Locale) {
     return `${time.format(start)}–${time.format(end)}`;
 }
 
-export default function NewAppointmentForm({ pets, today, emptyMessage, copy, locale, petId: requestedPetId, service }: { pets: BookablePet[]; today: string; emptyMessage?: string; copy: Copy; locale: Locale; petId?: string; service?: string }) {
+export default function NewAppointmentForm({ pets, today, copy, locale, petId: requestedPetId, service, staff = false, embedded = false }: { pets: BookablePet[]; today: string; copy: Copy; locale: Locale; petId?: string; service?: string; staff?: boolean; embedded?: boolean }) {
     const types = appointmentTypes(copy);
     const servicesForVisit = visitServices(copy);
     const groomingChoices = groomingServices(copy);
     const router = useRouter();
     const [formError, setFormError] = useState<string | null>(null);
+    const [petQuery, setPetQuery] = useState("");
+    const [petOpen, setPetOpen] = useState(false);
     const [starts, setStarts] = useState<string[]>([]);
     const [duration, setDuration] = useState(0);
     const [loadingTimes, setLoadingTimes] = useState(false);
@@ -175,7 +177,17 @@ export default function NewAppointmentForm({ pets, today, emptyMessage, copy, lo
         return () => window.clearTimeout(timer);
     }, [booked, router]);
 
-    if (pets.length === 0) {
+    const chosenPet = pets.find((pet) => pet.id === petId);
+    const needle = petQuery.trim().toLowerCase();
+    const needleDigits = petQuery.replace(/\D/g, "");
+    const matches = pets.filter((pet) => {
+        if (!needle) return true;
+        if (pet.name.toLowerCase().includes(needle)) return true;
+        if (pet.ownerName?.toLowerCase().includes(needle)) return true;
+        return needleDigits.length > 0 && (pet.ownerPhone ?? "").replace(/\D/g, "").includes(needleDigits);
+    });
+
+    if (!staff && pets.length === 0) {
         return (
             <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8">
                 <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-stone-950">
@@ -185,44 +197,85 @@ export default function NewAppointmentForm({ pets, today, emptyMessage, copy, lo
                         {copy.bookBack}
                     </Link>
                     <h1 className="text-2xl font-semibold text-emerald-950 dark:text-emerald-50">{copy.bookAppointment}</h1>
-                    <p className="text-sm text-emerald-900 dark:text-emerald-100">{emptyMessage ?? copy.bookEmpty}</p>
-                    {!emptyMessage && (
-                        <Link href="/pets/new" className="w-fit rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-900">
-                            {copy.bookAddPet}
-                        </Link>
-                    )}
+                    <p className="text-sm text-emerald-900 dark:text-emerald-100">{copy.bookEmpty}</p>
+                    <Link href="/pets/new" className="w-fit rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-900">
+                        {copy.bookAddPet}
+                    </Link>
                 </section>
                 </div>
             </main>
         );
     }
 
-    return (
-        <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8">
+    const formBody = (
+            <div className={embedded ? "mt-5" : undefined}>
             <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-stone-950">
             <section className="rounded-2xl border border-emerald-200 bg-white p-5 dark:border-emerald-900 dark:bg-stone-900">
-            <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
-                {copy.bookBack}
-            </Link>
-            <h1 className="mt-4 text-2xl font-semibold text-emerald-950 dark:text-emerald-50">{copy.bookAppointment}</h1>
-            <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">{copy.bookLead}</p>
+            {!embedded && (
+                <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                    <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
+                    {copy.bookBack}
+                </Link>
+            )}
+            {!embedded && <h1 className="mt-4 text-2xl font-semibold text-emerald-950 dark:text-emerald-50">{copy.bookAppointment}</h1>}
+            <p className={`${embedded ? "" : "mt-1"} text-sm text-emerald-800 dark:text-emerald-200`}>{copy.bookLead}</p>
 
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 flex flex-col gap-4">
-                <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
-                    {copy.bookPet}
-                    <span className="relative mt-1 block">
-                    <select className={selectClassName} {...form.register("petId")}>
-                        {pets.map((pet) => (
-                            <option key={pet.id} value={pet.id}>
-                                {pet.name}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2 text-emerald-800 dark:text-emerald-200" />
-                    </span>
+                <div className="relative">
+                    <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
+                        {copy.bookPet}
+                        <span className="relative mt-1 block">
+                        <input
+                            value={petOpen ? petQuery : chosenPet?.name ?? ""}
+                            onChange={(event) => {
+                                setPetQuery(event.target.value);
+                                setPetOpen(true);
+                                if (chosenPet && event.target.value !== chosenPet.name) form.setValue("petId", "");
+                            }}
+                            onFocus={() => {
+                                setPetQuery("");
+                                setPetOpen(true);
+                            }}
+                            onBlur={() => setPetOpen(false)}
+                            placeholder={staff ? copy.searchHint : copy.bookSearchPlaceholder}
+                            autoComplete="off"
+                            role="combobox"
+                            aria-expanded={petOpen}
+                            aria-controls="booking-pets"
+                            className={`${fieldClassName} pe-12`}
+                        />
+                        <ChevronDown className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2 text-emerald-800 dark:text-emerald-200" />
+                        </span>
+                    </label>
+                    {petOpen && (
+                        <ul id="booking-pets" className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-emerald-200 bg-white py-1 shadow-lg dark:border-emerald-900 dark:bg-stone-900">
+                            {matches.length === 0 ? (
+                                <li className="px-3 py-2 text-sm text-stone-500">{copy.visitNoPetMatch}</li>
+                            ) : matches.map((pet) => (
+                                <li key={pet.id}>
+                                    <button
+                                        type="button"
+                                        onMouseDown={(event) => event.preventDefault()}
+                                        onClick={() => {
+                                            form.setValue("petId", pet.id, { shouldValidate: form.formState.isSubmitted });
+                                            setPetQuery("");
+                                            setPetOpen(false);
+                                        }}
+                                        className="flex w-full flex-col px-3 py-2 text-start hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                    >
+                                        <span className="text-sm font-medium text-emerald-950 dark:text-emerald-50">{pet.name}</span>
+                                        <span className="text-sm text-emerald-800 dark:text-emerald-200">
+                                            {pet.species === "CAT" ? copy.speciesCat : copy.speciesDog}
+                                            {pet.ownerName ? ` · ${pet.ownerName}` : ""}
+                                            {pet.ownerPhone ? ` · ${pet.ownerPhone}` : ""}
+                                        </span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                     <FieldMessage message={bookingMessage(copy, form.formState.errors.petId?.message)} />
-                </label>
+                </div>
 
                 <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
                     {copy.bookType}
@@ -343,6 +396,14 @@ export default function NewAppointmentForm({ pets, today, emptyMessage, copy, lo
                     </p>
                 </div>
             )}
+            </div>
+    );
+
+    if (embedded) return formBody;
+
+    return (
+        <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-8">
+            {formBody}
         </main>
     );
 }

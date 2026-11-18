@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { quoteCart } from "@/lib/actions/shop";
 import type { Copy, Locale } from "@/lib/i18n";
-import { formatLbp } from "@/lib/shop/catalog";
+import { convertMinor, formatMoney, type Currency } from "@/lib/shop/money";
 import ProductPhoto from "./ProductPhoto";
 
 export type CartLine = {
@@ -48,9 +49,33 @@ export function addToCart(line: CartLine) {
     setCartQuantity(line, Math.min(20, current + line.quantity));
 }
 
-export default function CartView({ copy, locale }: { copy: Copy; locale: Locale }) {
+export function useQuotedLines(lines: CartLine[], display: Currency) {
+    const [prices, setPrices] = useState<Record<string, number> | null>(null);
+    const ids = lines.map((line) => line.productId).join(",");
+
+    useEffect(() => {
+        let cancelled = false;
+        void quoteCart(ids ? ids.split(",") : []).then((result) => {
+            if (cancelled) return;
+            const next: Record<string, number> = {};
+            for (const product of result.products) {
+                const shown = convertMinor(product.price, result.currency, display, result.rate);
+                if (shown != null) next[product.id] = shown;
+            }
+            setPrices(next);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [ids, display]);
+
+    return prices;
+}
+
+export default function CartView({ copy, locale, currency }: { copy: Copy; locale: Locale; currency: Currency }) {
     const [lines, setLines] = useState<CartLine[]>(() => readCart());
-    const total = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+    const prices = useQuotedLines(lines, currency);
+    const total = lines.reduce((sum, line) => sum + (prices?.[line.productId] ?? 0) * line.quantity, 0);
 
     function update(next: CartLine[]) {
         setLines(next);
@@ -72,7 +97,7 @@ export default function CartView({ copy, locale }: { copy: Copy; locale: Locale 
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
                         <p className="font-medium text-emerald-950">{line.name}</p>
-                        <p className="mt-1 text-sm text-stone-500">{formatLbp(line.price, locale)} {copy.lbp}</p>
+                        <p className="mt-1 text-sm text-stone-500">{prices?.[line.productId] == null ? copy.shopOut : formatMoney(prices[line.productId], currency, locale)}</p>
                         <div className="mt-auto flex items-center justify-between gap-3 pt-3">
                             <label className="inline-flex items-center gap-2 text-sm text-stone-600">
                                 <span className="sr-only">{copy.shopStockField}</span>
@@ -98,14 +123,14 @@ export default function CartView({ copy, locale }: { copy: Copy; locale: Locale 
                             </button>
                         </div>
                     </div>
-                    <p className="text-sm font-medium text-emerald-950">{formatLbp(line.price * line.quantity, locale)} {copy.lbp}</p>
+                    <p className="text-sm font-medium text-emerald-950">{prices?.[line.productId] == null ? "" : formatMoney(prices[line.productId] * line.quantity, currency, locale)}</p>
                 </div>
             ))}
             {lines.length > 0 && (
                 <div className="rounded-3xl bg-emerald-950 px-5 py-5 text-white">
                     <div className="flex items-center justify-between text-sm">
                         <span>{copy.shopTotal}</span>
-                        <span className="text-lg font-medium">{formatLbp(total, locale)} {copy.lbp}</span>
+                        <span className="text-lg font-medium">{prices ? formatMoney(total, currency, locale) : ""}</span>
                     </div>
                     <p className="mt-2 text-sm text-emerald-100">{copy.shopCartLead}</p>
                     <Link href="/shop/checkout" className="mt-4 inline-flex rounded-full bg-white px-5 py-2.5 text-sm font-medium text-emerald-950 transition duration-200 hover:scale-[1.02] hover:bg-emerald-50 hover:shadow-md">

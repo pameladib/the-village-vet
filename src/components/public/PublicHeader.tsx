@@ -4,24 +4,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import LogOutButton from "@/components/auth/LogOutButton";
+import CurrencySwitch from "@/components/CurrencySwitch";
 import LocaleSwitch from "@/components/LocaleSwitch";
 import type { Copy, Locale } from "@/lib/i18n";
+import type { Currency } from "@/lib/shop/money";
 
 const links = [
     { href: "/", key: "home" },
     { href: "/about", key: "navAbout" },
     { href: "/shop", key: "navStore" },
     { href: "/find-us", key: "navFindUs" },
+    { href: "/emergency", key: "emergency" },
 ] as const;
 
 export default function PublicHeader({
     copy,
     locale,
+    currency,
     loggedIn,
     showProfile = false,
 }: {
     copy: Copy;
     locale: Locale;
+    currency: Currency;
     loggedIn: boolean;
     showProfile?: boolean;
 }) {
@@ -57,6 +62,7 @@ export default function PublicHeader({
                     })}
                 </nav>
                 <div className="ms-auto flex items-center gap-3 lg:ms-2">
+                    <CurrencySwitch currency={currency} label={copy.currency} />
                     <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50" />
                     {showProfile && (
                         <Link href="/profile" className="text-sm font-semibold text-emerald-950 hover:text-emerald-800">
@@ -82,6 +88,9 @@ export default function PublicHeader({
             </div>
             {open && (
                 <nav id="public-menu" className="flex flex-col gap-1 border-t border-stone-200 px-5 py-3 lg:hidden">
+                    <div className="px-2 py-2">
+                        <CurrencySwitch currency={currency} label={copy.currency} />
+                    </div>
                     {links.map((link) => {
                         const active = current(link.href);
                         return (

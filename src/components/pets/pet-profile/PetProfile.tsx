@@ -47,9 +47,19 @@ export type ProfileAppointment = {
     groomingService: GroomingService | null;
     startAt: Date;
     duration: number;
+    status: string;
 };
 
-export type PetProfileData = Omit<Pet, "estimatedAgeValue"> & { // keep every other property from Pet
+export type ProfileVisit = {
+    id: string;
+    visitedAt: Date;
+    notes: string | null;
+    type: AppointmentType;
+    services: VisitService[];
+    linked: boolean;
+};
+
+export type PetProfileData = Omit<Pet, "estimatedAgeValue" | "medicalVisits"> & { // keep every other property from Pet
     estimatedAgeValue: number | null; // except estimatedAgeValue which is either a number or null
     currentWeightGrams: number | null; // latest weight, in grams. Null when the pet has no weight record
     vaccinations: ProfileVaccination[];
@@ -59,6 +69,7 @@ export type PetProfileData = Omit<Pet, "estimatedAgeValue"> & { // keep every ot
 
 export default function PetProfile({
     pet,
+    visits = [],
     documents = [],
     canUpload = false,
     canRecord = false,
@@ -69,6 +80,7 @@ export default function PetProfile({
     locale = "en",
 }: {
     pet: PetProfileData;
+    visits?: ProfileVisit[];
     documents?: PetDocument[];
     canUpload?: boolean;
     canRecord?: boolean;
@@ -81,14 +93,14 @@ export default function PetProfile({
     const [activeTab, setActiveTab] = useState("general");
 
     const tabs = [ // this array lets us define the tabs once and generate the buttons dynamically instead of writing four buttons manually
-        { id: "general", label: "General" }, // id identifies the tab in our code, and label is the text displayed on the button
-        { id: "appointments", label: "Appointments" },
-        { id: "vaccinations", label: "Vaccines & treatments" },
-        { id: "medical", label: "Medical" },
+        { id: "general", label: copy.tabGeneral }, // id identifies the tab in our code, and label is the text displayed on the button
+        { id: "appointments", label: copy.tabAppointments },
+        { id: "vaccinations", label: copy.tabCare },
+        { id: "medical", label: copy.tabMedical },
     ]
 
     const breed = pet.breed?.trim();
-    const species = pet.species === "CAT" ? "Cat" : "Dog";
+    const species = pet.species === "CAT" ? copy.speciesCat : copy.speciesDog;
     const photo = petPhotoSrc(pet.id, pet.photoUrl);
 
     return (
@@ -100,14 +112,14 @@ export default function PetProfile({
                         className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
                     >
                         <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
-                        Back
+                        {copy.profileBack}
                     </Link>
                     <Link
                         href={`/pets/${pet.id}/edit`}
                         className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
                     >
                         <SquarePen className="size-4" strokeWidth={1.5} />
-                        Edit
+                        {copy.profileEdit}
                     </Link>
                 </header>
 
@@ -129,9 +141,9 @@ export default function PetProfile({
                         </p>
                         {owner && (
                             <p className="mt-2 text-sm text-stone-500">
-                                Owner: {owner.name}
+                                {copy.profileOwner}: {owner.name}
                                 <span className="px-2">·</span>
-                                Phone: {owner.phone}
+                                {copy.profilePhone}: {owner.phone}
                             </p>
                         )}
                     </div>
@@ -160,8 +172,8 @@ export default function PetProfile({
                     </div>
                 </div>
                 <div className="mt-3">
-                    {activeTab === "general" && <GeneralTab pet={pet} />}
-                    {activeTab === "appointments" && <AppointmentsTab pet={pet} />}
+                    {activeTab === "general" && <GeneralTab pet={pet} copy={copy} locale={locale} />}
+                    {activeTab === "appointments" && <AppointmentsTab pet={pet} visits={visits} canRecord={canRecord} copy={copy} locale={locale} />}
                     {activeTab === "vaccinations" && <VaccinationsTab pet={pet} reminders={reminders} canRecord={canRecord} copy={copy} locale={locale} />}
                     {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload} copy={copy} locale={locale} />}
                 </div>

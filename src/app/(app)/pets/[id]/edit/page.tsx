@@ -1,4 +1,5 @@
 import NewPetForm from "@/components/pets/new/NewPetForm";
+import { getLocale, messages } from "@/lib/i18n";
 import { formatDateOnly } from "@/lib/clinic/vaccines";
 import { requireRole } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
@@ -103,5 +104,5 @@ export default async function EditPetPage({
         previousHistory: textValue(petFields.previousHistory),
     };
 
-    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id} allowClinical />;
+    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id} allowClinical copy={messages(await getLocale())} />;
 }

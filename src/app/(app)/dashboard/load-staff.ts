@@ -13,6 +13,7 @@ export type StaffVisit = {
     groomingService: GroomingService | null;
     startAt: Date;
     petName: string;
+    ownerId: string;
     ownerName: string;
     phone: string;
 };
@@ -22,13 +23,17 @@ export type StaffReminder = {
     kind: string;
     dose: string | null;
     dueAt: Date;
+    petId: string;
     petName: string;
+    ownerId: string;
     ownerName: string;
+    species: "CAT" | "DOG";
+    annualsBefore: number;
 };
 
 const visitInclude = {
     pet: { select: { id: true, name: true } },
-    owner: { select: { name: true, phoneNumber: true } },
+    owner: { select: { id: true, name: true, phoneNumber: true } },
 } as const;
 
 function toVisit(visit: {
@@ -38,7 +43,7 @@ function toVisit(visit: {
     groomingService: GroomingService | null;
     startAt: Date;
     pet: { id: string; name: string };
-    owner: { name: string; phoneNumber: string };
+    owner: { id: string; name: string; phoneNumber: string };
 }): StaffVisit {
     return {
         id: visit.id,
@@ -48,6 +53,7 @@ function toVisit(visit: {
         groomingService: visit.groomingService,
         startAt: visit.startAt,
         petName: visit.pet.name,
+        ownerId: visit.owner.id,
         ownerName: visit.owner.name,
         phone: visit.owner.phoneNumber,
     };
@@ -58,7 +64,7 @@ export async function loadStaffDashboard(role: string) {
     const clinical = canSeeClinicalRecords(role);
     const todayStart = beirutInstant(todayInBeirut(), 0, 0);
 
-    const [todayVisits, pendingOrders, lowStock, overdueCare, upcomingCare] = await Promise.all([
+    const [todayVisits, pendingOrders, lowStock, overdueCare, upcomingCare, awaitingCount] = await Promise.all([
         range
             ? prisma.appointment.findMany({
                 where: { status: "BOOKED", startAt: { gte: range.open, lt: range.close } },
@@ -74,6 +80,7 @@ export async function loadStaffDashboard(role: string) {
         clinical
             ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { gte: todayStart } } })
             : 0,
+        prisma.appointment.count({ where: { status: "BOOKED", startAt: { lt: new Date() } } }),
     ]);
 
     return {
@@ -83,13 +90,14 @@ export async function loadStaffDashboard(role: string) {
         lowStock: lowStock.filter((product) => product.stock <= product.lowStockAt).length,
         overdueCare,
         upcomingCare,
+        awaitingCount,
     };
 }
 
 export async function loadStaffAppointments() {
     const range = clinicDayRange(todayInBeirut());
     const now = new Date();
-    const [todayVisits, upcoming] = await Promise.all([
+    const [todayVisits, upcoming, awaiting] = await Promise.all([
         range
             ? prisma.appointment.findMany({
                 where: { status: "BOOKED", startAt: { gte: range.open, lt: range.close } },
@@ -103,10 +111,16 @@ export async function loadStaffAppointments() {
             take: 30,
             include: visitInclude,
         }),
+        prisma.appointment.findMany({
+            where: { status: "BOOKED", startAt: { lt: now } },
+            orderBy: { startAt: "asc" },
+            include: visitInclude,
+        }),
     ]);
     return {
         today: todayVisits.map(toVisit),
         upcoming: upcoming.map(toVisit),
+        awaiting: awaiting.map(toVisit),
     };
 }
 
@@ -147,16 +161,29 @@ export async function loadCareReminders() {
     const reminders = await prisma.careReminder.findMany({
         where: { completedAt: null },
         orderBy: { dueAt: "asc" },
-        take: 40,
-        include: { pet: { select: { name: true, owner: { select: { name: true } } } } },
+        include: {
+            pet: {
+                select: {
+                    id: true,
+                    name: true,
+                    species: true,
+                    owner: { select: { id: true, name: true } },
+                    vaccinations: { where: { type: "ANNUAL", administeredAt: { not: null } }, select: { id: true } },
+                },
+            },
+        },
     });
     return reminders.map((reminder) => ({
         id: reminder.id,
         kind: reminder.kind,
         dose: reminder.dose,
         dueAt: reminder.dueAt,
+        petId: reminder.pet.id,
         petName: reminder.pet.name,
+        ownerId: reminder.pet.owner.id,
         ownerName: reminder.pet.owner.name,
+        species: reminder.pet.species,
+        annualsBefore: reminder.pet.vaccinations.length,
     }));
 }
 

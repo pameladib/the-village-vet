@@ -19,6 +19,13 @@ describe("shop reservation", () => {
         ]).ok, false);
     });
 
+    it("refuses a hidden product at public checkout and allows it for staff when stock remains", () => {
+        const hidden = [{ id: "food", stock: 2, available: false, price: 1000 }];
+        assert.equal(planReservation(hidden, [{ productId: "food", quantity: 1 }]).ok, false);
+        const staff = planReservation(hidden, [{ productId: "food", quantity: 1 }], { allowHidden: true });
+        assert.equal(staff.ok, true);
+    });
+
     it("keeps the price from the product row", () => {
         const plan = planReservation(products, [{ productId: "food", quantity: 2 }]);
         assert.equal(plan.ok, true);

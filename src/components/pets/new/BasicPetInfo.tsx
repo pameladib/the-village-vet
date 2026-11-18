@@ -4,6 +4,8 @@ import { Camera, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFormContext, useFormState, useWatch } from "react-hook-form";
 import { formatTodayDate } from "@/lib/helpers/dates";
+import type { Copy } from "@/lib/i18n";
+import { shownMessage } from "@/lib/shown-message";
 
 const fieldClassName =
   "w-full min-w-0 rounded-lg border bg-white px-3 py-2.5 text-sm text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 dark:bg-stone-950 dark:text-stone-50";
@@ -23,18 +25,20 @@ const labelClassName =
 
 const fieldErrorClassName = "mt-1.5 text-sm text-red-700 dark:text-red-300";
 
-function fieldMessage(error: { message?: unknown } | undefined) {
-  return typeof error?.message === "string" ? error.message : undefined;
+function fieldMessage(copy: Copy, error: { message?: unknown } | undefined) {
+  return shownMessage(copy, typeof error?.message === "string" ? error.message : undefined);
 }
 
 export default function BasicPetInfo({
   title,
   photoUrl,
   lockIdentity = false,
+  copy,
 }: {
   title: string; // title is "Edit pet" for the edit form and "New pet" for the add form
   photoUrl?: string | null; // photoUrl is the URL of the pet's existing photo. It's an optional props because when this component is used for adding a pet, photoUrl is not passed. When the component is used for editing the pet, photoUrl is always passed, but it can either be a string if the pet has a saved photo, or null if it doesn't have a saved photo
   lockIdentity?: boolean;
+  copy: Copy;
 }) {
   const { register, setValue } = useFormContext();
   const { errors } = useFormState(); // we are reading errors using useFormState instead of useFormContext because we want the component to re-render when errors change so the error messages next to the fields are updated in real-time as the user types. If we used useFormContext, the component would not re-render when errors change and the error messages would not be updated in real-time.
@@ -97,7 +101,7 @@ export default function BasicPetInfo({
             ) : (
               <>
                 <Camera className="size-6" strokeWidth={1.5} />
-                <span className="text-xs">Add photo</span>
+                <span className="text-xs">{copy.petAddPhoto}</span>
               </>
             )}
           </label>
@@ -113,80 +117,80 @@ export default function BasicPetInfo({
         </div>
       </div>
       <input id="photo" type="file" accept="image/*" className="hidden" onChange={onPhotoChange} />
-      {fieldMessage(errors.photo) && <p className={fieldErrorClassName}>{fieldMessage(errors.photo)}</p>}
-      <p className="mt-6 text-xs text-stone-500 dark:text-stone-400">* Required fields</p>
+      {fieldMessage(copy, errors.photo) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.photo)}</p>}
+      <p className="mt-6 text-xs text-stone-500 dark:text-stone-400">{copy.petRequired}</p>
       <div className="mt-4 space-y-4">
         <div>
           <label htmlFor="name" className={labelClassName}>
-            Name <span className="text-stone-400 dark:text-stone-500">*</span>
+            {copy.petName} <span className="text-stone-400 dark:text-stone-500">*</span>
           </label>
           <input
             id="name"
             type="text"
-            placeholder="Pet Name"
+            placeholder={copy.petNamePh}
             className={fieldClasses(Boolean(errors.name))}
             {...register("name")}
           />
-          {fieldMessage(errors.name) && <p className={fieldErrorClassName}>{fieldMessage(errors.name)}</p>}
+          {fieldMessage(copy, errors.name) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.name)}</p>}
         </div>
 
         <div className={lockIdentity ? "pointer-events-none opacity-60" : undefined}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="species" className={labelClassName}>
-              Species <span className="text-stone-400 dark:text-stone-500">*</span>
+              {copy.petSpecies} <span className="text-stone-400 dark:text-stone-500">*</span>
             </label>
             <select id="species" className={fieldClasses(Boolean(errors.species))} {...register("species")}>
-              <option value="CAT">Cat</option>
-              <option value="DOG">Dog</option>
+              <option value="CAT">{copy.speciesCat}</option>
+              <option value="DOG">{copy.speciesDog}</option>
             </select>
-            {fieldMessage(errors.species) && <p className={fieldErrorClassName}>{fieldMessage(errors.species)}</p>}
+            {fieldMessage(copy, errors.species) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.species)}</p>}
           </div>
 
           <div>
             <label htmlFor="sex" className={labelClassName}>
-              Sex <span className="text-stone-400 dark:text-stone-500">*</span>
+              {copy.petSex} <span className="text-stone-400 dark:text-stone-500">*</span>
             </label>
             <select id="sex" className={fieldClasses(Boolean(errors.sex))} {...register("sex")}>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
+              <option value="MALE">{copy.sexMale}</option>
+              <option value="FEMALE">{copy.sexFemale}</option>
             </select>
-            {fieldMessage(errors.sex) && <p className={fieldErrorClassName}>{fieldMessage(errors.sex)}</p>}
+            {fieldMessage(copy, errors.sex) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.sex)}</p>}
           </div>
         </div>
 
         <div>
           <label htmlFor="breed" className={labelClassName}>
-            Breed
+            {copy.petBreed}
           </label>
           <input
             id="breed"
             type="text"
-            placeholder="Breed"
+            placeholder={copy.petBreed}
             className={fieldClasses(Boolean(errors.breed))}
             {...register("breed")}
           />
-          {fieldMessage(errors.breed) && <p className={fieldErrorClassName}>{fieldMessage(errors.breed)}</p>}
+          {fieldMessage(copy, errors.breed) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.breed)}</p>}
         </div>
 
         <div>
           <label htmlFor="color" className={labelClassName}>
-            Color
+            {copy.petColor}
           </label>
           <input
             id="color"
             type="text"
-            placeholder="Color"
+            placeholder={copy.petColor}
             className={fieldClasses(Boolean(errors.color))}
             {...register("color")}
           />
-          {fieldMessage(errors.color) && <p className={fieldErrorClassName}>{fieldMessage(errors.color)}</p>}
+          {fieldMessage(copy, errors.color) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.color)}</p>}
         </div>
         </div>
 
         <div>
           <label htmlFor="dateOfBirth" className={labelClassName}>
-            Date of birth
+            {copy.petDob}
           </label>
           <input
             id="dateOfBirth"
@@ -196,21 +200,21 @@ export default function BasicPetInfo({
             className={`${fieldClasses(Boolean(errors.dateOfBirth))} dark:[color-scheme:dark]`}
             {...register("dateOfBirth")}
           />
-          {fieldMessage(errors.dateOfBirth) && <p className={fieldErrorClassName}>{fieldMessage(errors.dateOfBirth)}</p>}
+          {fieldMessage(copy, errors.dateOfBirth) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.dateOfBirth)}</p>}
           <p className="mt-1.5 text-sm text-stone-500 dark:text-stone-400">
-            If you don&apos;t know the date of birth, enter an estimated age instead.
+            {copy.petDobHint}
           </p>
         </div>
 
         <div>
           <label htmlFor="estimatedAge" className={labelClassName}>
-            Estimated age
+            {copy.petAge}
           </label>
           <div className={`flex overflow-hidden rounded-lg border shadow-sm ${errors.estimatedAge || errors.estimatedAgeUnit ? "border-red-600 focus-within:border-red-600 focus-within:ring-2 focus-within:ring-red-600/15" : "border-stone-300 focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-700/15 dark:border-stone-700 dark:focus-within:border-emerald-400 dark:focus-within:ring-emerald-400/20"}`}>
             <input
               id="estimatedAge"
               type="number"
-              placeholder="Estimated Age"
+              placeholder={copy.petAgePh}
               className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-50"
               {...register("estimatedAge", { valueAsNumber: true })}
             />
@@ -218,32 +222,32 @@ export default function BasicPetInfo({
               className="border-l border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700 outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-200"
               {...register("estimatedAgeUnit")}
             >
-              <option value="DAYS">Days</option>
-              <option value="WEEKS">Weeks</option>
-              <option value="MONTHS">Months</option>
-              <option value="YEARS">Years</option>
+              <option value="DAYS">{copy.unitDays}</option>
+              <option value="WEEKS">{copy.unitWeeks}</option>
+              <option value="MONTHS">{copy.unitMonths}</option>
+              <option value="YEARS">{copy.unitYears}</option>
             </select>
           </div>
-          {fieldMessage(errors.estimatedAge) && <p className={fieldErrorClassName}>{fieldMessage(errors.estimatedAge)}</p>}
-          {fieldMessage(errors.estimatedAgeUnit) && <p className={fieldErrorClassName}>{fieldMessage(errors.estimatedAgeUnit)}</p>}
+          {fieldMessage(copy, errors.estimatedAge) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.estimatedAge)}</p>}
+          {fieldMessage(copy, errors.estimatedAgeUnit) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.estimatedAgeUnit)}</p>}
           <p className="mt-1.5 text-sm text-stone-500 dark:text-stone-400">
-            Not needed when a date of birth is provided.
+            {copy.petAgeHint}
           </p>
         </div>
 
         <div className={lockIdentity ? "pointer-events-none opacity-60" : undefined}>
           <label htmlFor="lifestyle" className={labelClassName}>
-            Lifestyle
+            {copy.petLifestyle}
           </label>
           <select id="lifestyle" className={fieldClasses(Boolean(errors.lifestyle))} {...register("lifestyle")}>
-            <option value="INDOOR">Indoor</option>
-            <option value="OUTDOOR">Outdoor</option>
-            <option value="HYBRID">Hybrid</option>
+            <option value="INDOOR">{copy.lifeIndoor}</option>
+            <option value="OUTDOOR">{copy.lifeOutdoor}</option>
+            <option value="HYBRID">{copy.lifeHybrid}</option>
           </select>
-          {fieldMessage(errors.lifestyle) && <p className={fieldErrorClassName}>{fieldMessage(errors.lifestyle)}</p>}
+          {fieldMessage(copy, errors.lifestyle) && <p className={fieldErrorClassName}>{fieldMessage(copy, errors.lifestyle)}</p>}
         </div>
         {lockIdentity && (
-          <p className="text-sm text-stone-500 dark:text-stone-400">You can change the name, photo, and age. The clinic keeps the other details.</p>
+          <p className="text-sm text-stone-500 dark:text-stone-400">{copy.petLocked}</p>
         )}
       </div>
     </div>

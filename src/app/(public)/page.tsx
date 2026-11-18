@@ -2,7 +2,7 @@ import Link from "next/link";
 import ClinicGallery from "@/components/public/ClinicGallery";
 import ClinicPicture from "@/components/public/ClinicPicture";
 import { ServiceGrid } from "@/components/public/services";
-import { getClinicSettings, getPublicPhotos } from "@/lib/clinic/public";
+import { getClinicSettings, getPublicPhotos, homepageCopy } from "@/lib/clinic/public";
 import { getLocale, messages } from "@/lib/i18n";
 
 const clinicMapsUrl = "https://maps.app.goo.gl/VgbXYipPXhcg4y8i8";
@@ -14,6 +14,7 @@ export default async function HomePage() {
     const copy = messages(locale); // get the corresponding copy for the locale based on the locale we got from the cookie
     const settings = await getClinicSettings();
     const photos = await getPublicPhotos(locale, copy);
+    const home = homepageCopy(settings, locale, copy);
     const mapsUrl = settings?.mapsUrl?.trim() || clinicMapsUrl;
 
     return (
@@ -22,8 +23,8 @@ export default async function HomePage() {
                 <div className="contents lg:block">
                     <div className="order-1">
                         <p className="text-xs font-semibold tracking-[0.18em] text-emerald-800 uppercase">{copy.clinicName}</p>
-                        <h1 className="mt-4 max-w-xl text-5xl leading-[1.05] text-emerald-950 sm:text-6xl">{copy.heroTitle}</h1>
-                        <p className="mt-6 max-w-md text-lg leading-8 text-stone-600">{copy.heroBody}</p>
+                        <h1 className="mt-4 max-w-xl text-5xl leading-[1.05] text-emerald-950 sm:text-6xl">{home.heroTitle}</h1>
+                        <p className="mt-6 max-w-md text-lg leading-8 text-stone-600">{home.heroBody}</p>
                     </div>
                     <div className="order-3 flex flex-col gap-3 sm:flex-row lg:mt-8">
                         <Link href={bookHref} className="inline-flex items-center justify-center rounded-full bg-emerald-900 px-5 py-3 text-sm font-medium text-white hover:bg-emerald-950">
@@ -46,8 +47,8 @@ export default async function HomePage() {
                     </div>
                     <div className="max-w-lg">
                         <h2 className="text-4xl text-emerald-950">{copy.aboutHeading}</h2>
-                        <p className="mt-5 text-lg leading-8 text-stone-700">{copy.aboutLead}</p>
-                        <p className="mt-4 text-base leading-7 text-stone-600">{copy.aboutBodyLong}</p>
+                        <p className="mt-5 text-lg leading-8 text-stone-700">{home.aboutLead}</p>
+                        <p className="mt-4 text-base leading-7 text-stone-600">{home.aboutBody}</p>
                         <p className="mt-6 text-sm font-medium text-stone-500">{copy.addressHeading}</p>
                         <p className="mt-1 text-xl text-emerald-950">{copy.aboutLocality}</p>
                         <p className="text-base text-stone-600">{copy.aboutArea}</p>

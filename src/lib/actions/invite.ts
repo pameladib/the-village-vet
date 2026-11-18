@@ -26,16 +26,17 @@ export async function createOwnerInvite(input: { name: string; phoneNumber: stri
     if (!parsed.success) return { success: false as const, formErrors: ["Enter a name and a phone number."] };
 
     const token = randomBytes(24).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000);
     await prisma.verification.create({
         data: {
             id: crypto.randomUUID(),
             identifier: `owner-invite:${hashToken(token)}`,
             value: JSON.stringify({ name: parsed.data.name, phoneNumber: parsed.data.phoneNumber }),
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60_000),
+            expiresAt,
         },
     });
 
-    return { success: true as const, path: `/account/setup?token=${token}` };
+    return { success: true as const, path: `/account/setup?token=${token}`, expiresAt: expiresAt.toISOString() };
 }
 
 export async function consumeOwnerInvite(token: string, phoneNumber: string) {

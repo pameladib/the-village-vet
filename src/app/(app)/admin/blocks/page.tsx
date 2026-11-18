@@ -1,18 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import BlockForm, { DeleteBlockButton } from "@/components/admin/BlockForm";
+import BlockForm from "@/components/admin/BlockForm";
 import { todayInBeirut } from "@/lib/appointments/availability";
 import { requireRole } from "@/lib/auth/session";
+import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-
-const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Beirut",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-});
 
 export default async function BlocksPage() {
     try {
@@ -21,25 +12,29 @@ export default async function BlocksPage() {
         redirect("/dashboard");
     }
 
+    const locale = await getLocale();
+    const copy = messages(locale);
     const blocks = await prisma.scheduleBlock.findMany({
         where: { endAt: { gt: new Date() } },
         orderBy: { startAt: "asc" },
+        select: { id: true, startAt: true, endAt: true, scope: true },
     });
 
     return (
-        <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
-            <Link href="/dashboard" className="text-sm text-emerald-800">Back</Link>
-            <h1 className="mt-3 text-2xl font-semibold">Schedule blocks</h1>
-            <p className="mt-1 text-sm text-stone-600">Vet only leaves grooming open. Grooming only leaves the vet open. Both closes the clinic.</p>
-            <BlockForm today={todayInBeirut()} />
-            <ul className="mt-6 flex flex-col gap-2 text-sm">
-                {blocks.map((block) => (
-                    <li key={block.id} className="flex items-center justify-between rounded-xl border border-stone-200 px-3 py-2">
-                        <span>{block.scope} · {time.format(block.startAt)} – {time.format(block.endAt)}</span>
-                        <DeleteBlockButton id={block.id} />
-                    </li>
-                ))}
-            </ul>
+        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+            <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.blocksTitle}</h1>
+            <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-300">{copy.blocksLead}</p>
+            <BlockForm
+                today={todayInBeirut()}
+                copy={copy}
+                locale={locale}
+                blocks={blocks.map((block) => ({
+                    id: block.id,
+                    startAt: block.startAt.toISOString(),
+                    endAt: block.endAt.toISOString(),
+                    scope: block.scope,
+                }))}
+            />
         </main>
     );
 }

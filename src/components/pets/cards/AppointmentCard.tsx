@@ -7,6 +7,7 @@ import type { AppointmentWithPet } from "../../../lib/types/appointments";
 import { cancelAppointment } from "@/lib/actions/appointment";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
+import { shownMessage } from "@/lib/shown-message";
 import { petPhotoSrc } from "@/lib/storage/files";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 
@@ -53,7 +54,7 @@ export default function AppointmentCard({ appointment, copy, locale }: { appoint
         const result = await cancelAppointment(appointment.id);
         setCancelling(false);
         if (!result.success) {
-            setError(result.formErrors[0] ?? "Could not cancel this appointment.");
+            setError(shownMessage(copy, result.formErrors[0]) ?? copy.errCancel);
             return;
         }
         router.refresh();

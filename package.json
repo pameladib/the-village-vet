@@ -9,7 +9,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/lib/appointments/availability.test.ts src/lib/clinic/vaccines.test.ts src/lib/shop/reservation.test.ts src/lib/shop/inventory.test.ts src/lib/auth/permissions.test.ts src/lib/storage/files.test.ts src/lib/pwa/worker.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/appointments/availability.test.ts src/lib/clinic/vaccines.test.ts src/lib/shop/reservation.test.ts src/lib/shop/inventory.test.ts src/lib/shop/lifecycle.test.ts src/lib/shop/money.test.ts src/lib/auth/permissions.test.ts src/lib/storage/files.test.ts src/lib/pwa/worker.test.ts src/lib/notifications/reminder-text.test.ts src/lib/visits/rules.test.ts src/lib/public-url.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -31,11 +31,11 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.43",
-    "@types/web-push": "^3.6.4",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",

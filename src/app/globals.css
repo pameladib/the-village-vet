@@ -25,6 +25,32 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Links already use the hand. Buttons and the other controls below keep the arrow unless this is set. */
+@layer base {
+  :is(
+    a[href],
+    button:not(:disabled),
+    summary,
+    select:not(:disabled),
+    label:has(:is(input[type="checkbox"], input[type="radio"], input[type="file"]):not(:disabled)),
+    input:is([type="checkbox"], [type="radio"], [type="file"], [type="submit"], [type="button"], [type="reset"]):not(:disabled),
+    [role="button"]:not([aria-disabled="true"])
+  ) {
+    cursor: pointer;
+  }
+
+  :is(
+    button:disabled,
+    select:disabled,
+    input:disabled,
+    textarea:disabled,
+    [aria-disabled="true"],
+    label:has(:is(input, select, textarea):disabled)
+  ) {
+    cursor: not-allowed;
+  }
+}
+
 .public-serif :is(h1, h2, h3) {
   font-family: var(--font-serif), Georgia, "Times New Roman", serif;
 }

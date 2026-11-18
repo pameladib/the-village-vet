@@ -12,13 +12,18 @@ export type ReservationLine = {
 };
 
 // Copies stock so a second line for the same product cannot reserve more than is on the shelf.
-export function planReservation(products: StockedProduct[], items: { productId: string; quantity: number }[]) {
+export function planReservation(
+    products: StockedProduct[],
+    items: { productId: string; quantity: number }[],
+    options?: { allowHidden?: boolean },
+) {
     const remaining = new Map(products.map((product) => [product.id, { ...product }]));
     const lines: ReservationLine[] = [];
 
     for (const item of items) {
         const product = remaining.get(item.productId);
-        if (!product || !product.available || item.quantity < 1 || product.stock < item.quantity) {
+        const hidden = !options?.allowHidden && !product?.available;
+        if (!product || hidden || item.quantity < 1 || product.stock < item.quantity) {
             return { ok: false as const };
         }
         product.stock -= item.quantity;

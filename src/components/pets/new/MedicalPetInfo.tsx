@@ -3,25 +3,20 @@
 import { useEffect, useRef } from "react";
 import { useFormContext, useWatch, useFieldArray } from "react-hook-form";
 import { formatTodayDate } from "@/lib/helpers/dates";
-import { addCalendarMonths, dateOnlyUtc, formatDateOnly, nextVaccineDue } from "@/lib/clinic/vaccines";
+import { dateOnlyUtc, formatDateOnly, nextVaccineDue } from "@/lib/clinic/vaccines";
 import type { PetForm } from "@/lib/validations/pet";
+import type { Copy } from "@/lib/i18n";
 const catVaccinationTypes = ["FIRST", "SECOND", "ANNUAL"] as const;
 const dogVaccinationTypes = ["FIRST", "SECOND", "THIRD", "ANNUAL"] as const;
 
-const vaccinationLabels = {
-  FIRST: "First dose",
-  SECOND: "Second dose",
-  THIRD: "Third dose",
-  ANNUAL: "Annual dose",
-} as const;
-
-const treatmentIntervals = [
-  { months: 1, label: "1 month" },
-  { months: 2, label: "2 months" },
-  { months: 3, label: "3 months" },
-  { months: 6, label: "6 months" },
-] as const;
-
+function vaccinationLabels(copy: Copy) {
+  return {
+    FIRST: copy.doseFirst,
+    SECOND: copy.doseSecond,
+    THIRD: copy.doseThird,
+    ANNUAL: copy.doseAnnual,
+  } as const;
+}
 
 function getAvailableVaccinationOptions(
   species: "CAT" | "DOG" | undefined,
@@ -61,7 +56,7 @@ function latestDose<T extends { type?: string; administeredAt?: string }>(rows: 
   return best;
 }
 
-function NextVaccineDue({ species }: { species: "CAT" | "DOG" | undefined }) {
+function NextVaccineDue({ species, copy }: { species: "CAT" | "DOG" | undefined; copy: Copy }) {
   const { register, setValue, getValues } = useFormContext<PetForm>();
   const vaccinations = useWatch<PetForm, "vaccinations">({ name: "vaccinations" });
   const latest = latestDose(vaccinations);
@@ -85,15 +80,15 @@ function NextVaccineDue({ species }: { species: "CAT" | "DOG" | undefined }) {
   return (
     <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
       <label className="block">
-        <span className={labelClassName}>Next vaccination due</span>
+        <span className={labelClassName}>{copy.petNextVaccine}</span>
         <input type="date" className={fieldClassName} {...register("vaccineNextDueAt")} />
       </label>
       <p className="mt-1 text-xs text-stone-500">
         {latest?.administeredAt
-          ? `${threeWeeks ? "Suggested 3 weeks after the last dose." : "Suggested 11 months after the last dose."} You can change or clear it.`
-          : "Set this even if the administration date is unknown."}
+          ? (threeWeeks ? copy.petSuggestWeeks : copy.petSuggestMonths)
+          : copy.petDueUnknown}
       </p>
-      <button type="button" onClick={() => setValue("vaccineNextDueAt", "")} className="mt-1 text-xs font-medium text-stone-500 hover:text-stone-800 dark:hover:text-stone-200">Clear date</button>
+      <button type="button" onClick={() => setValue("vaccineNextDueAt", "")} className="mt-1 text-xs font-medium text-stone-500 hover:text-stone-800 dark:hover:text-stone-200">{copy.clearDate}</button>
     </div>
   );
 }
@@ -102,40 +97,16 @@ function NextTreatmentDue({
   type,
   name,
   label,
+  copy,
 }: {
   type: "DEWORMING" | "FLEA_TICK";
   name: "dewormingNextDueAt" | "fleaNextDueAt";
   label: string;
+  copy: Copy;
 }) {
   const { register, setValue } = useFormContext<PetForm>();
   const treatments = useWatch<PetForm, "treatments">({ name: "treatments" });
   const latest = latestDose(treatments, type);
-  const interval = useRef<number | null>(null);
-  const previousDate = useRef<string | null>(null);
-
-  useEffect(() => {
-    const givenOn = latest?.administeredAt ?? "";
-    if (!givenOn) return;
-    if (previousDate.current === null) {
-      previousDate.current = givenOn;
-      return;
-    }
-    if (previousDate.current === givenOn || interval.current == null) {
-      previousDate.current = givenOn;
-      return;
-    }
-    previousDate.current = givenOn;
-    const given = dateOnlyUtc(givenOn);
-    if (!given) return;
-    setValue(name, formatDateOnly(addCalendarMonths(given, interval.current)));
-  }, [latest?.administeredAt, name, setValue]);
-
-  function chooseInterval(months: number) {
-    interval.current = months;
-    const given = latest?.administeredAt ? dateOnlyUtc(latest.administeredAt) : null;
-    if (!given) return;
-    setValue(name, formatDateOnly(addCalendarMonths(given, months)));
-  }
 
   return (
     <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -144,45 +115,18 @@ function NextTreatmentDue({
         <input
           type="date"
           className={fieldClassName}
-          {...register(name, {
-            onChange: () => {
-              interval.current = null;
-            },
-          })}
+          {...register(name)}
         />
       </label>
       <p className="mt-1 text-xs text-stone-500">
-        {latest?.administeredAt
-          ? "Counted from the last time this treatment was given. Leave it empty if none is scheduled."
-          : "Set this even if the administration date is unknown."}
+        {latest?.administeredAt ? copy.petTreatmentHint : copy.petDueUnknown}
       </p>
-      <button type="button" onClick={() => { interval.current = null; setValue(name, ""); }} className="mt-1 text-xs font-medium text-stone-500 hover:text-stone-800 dark:hover:text-stone-200">Clear date</button>
-      {latest?.administeredAt && <div className="mt-2 flex flex-wrap gap-2">
-        {treatmentIntervals.map((item) => (
-          <button key={item.months} type="button" onClick={() => chooseInterval(item.months)} className="rounded-full border border-stone-300 bg-white px-2.5 py-1 text-xs text-stone-700 hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-800">
-            {item.label}
-          </button>
-        ))}
-        <label className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-300">
-          Custom
-          <input
-            type="number"
-            min={1}
-            max={36}
-            aria-label={`${label} custom interval in months`}
-            className="w-16 rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm dark:border-stone-700 dark:bg-stone-950"
-            onChange={(event) => {
-              const months = Number(event.target.value);
-              if (Number.isInteger(months) && months >= 1 && months <= 36) chooseInterval(months);
-            }}
-          />
-        </label>
-      </div>}
+      <button type="button" onClick={() => setValue(name, "")} className="mt-1 text-xs font-medium text-stone-500 hover:text-stone-800 dark:hover:text-stone-200">{copy.clearDate}</button>
     </div>
   );
 }
 
-export function CarePetInfo({ species }: { species: "CAT" | "DOG" | undefined }) {
+export function CarePetInfo({ species, copy }: { species: "CAT" | "DOG" | undefined; copy: Copy }) {
   const { register, control } = useFormContext();
   const today = formatTodayDate();
   const {
@@ -208,69 +152,69 @@ export function CarePetInfo({ species }: { species: "CAT" | "DOG" | undefined })
   return (
     <div className="space-y-4">
       <div>
-        <p className={labelClassName}>Vaccinations</p>
+        <p className={labelClassName}>{copy.petVaccinations}</p>
           {vaccinationFields.map((field, index) => {
             const availableTypes = getAvailableVaccinationOptions(species, vaccinations, index);
 
             return (
               <div key={field.id} className="mt-2 space-y-2 rounded-lg border border-stone-200 p-3 dark:border-stone-700">
                 <label className="block">
-                  <span className={labelClassName}>Dose</span>
+                  <span className={labelClassName}>{copy.colDose}</span>
                   <select key={availableTypes.join()} className={fieldClassName} {...register(`vaccinations.${index}.type`)}>
                     {availableTypes.map((type) => (
                       <option key={type} value={type}>
-                        {vaccinationLabels[type]}
+                        {vaccinationLabels(copy)[type]}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="block">
-                  <span className={labelClassName}>Date administered</span>
+                  <span className={labelClassName}>{copy.colGiven}</span>
                   <input type="date" max={today} className={fieldClassName} {...register(`vaccinations.${index}.administeredAt`)} />
                 </label>
                 <button type="button" onClick={() => removeVaccination(index)} className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 transition hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-800">
-                  Remove
+                  {copy.petRemove}
                 </button>
               </div>
             );
           })}
         <button type="button" onClick={addNewVaccineForm} className="mt-2 rounded-lg border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-800 transition hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-800">
-          + Add Vaccination
+          {copy.petAddVaccine}
         </button>
-        <NextVaccineDue species={species} />
+        <NextVaccineDue species={species} copy={copy} />
       </div>
 
       <div>
-        <p className={labelClassName}>Treatments</p>
+        <p className={labelClassName}>{copy.petTreatments}</p>
         {treatmentsFields.map((field, index) => (
           <div key={field.id} className="mt-2 space-y-2 rounded-lg border border-stone-200 p-3 dark:border-stone-700">
             <label className="block">
-              <span className={labelClassName}>Treatment</span>
+              <span className={labelClassName}>{copy.colTreatment}</span>
               <select className={fieldClassName} {...register(`treatments.${index}.type`)}>
-                <option value="DEWORMING">Deworming</option>
-                <option value="FLEA_TICK">Flea and tick treatment</option>
+                <option value="DEWORMING">{copy.doseDeworming}</option>
+                <option value="FLEA_TICK">{copy.doseFlea}</option>
               </select>
             </label>
             <label className="block">
-              <span className={labelClassName}>Date administered</span>
+              <span className={labelClassName}>{copy.colGiven}</span>
               <input type="date" max={today} className={fieldClassName} {...register(`treatments.${index}.administeredAt`)} />
             </label>
             <button type="button" onClick={() => removeTreatment(index)} className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 transition hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-800">
-              Remove
+              {copy.petRemove}
             </button>
           </div>
         ))}
         <button type="button" onClick={() => appendTreatment({ type: "DEWORMING", administeredAt: "" })} className="mt-2 rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm font-medium text-stone-800 transition hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-800">
-          + Add Treatment
+          {copy.petAddTreatment}
         </button>
-        <NextTreatmentDue type="DEWORMING" name="dewormingNextDueAt" label="Next deworming due" />
-        <NextTreatmentDue type="FLEA_TICK" name="fleaNextDueAt" label="Next flea and tick treatment due" />
+        <NextTreatmentDue type="DEWORMING" name="dewormingNextDueAt" label={copy.petNextDeworm} copy={copy} />
+        <NextTreatmentDue type="FLEA_TICK" name="fleaNextDueAt" label={copy.petNextFlea} copy={copy} />
       </div>
     </div>
   );
 }
 
-export default function MedicalPetInfo() {
+export default function MedicalPetInfo({ copy }: { copy: Copy }) {
   const { register } = useFormContext();
   const today = formatTodayDate();
   const spayedNeuteredValue = useWatch({ name: "spayedNeutered" });
@@ -278,17 +222,17 @@ export default function MedicalPetInfo() {
   return (
     <div className="space-y-4">
       <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-        Please complete this section with Dr. Zeina so the medical record is accurate and complete.
+        {copy.petMedicalNote}
       </p>
       <div>
         <label htmlFor="currentWeight" className={labelClassName}>
-          Current Weight
+          {copy.petWeight}
         </label>
         <div className="flex overflow-hidden rounded-lg border border-stone-300 shadow-sm focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-700/15 dark:border-stone-700 dark:focus-within:border-emerald-400 dark:focus-within:ring-emerald-400/20">
           <input
             id="currentWeight"
             type="number"
-            placeholder="Current Weight"
+            placeholder={copy.petWeight}
             className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-50"
             {...register("currentWeight", { valueAsNumber: true })}
           />
@@ -296,32 +240,32 @@ export default function MedicalPetInfo() {
             className="border-l border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700 outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-200"
             {...register("weightUnit")}
           >
-            <option value="GRAMS">Grams</option>
-            <option value="KG">KG</option>
+            <option value="GRAMS">{copy.petGrams}</option>
+            <option value="KG">{copy.petKg}</option>
           </select>
         </div>
       </div>
 
       <div>
-        <p className={labelClassName}>Spayed/Neutered</p>
+        <p className={labelClassName}>{copy.petSpay}</p>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-sm text-stone-800 dark:text-stone-200">
             <input type="radio" value="YES" className="size-4 accent-emerald-800 dark:accent-emerald-400" {...register("spayedNeutered")} />
-            Yes
+            {copy.yes}
           </label>
           <label className="flex items-center gap-2 text-sm text-stone-800 dark:text-stone-200">
             <input type="radio" value="NO" className="size-4 accent-emerald-800 dark:accent-emerald-400" {...register("spayedNeutered")} />
-            No
+            {copy.no}
           </label>
           <label className="flex items-center gap-2 text-sm text-stone-800 dark:text-stone-200">
             <input type="radio" value="UNKNOWN" className="size-4 accent-emerald-800 dark:accent-emerald-400" {...register("spayedNeutered")} />
-            Unknown
+            {copy.unknown}
           </label>
         </div>
         {spayedNeuteredValue === "YES" && (
           <div className="mt-2">
             <label htmlFor="spayedNeuteredAt" className={labelClassName}>
-              Spayed/Neutered At
+              {copy.petSpayAt}
             </label>
             <input type="date" id="spayedNeuteredAt" max={today} className={fieldClassName} {...register("spayedNeuteredAt")} />
           </div>
@@ -330,37 +274,37 @@ export default function MedicalPetInfo() {
 
       <div>
         <label htmlFor="allergies" className={labelClassName}>
-          Allergies
+          {copy.petAllergies}
         </label>
         <textarea id="allergies" className={textareaClassName} {...register("allergies")} />
       </div>
 
       <div>
         <label htmlFor="medicalConditions" className={labelClassName}>
-          Chronic/Medical Conditions
+          {copy.petConditions}
         </label>
         <textarea id="medicalConditions" className={textareaClassName} {...register("medicalConditions")} />
       </div>
 
       <div>
         <label htmlFor="medications" className={labelClassName}>
-          Medications
+          {copy.petMedications}
         </label>
         <textarea id="medications" className={textareaClassName} {...register("medications")} />
       </div>
 
       <div>
         <label htmlFor="diet" className={labelClassName}>
-          Diet
+          {copy.petDiet}
         </label>
         <textarea id="diet" className={textareaClassName} {...register("diet")} />
       </div>
 
       <div>
         <label htmlFor="previousHistory" className={labelClassName}>
-          Previous History
+          {copy.petHistory}
         </label>
-        <textarea id="previousHistory" placeholder="Surgeries, hospital stays, and other past treatment" className={textareaClassName} {...register("previousHistory")} />
+        <textarea id="previousHistory" placeholder={copy.petHistoryPh} className={textareaClassName} {...register("previousHistory")} />
       </div>
     </div>
   );

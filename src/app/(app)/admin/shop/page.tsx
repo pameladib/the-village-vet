@@ -5,6 +5,8 @@ import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { adminShopHref, formatLbp, parseShopQuery, shopText } from "@/lib/shop/catalog";
+import { formatMoney } from "@/lib/shop/money";
+import { getPricing } from "@/lib/shop/pricing";
 import { productPhotoSrc } from "@/lib/storage/files";
 
 function first(value: string | string[] | undefined) {
@@ -20,7 +22,7 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
 
     const raw = await searchParams;
     const filters = parseShopQuery({ cat: first(raw.cat), q: first(raw.q) });
-    const locale = await getLocale();
+    const [locale, pricing] = await Promise.all([getLocale(), getPricing()]);
     const copy = messages(locale);
     const categories = await prisma.productCategory.findMany({ orderBy: { position: "asc" } });
     const selected = categories.find((category) => category.id === filters.cat);
@@ -39,15 +41,13 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
         include: { category: { select: { name: true, nameAr: true } } },
         orderBy: locale === "ar" ? { nameAr: "asc" } : { name: "asc" },
     });
-    const pill = "shrink-0 rounded-full px-4 py-2 text-sm whitespace-nowrap";
+    const pill = "shrink-0 rounded-full border px-4 py-2 text-sm whitespace-nowrap";
 
     return (
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-            <Link href="/dashboard" className="text-sm text-emerald-800">{copy.bookBack}</Link>
-            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-semibold">{copy.products}</h1>
-                    <p className="mt-1 text-sm text-stone-600">{copy.shopAdminLead}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Link href="/admin/shop/categories" className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-50">{copy.shopManageCategories}</Link>
@@ -56,9 +56,9 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
             </div>
 
             <nav aria-label={copy.shopManageCategories} className="mt-6 flex gap-2 overflow-x-auto">
-                <Link href={adminShopHref("", filters.q)} className={`${pill} ${selected ? "bg-white ring-1 ring-stone-200" : "bg-emerald-900 text-white"}`}>{copy.shopAll}</Link>
+                <Link href={adminShopHref("", filters.q)} className={`${pill} ${selected ? "border-stone-200 bg-white" : "border-emerald-900 bg-emerald-900 text-white"}`}>{copy.shopAll}</Link>
                 {categories.map((category) => (
-                    <Link key={category.id} href={adminShopHref(category.id, filters.q)} className={`${pill} ${selected?.id === category.id ? "bg-emerald-900 text-white" : "bg-white ring-1 ring-stone-200 hover:ring-emerald-700"}`}>
+                    <Link key={category.id} href={adminShopHref(category.id, filters.q)} className={`${pill} ${selected?.id === category.id ? "border-emerald-900 bg-emerald-900 text-white" : "border-stone-200 bg-white hover:border-emerald-700"}`}>
                         {shopText(locale, category.name, category.nameAr)}
                     </Link>
                 ))}
@@ -85,7 +85,7 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
                                     <Link href={`/admin/shop/${product.id}`} className="mt-1 block font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
                                     <p className="text-sm text-stone-500">{locale === "ar" ? product.name : product.nameAr}</p>
                                     <div className="mt-3 flex items-center justify-between gap-2 text-sm">
-                                        <span>{formatLbp(product.price, locale)} {copy.lbp}</span>
+                                        <span>{formatMoney(product.price, pricing.currency, locale)}</span>
                                         <span className="text-stone-500">{product.stock > 0 ? formatLbp(product.stock, locale) : copy.shopOut}</span>
                                     </div>
                                     {!product.available && <p className="mt-2 text-xs font-medium text-stone-500">{copy.shopHidden}</p>}

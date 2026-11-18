@@ -6,6 +6,7 @@ import { confirmProductPhoto, deleteProduct, prepareProductPhoto, saveProduct } 
 import { uploadToSignedUrl } from "@/lib/storage/direct-upload";
 import type { Copy, Locale } from "@/lib/i18n";
 import { shopText } from "@/lib/shop/catalog";
+import { inputFromMinor, minorFromInput, type Currency } from "@/lib/shop/money";
 import ProductPhoto from "./ProductPhoto";
 import { mapShopError } from "./ShopAdmin";
 
@@ -30,11 +31,13 @@ export default function ProductEditor({
     locale,
     categories,
     product,
+    currency,
 }: {
     copy: Copy;
     locale: Locale;
     categories: Category[];
     product?: Product;
+    currency: Currency;
 }) {
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
@@ -85,13 +88,20 @@ export default function ProductEditor({
                     setSaving(false);
                     return;
                 }
+                const price = minorFromInput(String(form.get("price") ?? ""), currency);
+                if (price == null) {
+                    setError(copy.shopErrPrice);
+                    setSaving(false);
+                    return;
+                }
                 const result = await saveProduct({
                     id: product?.id,
                     name: String(form.get("name") ?? ""),
                     nameAr: String(form.get("nameAr") ?? ""),
                     description: String(form.get("description") ?? ""),
                     descriptionAr: String(form.get("descriptionAr") ?? ""),
-                    price: Number(form.get("price")),
+                    price,
+                    priceCurrency: currency,
                     stock: Number(form.get("stock")),
                     categoryId: String(form.get("categoryId") ?? ""),
                     available: form.get("available") === "on",
@@ -106,8 +116,8 @@ export default function ProductEditor({
                 router.refresh();
             }}
         >
-            <div className="relative aspect-square overflow-hidden rounded-2xl bg-[#efe8dc]">
-                <ProductPhoto src={currentPhoto} alt="" sizes="32rem" />
+            <div className="relative aspect-square w-full max-w-48 overflow-hidden rounded-2xl bg-[#efe8dc]">
+                <ProductPhoto src={currentPhoto} alt="" sizes="12rem" />
             </div>
             <label className="text-sm font-medium">
                 {copy.shopPhoto}
@@ -141,8 +151,8 @@ export default function ProductEditor({
                 <textarea name="descriptionAr" defaultValue={product?.descriptionAr ?? ""} rows={3} dir="rtl" className={field} />
             </label>
             <label className="text-sm font-medium">
-                {copy.shopPrice}
-                <input name="price" type="number" min={0} defaultValue={product?.price ?? 0} required className={field} />
+                {currency === "USD" ? copy.shopPriceUsd : copy.shopPriceLbp}
+                <input name="price" inputMode="decimal" defaultValue={product ? inputFromMinor(product.price, currency) : ""} required className={field} />
             </label>
             <label className="text-sm font-medium">
                 {copy.shopStockField}

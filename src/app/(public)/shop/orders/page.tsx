@@ -4,7 +4,8 @@ import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
-import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, shopText } from "@/lib/shop/catalog";
+import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId, shopText } from "@/lib/shop/catalog";
+import { formatStored } from "@/lib/shop/money";
 
 export default async function MyOrdersPage() {
     let session;
@@ -31,13 +32,7 @@ export default async function MyOrdersPage() {
                 <ul className="mt-8 flex flex-col gap-4">
                     {orders.map((order) => {
                         const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-                        const statusTone = order.status === "PENDING"
-                            ? "bg-amber-100 text-amber-950"
-                            : order.status === "REJECTED"
-                                ? "bg-stone-200 text-stone-700"
-                                : order.status === "OUT_FOR_DELIVERY"
-                                    ? "bg-sky-100 text-sky-950"
-                                    : "bg-emerald-100 text-emerald-950";
+                        const statusTone = orderStatusTone(order.status);
                         const details = [
                             [copy.shopReceive, orderFulfillmentLabel(order.fulfillment, copy)],
                             [copy.shopPayment, orderPaymentLabel(order.payment, order.fulfillment, copy)],
@@ -48,8 +43,11 @@ export default async function MyOrdersPage() {
                         return (
                             <li key={order.id} className="overflow-hidden rounded-[1.6rem] bg-white ring-1 ring-stone-200">
                                 <div className="flex items-center justify-between gap-3 px-5 py-4">
-                                    <p className={`rounded-full px-3 py-1 text-xs font-medium ${statusTone}`}>{orderStatusLabel(order.status, copy)}</p>
-                                    <p className="text-sm text-stone-500">{date.format(order.createdAt)}</p>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <p className={`rounded-full px-3 py-1 text-xs font-medium ${statusTone}`}>{orderStatusLabel(order.status, copy)}</p>
+                                        <p className="truncate text-sm font-medium text-emerald-950">{shortOrderId(order.id)}</p>
+                                    </div>
+                                    <p className="shrink-0 text-sm text-stone-500">{date.format(order.createdAt)}</p>
                                 </div>
                                 {order.status === "PENDING" && (
                                     <p className="mx-5 rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">{copy.shopPendingCustomer}</p>
@@ -58,7 +56,7 @@ export default async function MyOrdersPage() {
                                     {order.items.map((item) => (
                                         <li key={item.id} className="flex justify-between gap-4 py-2">
                                             <span>{shopText(locale, item.product.name, item.product.nameAr)} × {formatLbp(item.quantity, locale)}</span>
-                                            <span className="shrink-0">{formatLbp(item.unitPrice * item.quantity, locale)} {copy.lbp}</span>
+                                            <span className="shrink-0">{formatStored(item.unitPrice * item.quantity, order.currency, locale)}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -70,10 +68,13 @@ export default async function MyOrdersPage() {
                                         </div>
                                     ))}
                                 </dl>
-                                <p className="flex items-center justify-between border-t border-stone-100 bg-stone-50 px-5 py-4 text-sm">
+                                <div className="flex items-center justify-between border-t border-stone-100 bg-stone-50 px-5 py-4 text-sm">
                                     <span className="text-stone-500">{copy.shopTotal}</span>
-                                    <span className="font-medium text-emerald-950">{formatLbp(total, locale)} {copy.lbp}</span>
-                                </p>
+                                    <span className="flex items-center gap-4">
+                                        <span className="font-medium text-emerald-950">{formatStored(total, order.currency, locale)}</span>
+                                        <Link href={`/shop/orders/${order.id}`} className="font-medium text-emerald-900 hover:underline">{copy.shopViewOrder}</Link>
+                                    </span>
+                                </div>
                             </li>
                         );
                     })}

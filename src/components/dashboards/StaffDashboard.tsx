@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { CalendarDays, CalendarPlus, HeartPulse, Package, ShoppingBag } from "lucide-react";
+import { CalendarDays, CalendarPlus, ClipboardPlus, HeartPulse, Package, ShoppingBag } from "lucide-react";
 import EnablePush from "@/components/EnablePush";
 import InstallPrompt from "@/components/InstallPrompt";
 import StaffShell from "@/components/dashboards/StaffShell";
 import Page from "@/components/Page";
-import VisitTable from "@/components/dashboards/VisitTable";
 import type { StaffVisit } from "@/app/(app)/dashboard/load-staff";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
@@ -19,6 +18,7 @@ export default function StaffDashboard({
     lowStock,
     overdueCare,
     upcomingCare,
+    awaitingCount,
 }: {
     copy: Copy;
     locale: Locale;
@@ -29,6 +29,7 @@ export default function StaffDashboard({
     lowStock: number;
     overdueCare: number;
     upcomingCare: number;
+    awaitingCount: number;
 }) {
     const count = new Intl.NumberFormat(intlLocale(locale));
     const dateLabel = new Intl.DateTimeFormat(intlLocale(locale), {
@@ -39,17 +40,19 @@ export default function StaffDashboard({
     }).format(new Date());
     const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Beirut", hour: "numeric", hourCycle: "h23" }).format(new Date()));
     const greeting = hour < 12 ? copy.goodMorning : hour < 17 ? copy.goodAfternoon : copy.goodEvening;
+    const headerAction = "inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-900 px-5 py-3 text-sm font-medium text-white hover:bg-emerald-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:bg-emerald-950";
 
     const summaries = [
-        { href: "#schedule", label: copy.todayAppointments, value: today.length, icon: CalendarDays },
+        { href: "/admin/appointments", label: copy.todayAppointments, value: today.length, icon: CalendarDays },
         { href: "/admin/orders?status=pending", label: copy.pendingOrders, value: pendingOrders, icon: ShoppingBag },
-        ...(clinical ? [{ href: "/admin/care", label: copy.upcomingCare, value: upcomingCare, icon: HeartPulse }] : []),
+        ...(clinical ? [{ href: "/admin/care?tab=upcoming", label: copy.upcomingCare, value: upcomingCare, icon: HeartPulse }] : []),
         { href: "/admin/inventory", label: copy.lowStockProducts, value: lowStock, icon: Package },
     ];
     const alerts = [
         pendingOrders > 0 ? { href: "/admin/orders?status=pending", label: copy.attentionOrders, value: pendingOrders } : null,
         lowStock > 0 ? { href: "/admin/inventory", label: copy.attentionStock, value: lowStock } : null,
-        clinical && overdueCare > 0 ? { href: "/admin/care", label: copy.overdueCareSection, value: overdueCare } : null,
+        clinical && overdueCare > 0 ? { href: "/admin/care?tab=overdue", label: copy.overdueCareSection, value: overdueCare } : null,
+        awaitingCount > 0 ? { href: "/admin/appointments?tab=awaiting", label: copy.attentionAppointments, value: awaitingCount } : null,
     ].filter((alert): alert is { href: string; label: string; value: number } => alert !== null);
 
     return (
@@ -61,13 +64,22 @@ export default function StaffDashboard({
                         <p className="mt-1 text-sm text-stone-500">{dateLabel}</p>
                         <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">{copy.dashboardTodayLead}</p>
                     </div>
-                    <Link
-                        href="/appointments/new"
-                        className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-900 px-5 py-3 text-sm font-medium text-white hover:bg-emerald-950"
-                    >
-                        <CalendarPlus className="size-4" />
-                        {copy.newAppointment}
-                    </Link>
+                    <div className="flex w-full flex-col gap-2 sm:w-fit">
+                        <Link href="/admin/appointments/new" className={headerAction}>
+                            <CalendarPlus className="size-4" />
+                            {copy.newAppointment}
+                        </Link>
+                        {clinical && (
+                            <Link href="/admin/visits/new" className={headerAction}>
+                                <ClipboardPlus className="size-4" />
+                                {copy.addVisit}
+                            </Link>
+                        )}
+                        <Link href="/admin/orders/new" className={headerAction}>
+                            <ShoppingBag className="size-4" />
+                            {copy.shopNewOrder}
+                        </Link>
+                    </div>
                 </header>
                 <InstallPrompt copy={copy} />
                 <EnablePush copy={copy} />
@@ -103,14 +115,6 @@ export default function StaffDashboard({
                     </section>
                 )}
 
-                <section id="schedule" className="mt-8 scroll-mt-6">
-                    <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.todaySchedule}</h2>
-                    {today.length === 0 ? (
-                        <p className="mt-3 text-sm text-stone-500">{copy.noVisitsToday}</p>
-                    ) : (
-                        <VisitTable visits={today} copy={copy} locale={locale} clinical={clinical} />
-                    )}
-                </section>
             </Page>
         </StaffShell>
     );

@@ -1,5 +1,6 @@
 import NewPetForm from "@/components/pets/new/NewPetForm";
 import { requireRole } from "@/lib/auth/session";
+import { getLocale, messages } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
@@ -25,5 +26,5 @@ export default async function NewPetPage() {
   const isFirstPet = petCount === 0; // to display different headers based on whether this is the user's first pet or not
   const ownerName = session.user.name.trim().split(/\s+/)[0]; // getting the first name of the user to display a welcome message
 
-  return <NewPetForm isFirstPet={isFirstPet} ownerName={ownerName} allowClinical />;
+  return <NewPetForm isFirstPet={isFirstPet} ownerName={ownerName} allowClinical copy={messages(await getLocale())} />;
 }

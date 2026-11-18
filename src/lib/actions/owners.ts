@@ -11,7 +11,6 @@ import { prisma } from "@/lib/prisma";
 const profileSchema = z.object({
     name: z.string().trim().min(1).max(80),
     phoneNumber: z.string().trim().min(1).max(30),
-    email: z.string().trim().max(200).toLowerCase().pipe(z.email()),
 });
 
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -46,7 +45,6 @@ export async function updateCustomerAccount(userId: string, input: unknown) {
     const parsed = profileSchema.safeParse(input);
     if (!parsed.success) {
         const field = parsed.error.issues[0]?.path[0];
-        if (field === "email") return { success: false as const, error: "email" as const };
         if (field === "phoneNumber") return { success: false as const, error: "phone" as const };
         if (field === "name") return { success: false as const, error: "name" as const };
         return { success: false as const, error: "invalid" as const };
@@ -54,25 +52,15 @@ export async function updateCustomerAccount(userId: string, input: unknown) {
     const owner = await ownerAccount(userId);
     if (!owner) return { success: false as const, error: "forbidden" as const };
 
-    const taken = await prisma.user.findFirst({
-        where: { email: parsed.data.email, NOT: { id: owner.id } },
-        select: { id: true },
-    });
-    if (taken) return { success: false as const, error: "taken" as const };
-
     try {
         await prisma.user.update({
             where: { id: owner.id },
             data: {
                 name: parsed.data.name,
                 phoneNumber: parsed.data.phoneNumber,
-                email: parsed.data.email,
             },
         });
-    } catch (error) {
-        if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
-            return { success: false as const, error: "taken" as const };
-        }
+    } catch {
         return { success: false as const, error: "invalid" as const };
     }
     revalidatePath(`/admin/owners/${owner.id}`);

@@ -24,32 +24,33 @@ export default async function NewAppointmentPage({
         throw error;
     }
 
-    const { q = "", petId = "", service = "" } = await searchParams;
+    const { petId = "", service = "" } = await searchParams;
+    const staff = session.user.role !== "OWNER";
+    if (staff) {
+        const next = new URLSearchParams();
+        if (petId) next.set("petId", petId);
+        if (service) next.set("service", service);
+        const query = next.toString();
+        redirect(query ? `/admin/appointments/new?${query}` : "/admin/appointments/new");
+    }
+
     const locale = await getLocale();
     const copy = messages(locale);
-    const staff = session.user.role !== "OWNER";
     const pets = await prisma.pet.findMany({
-        where: staff
-            ? petId
-                ? { id: petId }
-                : q.trim().length >= 2
-                    ? { name: { contains: q.trim(), mode: "insensitive" } }
-                    : { id: "00000000-0000-0000-0000-000000000000" }
-            : { ownerId: session.user.id },
-        select: { id: true, name: true, species: true },
-        orderBy: { name: "asc" },
-        take: 20,
+        where: staff ? {} : { ownerId: session.user.id },
+        select: { id: true, name: true, species: true, owner: { select: { name: true } } },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
     });
 
     return (
-        <>
-            {staff && (
-                <form action="/appointments/new" className="mx-auto mt-8 flex w-full max-w-lg gap-2 px-4">
-                    <input name="q" defaultValue={q} placeholder={copy.bookSearchPlaceholder} className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-stone-950" />
-                    <button className="rounded-lg bg-emerald-800 px-3 py-2 text-sm font-medium text-white">{copy.bookFind}</button>
-                </form>
-            )}
-            <NewAppointmentForm pets={pets} today={todayInBeirut()} emptyMessage={staff ? copy.bookSearchEmpty : undefined} copy={copy} locale={locale} petId={petId} service={service} />
-        </>
+        <NewAppointmentForm
+            pets={pets.map((pet) => ({ id: pet.id, name: pet.name, species: pet.species, ownerName: staff ? pet.owner.name : undefined }))}
+            today={todayInBeirut()}
+            copy={copy}
+            locale={locale}
+            petId={petId}
+            service={service}
+            staff={staff}
+        />
     );
 }

@@ -7,7 +7,9 @@
 // todayInBeirut() returns the current date in Beirut time as a YYYY-MM-DD string
 
 import { beirutInstant, calendarDateInBeirut, careNoticeDay, hourInBeirut, todayInBeirut } from "@/lib/appointments/availability";
+import { messages, type Locale } from "@/lib/i18n";
 import { notify, notifyOwnerAndStaff } from "@/lib/notifications";
+import { careReminder, visitReminder } from "@/lib/notifications/reminder-text";
 import { prisma } from "@/lib/prisma"; // prisma is the database client, which allows us to query the database
 
 function nextCalendarDate(date: string) { // takes a YYYY-MM-DD string and returns the next calendar date as a YYYY-MM-DD string (the next day)
@@ -45,7 +47,7 @@ export async function GET(request: Request) {
 
     const visits = await prisma.appointment.findMany({ // retrieving all booked appointments between today at midnight and the day after tomorrow at midnight in Beirut time
         where: { status: "BOOKED", startAt: { gte: todayStart, lt: dayAfterStart } }, // gte (greater than or equal to) and lt (less than) are Prisma query filters that translate into SQL >= and < operators. We didn't use BETWEEN because we don't want to include an appointment that starts exactly at the day after tomorrow at midnight.
-        select: { id: true, ownerId: true, startAt: true }, // these are the only fields we need from the appointments. id is used to create a unique dedupeKey, ownerId identifies which user should receive the reminder, and startAt is used to determine if the appointment is today or tomorrow.
+        select: { id: true, ownerId: true, startAt: true, type: true, groomingService: true }, // id builds the dedupe key. type and groomingService name the visit. startAt supplies the clock time.
     });
 
     // this query translates into the following SQL query:
@@ -65,10 +67,11 @@ export async function GET(request: Request) {
         if (sameDay) todayCount += 1; // if the appointment is today, we increment the todayCount variable
         else tomorrowCount += 1; // if the appointment is not today, we increment the tomorrowCount variable
 
+        const when = sameDay ? "today" : "tomorrow";
         await notify(
             appointment.ownerId,
-            sameDay ? "Appointment today" : "Appointment tomorrow",
-            sameDay ? "You have a visit today." : "You have a visit tomorrow.",
+            (locale: Locale) => visitReminder(messages(locale), locale, when, appointment.type, appointment.groomingService, appointment.startAt).title,
+            (locale: Locale) => visitReminder(messages(locale), locale, when, appointment.type, appointment.groomingService, appointment.startAt).body,
             sameDay ? `appt-today:${appointment.id}` : `appt-tomorrow:${appointment.id}`,
         );
 
@@ -89,6 +92,7 @@ export async function GET(request: Request) {
         select: {
             id: true,
             kind: true,
+            dose: true,
             dueAt: true,
             petId: true,
             pet: { select: { name: true, ownerId: true } },
@@ -116,8 +120,8 @@ export async function GET(request: Request) {
         const dueDay = calendarDateInBeirut(reminder.dueAt);
         await notifyOwnerAndStaff(
             reminder.pet.ownerId,
-            followUp ? "Care is still due" : "Care is due today",
-            `${reminder.pet.name} has a vaccination or treatment to book.`,
+            (locale: Locale) => careReminder(messages(locale), reminder.pet.name, reminder.kind, reminder.dose, followUp).title,
+            (locale: Locale) => careReminder(messages(locale), reminder.pet.name, reminder.kind, reminder.dose, followUp).body,
             `care:${reminder.id}:${dueDay}:${followUp ? "plus7" : "due"}`,
         );
     }

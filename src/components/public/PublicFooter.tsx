@@ -34,6 +34,7 @@ export default function PublicFooter({
                         <li><Link href="/about" className="hover:text-emerald-950">{copy.navAbout}</Link></li>
                         <li><Link href="/shop" className="hover:text-emerald-950">{copy.navStore}</Link></li>
                         <li><Link href="/find-us" className="hover:text-emerald-950">{copy.navFindUs}</Link></li>
+                        <li><Link href="/emergency" className="hover:text-emerald-950">{copy.emergency}</Link></li>
                     </ul>
                 </nav>
                 {(email || phone || whatsapp) && (

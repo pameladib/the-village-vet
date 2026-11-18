@@ -38,9 +38,13 @@ export default async function PetProfilePage({
       vaccinations: { select: { id: true, type: true, administeredAt: true } },
       treatments: { select: { id: true, type: true, administeredAt: true } },
       appointments: {
-        where: { status: { not: "CANCELLED" } },
-        orderBy: { startAt: "desc" },
-        select: { id: true, type: true, services: true, groomingService: true, startAt: true, duration: true },
+        where: { status: "BOOKED", startAt: { gte: new Date() } },
+        orderBy: { startAt: "asc" },
+        select: { id: true, type: true, services: true, groomingService: true, startAt: true, duration: true, status: true },
+      },
+      medicalVisits: {
+        orderBy: { visitedAt: "desc" },
+        select: { id: true, visitedAt: true, notes: true, type: true, services: true, appointmentId: true },
       },
       owner: { select: { name: true, phoneNumber: true } },
       documents: {
@@ -63,7 +67,7 @@ export default async function PetProfilePage({
   Client components do not support Decimal props so we must convert the Decimal object into a normal JS number before passing it to PetProfile
   We cannot just remove it because the pet profile needs to display the age
   */
-  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, documents, careReminders, owner, ...petFields } = pet;
+  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, medicalVisits, documents, careReminders, owner, ...petFields } = pet;
   const locale = await getLocale();
 
   const profilePet = {
@@ -78,6 +82,7 @@ export default async function PetProfilePage({
   return (
     <PetProfile
       pet={profilePet}
+      visits={medicalVisits.map((visit) => ({ ...visit, linked: Boolean(visit.appointmentId) }))}
       documents={documents.map((document) => ({
         id: document.id,
         title: document.title,

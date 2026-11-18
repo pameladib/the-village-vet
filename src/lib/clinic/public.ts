@@ -7,6 +7,33 @@ export const getClinicSettings = cache(() =>
     prisma.clinicSetting.findUnique({ where: { id: "clinic" } }),
 );
 
+function written(locale: Locale, english: string | null | undefined, arabic: string | null | undefined, fallback: string) {
+    const value = (locale === "ar" ? arabic : english)?.trim();
+    return value || fallback;
+}
+
+export function homepageCopy(
+    settings: {
+        heroTitleEn: string | null;
+        heroTitleAr: string | null;
+        heroBodyEn: string | null;
+        heroBodyAr: string | null;
+        aboutLeadEn: string | null;
+        aboutLeadAr: string | null;
+        aboutBodyEn: string | null;
+        aboutBodyAr: string | null;
+    } | null,
+    locale: Locale,
+    copy: Copy,
+) {
+    return {
+        heroTitle: written(locale, settings?.heroTitleEn, settings?.heroTitleAr, copy.heroTitle),
+        heroBody: written(locale, settings?.heroBodyEn, settings?.heroBodyAr, copy.heroBody),
+        aboutLead: written(locale, settings?.aboutLeadEn, settings?.aboutLeadAr, copy.aboutLead),
+        aboutBody: written(locale, settings?.aboutBodyEn, settings?.aboutBodyAr, copy.aboutBodyLong),
+    };
+}
+
 export type PublicPhoto = { src: string; alt: string };
 export type GallerySlide = { src: string; caption: string };
 
@@ -80,6 +107,17 @@ function coordinatesIn(url: string | null | undefined) {
 export function whatsappHref(value: string) {
     const digits = value.replace(/\D/g, "");
     return digits.length >= 8 ? `https://wa.me/${digits}` : null;
+}
+
+// Lebanese mobiles are often stored with a leading 0. WhatsApp needs the country code.
+export function ownerChat(phone: string) {
+    const digits = phone.replace(/\D/g, "");
+    const international = digits.startsWith("00")
+        ? digits.slice(2)
+        : digits.startsWith("0")
+            ? `961${digits.slice(1)}`
+            : digits;
+    return whatsappHref(international);
 }
 
 // Only in-app paths the public site is allowed to send someone to after login.

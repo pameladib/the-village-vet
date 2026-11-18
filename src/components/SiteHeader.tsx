@@ -8,11 +8,13 @@ export default function SiteHeader({
     copy,
     locale,
     showProfile = false,
+    showEmergency = false,
     notices,
 }: {
     copy: Copy;
     locale: Locale;
     showProfile?: boolean;
+    showEmergency?: boolean;
     notices?: { id: string; title: string; body: string; readAt: Date | null; createdAt?: Date | null; dedupeKey?: string | null }[];
 }) {
     return (
@@ -22,6 +24,7 @@ export default function SiteHeader({
             </Link>
             <nav className="flex flex-wrap items-center gap-3 text-sm text-emerald-900 dark:text-emerald-100">
                 <Link href="/">{copy.clinic}</Link>
+                {showEmergency && <Link href="/emergency">{copy.emergency}</Link>}
                 <Link href="/shop">{copy.shop}</Link>
                 <Link href="/dashboard">{copy.dashboard}</Link>
                 {notices !== undefined && <NotificationBell copy={copy} locale={locale} items={notices} />}

@@ -90,7 +90,7 @@ export default async function InventoryProductPage({ params }: { params: Promise
                 staff: null,
                 orderId: item.order.id,
             };
-            if (item.order.status === "REJECTED") {
+            if (item.order.status === "REJECTED" || item.order.status === "CANCELLED") {
                 return [reservedRow, {
                     id: `${item.id}-return`,
                     at: item.order.updatedAt,

@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ClinicDateField from "@/components/ClinicDateField";
 import { getOpenings, rescheduleAppointment } from "@/lib/actions/appointment";
+import type { Copy, Locale } from "@/lib/i18n";
+import { intlLocale } from "@/lib/intl-locale";
+import { shownMessage } from "@/lib/shown-message";
 import type { AppointmentType, Species } from "../../generated/prisma/client";
 
 export default function RescheduleForm({
@@ -12,12 +15,16 @@ export default function RescheduleForm({
     type,
     species,
     today,
+    copy,
+    locale,
 }: {
     appointmentId: string;
     petId: string;
     type: AppointmentType;
     species: Species;
     today: string;
+    copy: Copy;
+    locale: Locale;
 }) {
     const router = useRouter();
     const [date, setDate] = useState("");
@@ -32,7 +39,7 @@ export default function RescheduleForm({
         getOpenings({ petId, type, date }).then((result) => {
             if (cancelled) return;
             if (!result.success) {
-                setError(result.formErrors[0] ?? "Could not load times.");
+                setError(shownMessage(copy, result.formErrors[0]) ?? copy.loadTimesFail);
                 setStarts([]);
                 return;
             }
@@ -45,7 +52,7 @@ export default function RescheduleForm({
         };
     }, [date, petId, type]);
 
-    const time = new Intl.DateTimeFormat("en-GB", {
+    const time = new Intl.DateTimeFormat(intlLocale(locale), {
         timeZone: "Asia/Beirut",
         hour: "2-digit",
         minute: "2-digit",
@@ -55,7 +62,7 @@ export default function RescheduleForm({
     return (
         <form className="mt-6 flex flex-col gap-4">
             <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
-                Date
+                {copy.moveDate}
                 <ClinicDateField value={date} min={today} onChange={setDate} />
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -69,7 +76,7 @@ export default function RescheduleForm({
                             const result = await rescheduleAppointment({ appointmentId, date, start });
                             setPending(false);
                             if (!result.success) {
-                                setError(result.formErrors[0] ?? "Could not move this visit.");
+                                setError(shownMessage(copy, result.formErrors[0]) ?? copy.moveFail);
                                 return;
                             }
                             router.push("/dashboard");
@@ -81,7 +88,7 @@ export default function RescheduleForm({
                     </button>
                 ))}
             </div>
-            {date && starts.length === 0 && <p className="text-sm text-emerald-800">No open times on this day.</p>}
+            {date && starts.length === 0 && <p className="text-sm text-emerald-800">{copy.moveNone}</p>}
             {error && <p className="text-sm text-red-700">{error}</p>}
         </form>
     );

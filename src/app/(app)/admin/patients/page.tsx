@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import PatientCard from "@/components/admin/PatientCard";
+import PatientSearch from "@/components/admin/PatientSearch";
 import Page from "@/components/Page";
 import { redirect } from "next/navigation";
 import { loadPatients } from "@/app/(app)/dashboard/load-staff";
@@ -41,57 +42,50 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
         <Page width="medium">
             <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.patients}</h1>
             <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">{copy.patientsLead}</p>
-            <form className="mt-5 flex gap-2" action="/admin/patients">
-                <input
-                    name="q"
-                    defaultValue={query}
-                    placeholder={copy.searchHint}
-                    className="w-full rounded-full border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-800 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50"
-                />
-                <button className="rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.search}</button>
-            </form>
-            <ul className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-2">
-                {pets.map((pet) => {
-                    const breed = pet.breed?.trim();
-                    const profileHref = clinical ? `/pets/${pet.id}` : `/admin/patients/${pet.id}`;
-                    return (
-                        <PatientCard
-                            key={pet.id}
-                            petHref={profileHref}
-                            ownerHref={`/admin/owners/${pet.owner.id}`}
-                            name={pet.name}
-                            species={pet.species}
-                            speciesLabel={speciesName[pet.species]}
-                            breed={breed ?? ""}
-                            ownerLabel={copy.columnOwner}
-                            ownerName={pet.owner.name}
-                            phoneLabel={copy.phone}
-                            phone={pet.owner.phoneNumber}
-                        />
-                    );
-                })}
-                {pets.length === 0 && <li className="text-sm text-stone-500">{query ? copy.noMatches : copy.patientsEmpty}</li>}
-            </ul>
-            {pages > 1 && (
-                <nav aria-label={copy.patients} className="mt-5 flex flex-wrap items-center justify-center gap-1">
-                    <PageLink href={page > 1 ? patientsHref(query, page - 1) : undefined} label={copy.patientsPrevious}>
-                        <ChevronLeft className="size-4 rtl:rotate-180" />
-                    </PageLink>
-                    {Array.from({ length: pages }, (_, index) => index + 1).map((number) => (
-                        <Link
-                            key={number}
-                            href={patientsHref(query, number)}
-                            aria-current={number === page ? "page" : undefined}
-                            className={`inline-flex size-9 items-center justify-center rounded-full text-sm ${number === page ? "bg-emerald-900 text-white" : "text-emerald-950 hover:bg-emerald-50 dark:text-emerald-50 dark:hover:bg-stone-800"}`}
-                        >
-                            {count.format(number)}
-                        </Link>
-                    ))}
-                    <PageLink href={page < pages ? patientsHref(query, page + 1) : undefined} label={copy.patientsNext}>
-                        <ChevronRight className="size-4 rtl:rotate-180" />
-                    </PageLink>
-                </nav>
-            )}
+            <PatientSearch query={query} label={copy.search} placeholder={copy.searchHint}>
+                <ul className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-2">
+                    {pets.map((pet) => {
+                        const breed = pet.breed?.trim();
+                        const profileHref = clinical ? `/pets/${pet.id}` : `/admin/patients/${pet.id}`;
+                        return (
+                            <PatientCard
+                                key={pet.id}
+                                petHref={profileHref}
+                                ownerHref={`/admin/owners/${pet.owner.id}`}
+                                name={pet.name}
+                                species={pet.species}
+                                speciesLabel={speciesName[pet.species]}
+                                breed={breed ?? ""}
+                                ownerLabel={copy.columnOwner}
+                                ownerName={pet.owner.name}
+                                phoneLabel={copy.phone}
+                                phone={pet.owner.phoneNumber}
+                            />
+                        );
+                    })}
+                    {pets.length === 0 && <li className="text-sm text-stone-500">{query ? copy.noMatches : copy.patientsEmpty}</li>}
+                </ul>
+                {pages > 1 && (
+                    <nav aria-label={copy.patients} className="mt-5 flex flex-wrap items-center justify-center gap-1">
+                        <PageLink href={page > 1 ? patientsHref(query, page - 1) : undefined} label={copy.patientsPrevious}>
+                            <ChevronLeft className="size-4 rtl:rotate-180" />
+                        </PageLink>
+                        {Array.from({ length: pages }, (_, index) => index + 1).map((number) => (
+                            <Link
+                                key={number}
+                                href={patientsHref(query, number)}
+                                aria-current={number === page ? "page" : undefined}
+                                className={`inline-flex size-9 items-center justify-center rounded-full text-sm ${number === page ? "bg-emerald-900 text-white" : "text-emerald-950 hover:bg-emerald-50 dark:text-emerald-50 dark:hover:bg-stone-800"}`}
+                            >
+                                {count.format(number)}
+                            </Link>
+                        ))}
+                        <PageLink href={page < pages ? patientsHref(query, page + 1) : undefined} label={copy.patientsNext}>
+                            <ChevronRight className="size-4 rtl:rotate-180" />
+                        </PageLink>
+                    </nav>
+                )}
+            </PatientSearch>
         </Page>
     );
 }

@@ -6,6 +6,7 @@ import {
     CalendarDays,
     CalendarOff,
     HeartPulse,
+    Image as ImageIcon,
     LayoutDashboard,
     Package,
     PawPrint,
@@ -56,6 +57,7 @@ export default function StaffNav({
             items: [
                 ...(manageClinic
                     ? [
+                        { href: "/admin/homepage", label: copy.homepageContent, icon: ImageIcon },
                         { href: "/admin/settings", label: copy.settings, icon: Settings },
                         { href: "/admin/blocks", label: copy.blocks, icon: CalendarOff },
                     ]

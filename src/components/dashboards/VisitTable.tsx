@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { appointmentDetail } from "@/lib/appointments/labels";
 import type { StaffVisit } from "@/app/(app)/dashboard/load-staff";
+import { ownerChat } from "@/lib/clinic/public";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 
@@ -40,26 +41,31 @@ export default function VisitTable({
                 <span className="sr-only">{copy.viewAppointment}</span>
             </div>
             <ul className="divide-y divide-stone-100 dark:divide-stone-800">
-                {visits.map((visit) => (
-                    <li key={visit.id} className="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-[5.5rem_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.3fr)_auto] sm:items-center sm:gap-3">
-                        <div>
-                            <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{clock.format(visit.startAt)}</p>
-                            {showDate && <p className="text-xs text-stone-500">{day.format(visit.startAt)}</p>}
-                        </div>
-                        <p className="truncate text-sm font-medium text-stone-900 dark:text-stone-50">
-                            {clinical ? <Link href={`/pets/${visit.petId}`} className="hover:underline">{visit.petName}</Link> : visit.petName}
-                        </p>
-                        <p className="truncate text-sm text-stone-600 dark:text-stone-300">
-                            {visit.ownerName}
-                            {" · "}
-                            <a href={`tel:${visit.phone}`} className="hover:underline">{visit.phone}</a>
-                        </p>
-                        <p className="truncate text-sm text-stone-600 dark:text-stone-300">{appointmentDetail(visit.type, visit.services, visit.groomingService)}</p>
-                        <Link href={`/admin/appointments/${visit.id}`} className="text-sm font-medium text-emerald-900 hover:underline sm:text-end dark:text-emerald-200">
-                            {copy.viewAppointment}
-                        </Link>
-                    </li>
-                ))}
+                {visits.map((visit) => {
+                    const chat = ownerChat(visit.phone);
+                    return (
+                        <li key={visit.id} className="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-[5.5rem_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.3fr)_auto] sm:items-center sm:gap-3">
+                            <div>
+                                <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{clock.format(visit.startAt)}</p>
+                                {showDate && <p className="text-xs text-stone-500">{day.format(visit.startAt)}</p>}
+                            </div>
+                            <p className="truncate text-sm font-medium text-stone-900 dark:text-stone-50">
+                                {clinical ? <Link href={`/pets/${visit.petId}`} className="hover:underline">{visit.petName}</Link> : visit.petName}
+                            </p>
+                            <p className="truncate text-sm text-stone-600 dark:text-stone-300">
+                                <Link href={`/admin/owners/${visit.ownerId}`} className="hover:underline">{visit.ownerName}</Link>
+                                {" · "}
+                                {chat ? (
+                                    <a href={chat} target="_blank" rel="noopener noreferrer" aria-label={copy.whatsappOwner.replace("{phone}", visit.phone)} className="hover:underline">{visit.phone}</a>
+                                ) : visit.phone}
+                            </p>
+                            <p className="truncate text-sm text-stone-600 dark:text-stone-300">{appointmentDetail(visit.type, visit.services, visit.groomingService, copy)}</p>
+                            <Link href={`/admin/appointments/${visit.id}`} className="text-sm font-medium text-emerald-900 hover:underline sm:text-end dark:text-emerald-200">
+                                {copy.viewAppointment}
+                            </Link>
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );

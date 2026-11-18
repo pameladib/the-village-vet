@@ -21,6 +21,8 @@ model User {
   emailVerified Boolean       @default(false)
   username      String        @unique
   image         String?
+  // The language chosen in the app. The morning reminders use it, because that job cannot see the browser cookie.
+  locale        String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   sessions      Session[]
@@ -32,6 +34,7 @@ model User {
   notifications Notification[]
   pushSubscriptions PushSubscription[]
   shopOrders    ShopOrder[]
+  createdShopOrders ShopOrder[] @relation("ShopOrderCreatedBy")
   stockMovements StockMovement[]
 
   @@unique([email])
@@ -280,6 +283,9 @@ model MedicalVisit {
   id        String   @id @default(uuid())
   visitedAt DateTime
   notes     String?
+  // Copied from the booking, or chosen for a walk-in, so the history stays put if the appointment changes.
+  type      AppointmentType
+  services  VisitService[] @default([])
   petId     String
   pet       Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
 
@@ -390,6 +396,18 @@ model ClinicSetting {
   // Kept for older rows. The clinic uses the public phone number for emergencies.
   emergencyPhone String?
   about          String?
+  heroTitleEn    String?
+  heroTitleAr    String?
+  heroBodyEn     String?
+  heroBodyAr     String?
+  aboutLeadEn    String?
+  aboutLeadAr    String?
+  aboutBodyEn    String?
+  aboutBodyAr    String?
+  // Product.price is stored in this currency. USD prices are cents. LBP prices are whole pounds.
+  priceCurrency  String  @default("USD")
+  // Whole Lebanese pounds equal to one US dollar. The clinic sets this by hand.
+  usdRate        Int     @default(89500)
 
   @@map("clinic_setting")
 }
@@ -439,7 +457,7 @@ model Product {
   nameAr        String
   description   String?
   descriptionAr String?
-  // Whole Lebanese pounds. The clinic has not asked for another currency.
+  // Minor units of ClinicSetting.priceCurrency. Cents when that is USD, whole pounds when it is LBP.
   price         Int
   stock         Int             @default(0)
   // Available units at or below this number are low stock. Zero is out of stock.
@@ -476,7 +494,9 @@ enum ShopOrderStatus {
   APPROVED
   PREPARING
   OUT_FOR_DELIVERY
+  READY_FOR_PICKUP
   REJECTED
+  CANCELLED
   FULFILLED
 }
 
@@ -490,14 +510,38 @@ model ShopOrder {
   deliveryPhone    String?
   deliveryNote     String?
 
-  ownerId String
-  owner   User   @relation(fields: [ownerId], references: [id])
+  // Copied at creation so a later account change does not rewrite the sale.
+  customerName  String @default("")
+  customerPhone String @default("")
+
+  ownerId String?
+  owner   User?  @relation(fields: [ownerId], references: [id])
+
+  // Set when clinic staff record the order. Empty when the customer placed it.
+  createdById String?
+  createdBy   User?  @relation("ShopOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Empty until the clinic records that cash or Whish was received.
+  paidAt DateTime?
+
+  // The currency of the line prices, and the rate used if a conversion was needed. Later rate changes do not rewrite this.
+  currency     String @default("LBP")
+  exchangeRate Int    @default(89500)
+
   items   OrderItem[]
+
+  approvedAt       DateTime?
+  outForDeliveryAt DateTime?
+  readyForPickupAt DateTime?
+  completedAt      DateTime?
+  rejectedAt       DateTime?
+  cancelledAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerId, createdAt])
+  @@index([createdById])
   @@index([status])
   @@map("shop_order")
 }

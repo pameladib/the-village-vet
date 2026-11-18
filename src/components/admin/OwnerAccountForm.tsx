@@ -13,7 +13,6 @@ export default function OwnerAccountForm({
     name,
     phoneNumber,
     username,
-    email,
     canEdit,
 }: {
     copy: Copy;
@@ -21,11 +20,10 @@ export default function OwnerAccountForm({
     name: string;
     phoneNumber: string;
     username: string;
-    email: string;
     canEdit: boolean;
 }) {
     const router = useRouter();
-    const [form, setForm] = useState({ name, phoneNumber, email });
+    const [form, setForm] = useState({ name, phoneNumber });
     const [error, setError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -42,15 +40,11 @@ export default function OwnerAccountForm({
             setError(copy.errPhoneRequired);
             return;
         }
-        if (!form.email.trim()) {
-            setError(copy.errEmail);
-            return;
-        }
         setSaving(true);
         const result = await updateCustomerAccount(userId, form);
         setSaving(false);
         if (!result.success) {
-            setError(result.error === "email" ? copy.errEmail : result.error === "taken" ? copy.errEmailTaken : result.error === "name" ? copy.errNameRequired : result.error === "phone" ? copy.errPhoneRequired : copy.errProfileFailed);
+            setError(result.error === "name" ? copy.errNameRequired : result.error === "phone" ? copy.errPhoneRequired : copy.errProfileFailed);
             return;
         }
         setSaved(true);
@@ -71,20 +65,6 @@ export default function OwnerAccountForm({
                 <p>{copy.username}</p>
                 <p dir="ltr" className="mt-1 rounded-xl bg-stone-100 px-3 py-2.5 text-left text-sm text-stone-600 dark:bg-stone-800 dark:text-stone-300">{username}</p>
             </div>
-            <label className="text-sm text-stone-500 sm:col-span-2">
-                {copy.email}
-                <input
-                    value={form.email}
-                    onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                    readOnly={!canEdit}
-                    type="email"
-                    dir="ltr"
-                    autoComplete="email"
-                    spellCheck={false}
-                    className={`${inputClassName} text-left`}
-                />
-                <span className="mt-1 block text-xs text-stone-400">{copy.ownerEmailNote}</span>
-            </label>
             {canEdit && (
                 <div className="sm:col-span-2">
                     {error && <p className="mb-2 text-sm text-red-700 dark:text-red-300">{error}</p>}

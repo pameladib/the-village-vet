@@ -2,21 +2,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import OrderSort from "@/components/shop/OrderSort";
 import { requireRole } from "@/lib/auth/session";
-import { getLocale, messages, type Copy } from "@/lib/i18n";
+import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
-import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, shortOrderId } from "@/lib/shop/catalog";
+import { orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId } from "@/lib/shop/catalog";
+import { formatStored } from "@/lib/shop/money";
+import { orderContact, orderOrigin } from "@/lib/shop/lifecycle";
 
 const statusFilters = {
-    pending: "PENDING",
-    approved: "APPROVED",
-    preparing: "PREPARING",
-    out: "OUT_FOR_DELIVERY",
-    completed: "FULFILLED",
-    cancelled: "REJECTED",
+    pending: ["PENDING"],
+    approved: ["APPROVED", "PREPARING"],
+    ready: ["READY_FOR_PICKUP"],
+    out: ["OUT_FOR_DELIVERY"],
+    completed: ["FULFILLED"],
+    rejected: ["REJECTED"],
+    cancelled: ["CANCELLED"],
 } as const;
 
-const activeStatuses = ["PENDING", "APPROVED", "PREPARING", "OUT_FOR_DELIVERY"] as const;
+const activeStatuses = ["PENDING", "APPROVED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"] as const;
 
 type FilterKey = keyof typeof statusFilters;
 
@@ -32,21 +35,6 @@ function ordersHref(status: string, query: string, sort: string, owner: string) 
     if (owner) params.set("owner", owner);
     const search = params.toString();
     return search ? `/admin/orders?${search}` : "/admin/orders";
-}
-
-function adminStatusLabel(status: string, copy: Copy) {
-    if (status === "PENDING") return copy.shopFilterPending;
-    if (status === "REJECTED") return copy.shopFilterCancelled;
-    if (status === "FULFILLED") return copy.shopFilterCompleted;
-    return orderStatusLabel(status, copy);
-}
-
-function statusTone(status: string) {
-    if (status === "PENDING") return "bg-amber-100 text-amber-950";
-    if (status === "REJECTED") return "bg-stone-200 text-stone-600";
-    if (status === "FULFILLED") return "bg-emerald-100 text-emerald-950";
-    if (status === "OUT_FOR_DELIVERY") return "bg-sky-100 text-sky-950";
-    return "bg-emerald-50 text-emerald-950";
 }
 
 export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ status?: string | string[]; q?: string | string[]; sort?: string | string[]; owner?: string | string[] }> }) {
@@ -73,11 +61,13 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
     const count = new Intl.NumberFormat(intlLocale(locale));
     const where = {
         ...(ownerId ? { ownerId } : {}),
-        ...(!showAll ? { status: status ? status : { in: [...activeStatuses] } } : {}),
+        ...(!showAll ? { status: { in: status ? [...status] : [...activeStatuses] } } : {}),
         ...(query
             ? {
                 OR: [
                     { id: { contains: query, mode: "insensitive" as const } },
+                    { customerName: { contains: query, mode: "insensitive" as const } },
+                    { customerPhone: { contains: query } },
                     { owner: { name: { contains: query, mode: "insensitive" as const } } },
                     { owner: { phoneNumber: { contains: query } } },
                     { deliveryPhone: { contains: query } },
@@ -105,17 +95,23 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
         ...(ownerId ? [{ key: "all", label: copy.ownerOrdersAll, value: allCount }] : []),
         { key: "", label: copy.shopFilterAll, value: activeCount },
         { key: "pending", label: copy.shopFilterPending, value: totals.PENDING ?? 0 },
-        { key: "approved", label: copy.shopStatusApproved, value: totals.APPROVED ?? 0 },
-        { key: "preparing", label: copy.shopFilterPreparing, value: totals.PREPARING ?? 0 },
+        { key: "approved", label: copy.shopStatusApproved, value: (totals.APPROVED ?? 0) + (totals.PREPARING ?? 0) },
+        { key: "ready", label: copy.shopFilterReady, value: totals.READY_FOR_PICKUP ?? 0 },
         { key: "out", label: copy.shopFilterOut, value: totals.OUT_FOR_DELIVERY ?? 0 },
         { key: "completed", label: copy.shopFilterCompleted, value: totals.FULFILLED ?? 0 },
-        { key: "cancelled", label: copy.shopFilterCancelled, value: totals.REJECTED ?? 0 },
+        { key: "rejected", label: copy.shopFilterRejected, value: totals.REJECTED ?? 0 },
+        { key: "cancelled", label: copy.shopFilterCancelled, value: totals.CANCELLED ?? 0 },
     ];
 
     return (
         <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.shopAdminOrders}</h1>
-            <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{copy.shopOrdersLead}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.shopAdminOrders}</h1>
+                    <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{copy.shopOrdersLead}</p>
+                </div>
+                <Link href="/admin/orders/new" className="inline-flex items-center justify-center rounded-full bg-emerald-900 px-5 py-3 text-sm font-medium text-white hover:bg-emerald-950">{copy.shopNewOrder}</Link>
+            </div>
             {customer && (
                 <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
                     {copy.ownerOrdersFor}{" "}
@@ -164,19 +160,22 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                         {orders.map((order) => {
                             const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
                             const items = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                            const contact = orderContact(order, copy.shopWalkIn);
+                            const origin = orderOrigin(order);
+                            const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : copy.shopOriginCustomer;
                             return (
                                 <li key={order.id}>
                                     <Link href={`/admin/orders/${order.id}`} className={`block rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 ${order.status === "PENDING" ? "ring-1 ring-amber-300" : ""}`}>
                                         <div className="flex items-center justify-between gap-3">
                                             <p className="font-medium text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</p>
-                                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusTone(order.status)}`}>{adminStatusLabel(order.status, copy)}</span>
+                                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${orderStatusTone(order.status)}`}>{orderStatusLabel(order.status, copy)}</span>
                                         </div>
-                                        <p className="mt-1 text-sm text-stone-800 dark:text-stone-100">{order.owner.name}</p>
-                                        <p className="text-xs text-stone-500">{order.owner.phoneNumber}</p>
+                                        <p className="mt-1 text-sm text-stone-800 dark:text-stone-100">{contact.name}</p>
+                                        <p className="text-xs text-stone-500">{contact.phone ? `${contact.phone} · ` : ""}{originLabel}</p>
                                         <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
                                             {count.format(items)} {copy.shopOrderItems}
                                             {" · "}
-                                            {formatLbp(total, locale)} {copy.lbp}
+                                            {formatStored(total, order.currency, locale)}
                                             {" · "}
                                             {orderFulfillmentLabel(order.fulfillment, copy)}
                                             {" · "}
@@ -205,18 +204,21 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                 {orders.map((order) => {
                                     const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
                                     const items = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                                    const contact = orderContact(order, copy.shopWalkIn);
+                                    const origin = orderOrigin(order);
+                                    const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : copy.shopOriginCustomer;
                                     return (
                                         <tr key={order.id} className={order.status === "PENDING" ? "bg-amber-50/80 dark:bg-amber-950/20" : "bg-white dark:bg-stone-900"}>
                                             <td className="rounded-s-xl px-3 py-3 font-medium text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</td>
                                             <td className="px-3 py-3">
-                                                <p className="text-stone-900 dark:text-stone-50">{order.owner.name}</p>
-                                                <p className="text-xs text-stone-500">{order.owner.phoneNumber}</p>
+                                                <p className="text-stone-900 dark:text-stone-50">{contact.name}</p>
+                                                <p className="text-xs text-stone-500">{contact.phone ? `${contact.phone} · ` : ""}{originLabel}</p>
                                             </td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{count.format(items)} {copy.shopOrderItems}</td>
-                                            <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{formatLbp(total, locale)} {copy.lbp}</td>
+                                            <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{formatStored(total, order.currency, locale)}</td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{orderFulfillmentLabel(order.fulfillment, copy)}</td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{orderPaymentLabel(order.payment, order.fulfillment, copy)}</td>
-                                            <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusTone(order.status)}`}>{adminStatusLabel(order.status, copy)}</span></td>
+                                            <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${orderStatusTone(order.status)}`}>{orderStatusLabel(order.status, copy)}</span></td>
                                             <td className="rounded-e-xl px-3 py-3"><Link href={`/admin/orders/${order.id}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{copy.viewAppointment}</Link></td>
                                         </tr>
                                     );

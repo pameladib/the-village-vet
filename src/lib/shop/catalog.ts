@@ -56,13 +56,22 @@ export function shortOrderId(id: string) {
     return id.replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
-export function orderStatusLabel(status: string, copy: { shopStatusApproved: string; shopStatusPreparing: string; shopStatusOut: string; shopStatusRejected: string; shopStatusFulfilled: string; shopStatusPending: string }) {
-    if (status === "APPROVED") return copy.shopStatusApproved;
-    if (status === "PREPARING") return copy.shopStatusPreparing;
+export function orderStatusLabel(status: string, copy: { shopStatusApproved: string; shopStatusOut: string; shopStatusReady: string; shopStatusRejected: string; shopStatusCancelled: string; shopStatusFulfilled: string; shopFilterPending: string }) {
+    if (status === "APPROVED" || status === "PREPARING") return copy.shopStatusApproved;
     if (status === "OUT_FOR_DELIVERY") return copy.shopStatusOut;
+    if (status === "READY_FOR_PICKUP") return copy.shopStatusReady;
     if (status === "REJECTED") return copy.shopStatusRejected;
+    if (status === "CANCELLED") return copy.shopStatusCancelled;
     if (status === "FULFILLED") return copy.shopStatusFulfilled;
-    return copy.shopStatusPending;
+    return copy.shopFilterPending;
+}
+
+export function orderStatusTone(status: string) {
+    if (status === "PENDING") return "bg-amber-100 text-amber-950";
+    if (status === "REJECTED" || status === "CANCELLED") return "bg-stone-200 text-stone-700";
+    if (status === "FULFILLED") return "bg-emerald-100 text-emerald-950";
+    if (status === "OUT_FOR_DELIVERY") return "bg-sky-100 text-sky-950";
+    return "bg-emerald-50 text-emerald-950";
 }
 
 export function orderFulfillmentLabel(fulfillment: string, copy: { shopPickup: string; shopDelivery: string }) {

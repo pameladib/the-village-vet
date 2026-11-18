@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 const vaccinationSchema = z.object({
     petId: z.string().min(1),
     recordId: z.string().min(1).optional(),
+    medicalVisitId: z.string().min(1).optional(),
     type: z.enum(["FIRST", "SECOND", "THIRD", "ANNUAL"]),
     administeredAt: z.string(),
     nextDueAt: z.string(),
@@ -18,6 +19,7 @@ const vaccinationSchema = z.object({
 const treatmentSchema = z.object({
     petId: z.string().min(1),
     recordId: z.string().min(1).optional(),
+    medicalVisitId: z.string().min(1).optional(),
     type: z.enum(["DEWORMING", "FLEA_TICK"]),
     administeredAt: z.string(),
     nextDueAt: z.string(),
@@ -40,10 +42,20 @@ async function veterinarian() {
     }
 }
 
-function refresh(petId: string) {
+function refresh(petId: string, visitId?: string) {
     revalidatePath(`/pets/${petId}`);
     revalidatePath("/dashboard");
     revalidatePath("/admin/care");
+    if (visitId) revalidatePath(`/pets/${petId}/visits/${visitId}`);
+}
+
+async function visitOnPet(petId: string, medicalVisitId: string | undefined) {
+    if (!medicalVisitId) return { id: undefined as string | undefined };
+    const visit = await prisma.medicalVisit.findFirst({
+        where: { id: medicalVisitId, petId },
+        select: { id: true },
+    });
+    return visit ? { id: visit.id } : null;
 }
 
 export async function saveVaccination(input: unknown) {
@@ -62,6 +74,8 @@ export async function saveVaccination(input: unknown) {
         },
     });
     if (!pet) return { success: false as const, error: "missing" as const };
+    const visit = await visitOnPet(pet.id, parsed.data.recordId ? undefined : parsed.data.medicalVisitId);
+    if (!visit) return { success: false as const, error: "visit" as const };
 
     const existing = pet.vaccinations.map((row) => ({
         id: row.id,
@@ -100,6 +114,7 @@ export async function saveVaccination(input: unknown) {
                         type: parsed.data.type,
                         administeredAt: when.given,
                         followUpCleared: !when.due,
+                        ...(visit.id ? { medicalVisitId: visit.id } : {}),
                     },
                 });
 
@@ -146,7 +161,7 @@ export async function saveVaccination(input: unknown) {
         return { success: false as const, error: "save" as const };
     }
 
-    refresh(pet.id);
+    refresh(pet.id, visit.id);
     return { success: true as const };
 }
 
@@ -162,6 +177,8 @@ export async function saveTreatment(input: unknown) {
         select: { id: true },
     });
     if (!pet) return { success: false as const, error: "missing" as const };
+    const visit = await visitOnPet(pet.id, parsed.data.recordId ? undefined : parsed.data.medicalVisitId);
+    if (!visit) return { success: false as const, error: "visit" as const };
     const kind = parsed.data.type === "DEWORMING" ? "DEWORMING" as const : "FLEA_TREATMENT" as const;
 
     try {
@@ -185,6 +202,7 @@ export async function saveTreatment(input: unknown) {
                         type: parsed.data.type,
                         administeredAt: when.given,
                         followUpCleared: !when.due,
+                        ...(visit.id ? { medicalVisitId: visit.id } : {}),
                     },
                 });
 
@@ -230,6 +248,36 @@ export async function saveTreatment(input: unknown) {
         return { success: false as const, error: "save" as const };
     }
 
-    refresh(pet.id);
+    refresh(pet.id, visit.id);
+    return { success: true as const };
+}
+
+const rescheduleSchema = z.object({
+    id: z.string().min(1),
+    dueAt: z.string(),
+});
+
+// Moves the same open reminder. It does not record a dose or open a second reminder.
+export async function rescheduleCareReminder(input: unknown) {
+    if (!await veterinarian()) return { success: false as const, error: "denied" as const };
+    const parsed = rescheduleSchema.safeParse(input);
+    const due = parsed.success ? dateOnlyUtc(parsed.data.dueAt) : null;
+    if (!parsed.success || !due) return { success: false as const, error: "date" as const };
+
+    const updated = await prisma.careReminder.updateMany({
+        where: { id: parsed.data.id, completedAt: null },
+        data: { dueAt: due, overridden: true },
+    });
+    if (updated.count !== 1) return { success: false as const, error: "missing" as const };
+
+    const reminder = await prisma.careReminder.findUnique({
+        where: { id: parsed.data.id },
+        select: { petId: true },
+    });
+    if (reminder) refresh(reminder.petId);
+    else {
+        revalidatePath("/admin/care");
+        revalidatePath("/dashboard");
+    }
     return { success: true as const };
 }

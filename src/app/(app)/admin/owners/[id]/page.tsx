@@ -7,26 +7,12 @@ import OwnerPasswordReset from "@/components/admin/OwnerPasswordReset";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
-import { getLocale, messages, type Copy } from "@/lib/i18n";
+import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
-import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, shortOrderId } from "@/lib/shop/catalog";
+import { orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId } from "@/lib/shop/catalog";
+import { formatStored } from "@/lib/shop/money";
 import { petPhotoSrc } from "@/lib/storage/files";
-
-function orderLabel(status: string, copy: Copy) {
-    if (status === "PENDING") return copy.shopFilterPending;
-    if (status === "REJECTED") return copy.shopFilterCancelled;
-    if (status === "FULFILLED") return copy.shopFilterCompleted;
-    return orderStatusLabel(status, copy);
-}
-
-function orderTone(status: string) {
-    if (status === "PENDING") return "bg-amber-100 text-amber-950";
-    if (status === "REJECTED") return "bg-stone-200 text-stone-600";
-    if (status === "FULFILLED") return "bg-emerald-100 text-emerald-950";
-    if (status === "OUT_FOR_DELIVERY") return "bg-sky-100 text-sky-950";
-    return "bg-emerald-50 text-emerald-950";
-}
 
 export default async function OwnerProfilePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -44,7 +30,6 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
             name: true,
             phoneNumber: true,
             username: true,
-            email: true,
             createdAt: true,
             pets: {
                 select: { id: true, name: true, species: true, breed: true, photoUrl: true },
@@ -69,6 +54,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                 status: true,
                 payment: true,
                 fulfillment: true,
+                currency: true,
                 createdAt: true,
                 items: { select: { quantity: true, unitPrice: true } },
             },
@@ -93,8 +79,8 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
             <h1 className="mt-4 text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{owner.name}</h1>
             <p className="mt-1 text-sm text-stone-500">{copy.ownerSince} {since.format(owner.createdAt)}</p>
 
-            <div className="mt-5 grid items-start gap-3 lg:grid-cols-2">
-            <section className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-sm dark:border-stone-800 dark:bg-stone-900">
+            <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            <section className="h-full rounded-2xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-sm dark:border-stone-800 dark:bg-stone-900">
                 <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.ownerPersonal}</h2>
                 <OwnerAccountForm
                     copy={copy}
@@ -102,18 +88,17 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                     name={owner.name}
                     phoneNumber={owner.phoneNumber}
                     username={owner.username}
-                    email={owner.email}
                     canEdit
                 />
             </section>
 
-            <section className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-sm dark:border-stone-800 dark:bg-stone-900">
+            <section className="flex h-full flex-col rounded-2xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-sm dark:border-stone-800 dark:bg-stone-900">
                 <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.ownerAccount}</h2>
                 <p className="mt-3 text-sm text-stone-500">{copy.username}</p>
                 <p dir="ltr" className="text-left text-sm font-medium text-stone-900 dark:text-stone-50">{owner.username}</p>
                 <p className="mt-3 text-sm text-stone-500">{copy.ownerLastLogin}</p>
                 <p className="text-sm font-medium text-stone-900 dark:text-stone-50">{lastLogin ? signedIn.format(lastLogin) : copy.ownerNoLogin}</p>
-                {session.user.role === "ADMIN" && <OwnerPasswordReset copy={copy} userId={owner.id} />}
+                {session.user.role === "ADMIN" && <div className="mt-auto"><OwnerPasswordReset copy={copy} userId={owner.id} /></div>}
             </section>
             </div>
 
@@ -167,12 +152,12 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                                     <Link href={`/admin/orders/${order.id}`} className="block rounded-xl px-2 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
                                         <span className="flex items-center justify-between gap-3">
                                             <span className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</span>
-                                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${orderTone(order.status)}`}>{orderLabel(order.status, copy)}</span>
+                                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${orderStatusTone(order.status)}`}>{orderStatusLabel(order.status, copy)}</span>
                                         </span>
                                         <span className="mt-1 block text-sm text-stone-500">
                                             {since.format(order.createdAt)}
                                             {" · "}
-                                            {formatLbp(total, locale)} {copy.lbp}
+                                            {formatStored(total, order.currency, locale)}
                                         </span>
                                         <span className="block text-sm text-stone-500">
                                             {orderFulfillmentLabel(order.fulfillment, copy)}

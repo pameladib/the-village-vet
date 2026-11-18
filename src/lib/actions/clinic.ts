@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/session";
+import { convertMinor } from "@/lib/shop/money";
+import { pricingFrom } from "@/lib/shop/pricing";
 import {
     CLINIC_PHOTOS_BUCKET,
     PHOTO_TYPES,
@@ -73,10 +75,94 @@ export async function saveClinicSettings(input: unknown) {
     return { success: true as const };
 }
 
+const pricingSchema = z.object({
+    currency: z.enum(["USD", "LBP"]),
+    rate: z.number().int().min(1).max(10_000_000),
+});
+
+export async function savePricing(input: unknown) {
+    try {
+        await requireRole(["ADMIN"]);
+    } catch {
+        return { success: false as const, formErrors: ["Only the veterinarian can edit the clinic page."] };
+    }
+    const parsed = pricingSchema.safeParse(input);
+    if (!parsed.success) return { success: false as const, formErrors: ["Enter a whole number of Lebanese pounds for 1 USD."] };
+
+    const converted = await prisma.$transaction(async (tx) => {
+        const current = pricingFrom(await tx.clinicSetting.findUnique({
+            where: { id: "clinic" },
+            select: { priceCurrency: true, usdRate: true },
+        }));
+        let changedPrices = false;
+        if (current.currency !== parsed.data.currency) {
+            const products = await tx.product.findMany({ select: { id: true, price: true } });
+            for (const product of products) {
+                const price = convertMinor(product.price, current.currency, parsed.data.currency, parsed.data.rate);
+                if (price == null) throw new Error("rate");
+                await tx.product.update({ where: { id: product.id }, data: { price } });
+            }
+            changedPrices = products.length > 0;
+        }
+        await tx.clinicSetting.upsert({
+            where: { id: "clinic" },
+            update: { priceCurrency: parsed.data.currency, usdRate: parsed.data.rate },
+            create: { id: "clinic", priceCurrency: parsed.data.currency, usdRate: parsed.data.rate },
+        });
+        return changedPrices;
+    });
+
+    revalidatePath("/", "layout");
+    revalidatePath("/shop");
+    revalidatePath("/admin/shop");
+    return { success: true as const, converted: converted };
+}
+
+const homepageSchema = z.object({
+    heroTitleEn: z.string().trim().max(200),
+    heroTitleAr: z.string().trim().max(200),
+    heroBodyEn: z.string().trim().max(600),
+    heroBodyAr: z.string().trim().max(600),
+    aboutLeadEn: z.string().trim().max(400),
+    aboutLeadAr: z.string().trim().max(400),
+    aboutBodyEn: z.string().trim().max(800),
+    aboutBodyAr: z.string().trim().max(800),
+});
+
+export async function saveHomepageCopy(input: unknown) {
+    try {
+        await requireRole(["ADMIN"]);
+    } catch {
+        return { success: false as const, formErrors: ["Only the veterinarian can edit the homepage."] };
+    }
+    const parsed = homepageSchema.safeParse(input);
+    if (!parsed.success) return { success: false as const, formErrors: ["Could not save the homepage."] };
+
+    const text = {
+        heroTitleEn: emptyToNull(parsed.data.heroTitleEn),
+        heroTitleAr: emptyToNull(parsed.data.heroTitleAr),
+        heroBodyEn: emptyToNull(parsed.data.heroBodyEn),
+        heroBodyAr: emptyToNull(parsed.data.heroBodyAr),
+        aboutLeadEn: emptyToNull(parsed.data.aboutLeadEn),
+        aboutLeadAr: emptyToNull(parsed.data.aboutLeadAr),
+        aboutBodyEn: emptyToNull(parsed.data.aboutBodyEn),
+        aboutBodyAr: emptyToNull(parsed.data.aboutBodyAr),
+    };
+    await prisma.clinicSetting.upsert({
+        where: { id: "clinic" },
+        update: text,
+        create: { id: "clinic", ...text },
+    });
+    revalidatePath("/", "layout");
+    revalidatePath("/about");
+    revalidatePath("/admin/homepage");
+    return { success: true as const };
+}
+
 function refreshPhotos() {
     revalidatePath("/", "layout");
     revalidatePath("/about");
-    revalidatePath("/admin/settings");
+    revalidatePath("/admin/homepage");
 }
 
 async function veterinarian() {

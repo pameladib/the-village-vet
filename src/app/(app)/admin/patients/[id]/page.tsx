@@ -68,9 +68,9 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
             estimatedAgeUnit: true,
             owner: { select: { name: true, phoneNumber: true } },
             appointments: {
-                where: { status: { not: "CANCELLED" } },
+                where: { status: { in: ["BOOKED", "COMPLETED"] } },
                 orderBy: { startAt: "desc" },
-                select: { id: true, type: true, services: true, groomingService: true, startAt: true },
+                select: { id: true, type: true, services: true, groomingService: true, startAt: true, status: true },
             },
         },
     });
@@ -81,8 +81,8 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
     const when = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Beirut" });
     const born = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "UTC" });
     const now = Date.now();
-    const upcoming = pet.appointments.filter((visit) => visit.startAt.getTime() >= now).sort((left, right) => left.startAt.getTime() - right.startAt.getTime());
-    const previous = pet.appointments.filter((visit) => visit.startAt.getTime() < now);
+    const upcoming = pet.appointments.filter((visit) => visit.status === "BOOKED" && visit.startAt.getTime() >= now).sort((left, right) => left.startAt.getTime() - right.startAt.getTime());
+    const previous = pet.appointments.filter((visit) => visit.status === "COMPLETED");
     const breed = pet.breed?.trim();
     const age = ageText(pet, copy, locale);
     const lifestyle = pet.lifestyle === "INDOOR" ? copy.lifestyleIndoor : pet.lifestyle === "OUTDOOR" ? copy.lifestyleOutdoor : pet.lifestyle === "HYBRID" ? copy.lifestyleHybrid : copy.notProvided;
@@ -123,11 +123,11 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
                 <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.columnOwner}</h2>
                 <p className="mt-2 text-sm text-stone-800 dark:text-stone-100">{pet.owner.name}</p>
                 <p className="text-sm text-stone-500">{copy.phone}: {pet.owner.phoneNumber}</p>
-                <Link href={`/appointments/new?petId=${pet.id}`} className="mt-3 inline-flex rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.book}</Link>
+                <Link href={`/admin/appointments/new?petId=${pet.id}`} className="mt-3 inline-flex rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.book}</Link>
             </section>
 
-            <AppointmentGroup title={copy.patientUpcoming} empty={copy.patientNoneUpcoming} visits={upcoming} when={when} />
-            <AppointmentGroup title={copy.patientPrevious} empty={copy.patientNonePrevious} visits={previous} when={when} />
+            <AppointmentGroup title={copy.patientUpcoming} empty={copy.patientNoneUpcoming} visits={upcoming} when={when} copy={copy} />
+            <AppointmentGroup title={copy.patientPrevious} empty={copy.patientNonePrevious} visits={previous} when={when} copy={copy} />
         </main>
     );
 }
@@ -146,6 +146,7 @@ function AppointmentGroup({
     empty,
     visits,
     when,
+    copy,
 }: {
     title: string;
     empty: string;
@@ -157,6 +158,7 @@ function AppointmentGroup({
         startAt: Date;
     }[];
     when: Intl.DateTimeFormat;
+    copy: Copy;
 }) {
     return (
         <section className="mt-3 rounded-2xl bg-white px-4 py-4 dark:bg-stone-900">
@@ -168,7 +170,7 @@ function AppointmentGroup({
                     {visits.map((visit) => (
                         <li key={visit.id} className="text-sm">
                             <Link href={`/admin/appointments/${visit.id}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">
-                                {appointmentDetail(visit.type, visit.services, visit.groomingService)}
+                                {appointmentDetail(visit.type, visit.services, visit.groomingService, copy)}
                             </Link>
                             <p className="text-stone-500">{when.format(visit.startAt)}</p>
                         </li>

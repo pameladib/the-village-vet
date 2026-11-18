@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { appointmentDetail } from "@/lib/appointments/labels";
+import AppointmentOutcomes from "@/components/visits/AppointmentOutcomes";
 import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { getLocale, messages } from "@/lib/i18n";
@@ -21,6 +22,7 @@ export default async function StaffAppointmentPage({ params }: { params: Promise
         include: {
             pet: { select: { id: true, name: true } },
             owner: { select: { name: true, phoneNumber: true } },
+            medicalVisit: { select: { id: true } },
         },
     });
     if (!appointment) notFound();
@@ -38,6 +40,13 @@ export default async function StaffAppointmentPage({ params }: { params: Promise
         hourCycle: "h23",
     }).format(appointment.startAt);
     const canMove = appointment.status === "BOOKED" && appointment.startAt > new Date();
+    const statusLabel = appointment.status === "COMPLETED"
+        ? copy.statusCompleted
+        : appointment.status === "EXPIRED"
+            ? copy.statusMissed
+            : appointment.status === "CANCELLED"
+                ? copy.statusCancelled
+                : copy.booked;
 
     return (
         <main className="mx-auto w-full max-w-xl px-4 py-6 sm:px-6">
@@ -64,9 +73,23 @@ export default async function StaffAppointmentPage({ params }: { params: Promise
                 </div>
                 <div>
                     <dt className="text-stone-500">{copy.columnService}</dt>
-                    <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{appointmentDetail(appointment.type, appointment.services, appointment.groomingService)}</dd>
+                    <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{appointmentDetail(appointment.type, appointment.services, appointment.groomingService, copy)}</dd>
+                </div>
+                <div>
+                    <dt className="text-stone-500">{copy.appointmentStatus}</dt>
+                    <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{statusLabel}</dd>
                 </div>
             </dl>
+            {appointment.status === "BOOKED" && (
+                <div className="mt-6">
+                    <AppointmentOutcomes id={appointment.id} type={appointment.type} passed={appointment.startAt.getTime() < Date.now()} canWrite={clinical} copy={copy} />
+                </div>
+            )}
+            {appointment.medicalVisit && clinical && (
+                <Link href={`/pets/${appointment.pet.id}/visits/${appointment.medicalVisit.id}`} className="mt-4 inline-flex text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">
+                    {copy.openVisit}
+                </Link>
+            )}
             {canMove && (
                 <Link href={`/appointments/${appointment.id}/reschedule`} className="mt-6 inline-flex rounded-full bg-emerald-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-950">
                     {copy.reschedule}
