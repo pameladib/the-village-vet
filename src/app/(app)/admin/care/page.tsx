@@ -28,6 +28,7 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
         petName: reminder.petName,
         ownerId: reminder.ownerId,
         ownerName: reminder.ownerName,
+        phone: reminder.phone,
         species: reminder.species,
         annualsBefore: reminder.annualsBefore,
     }));

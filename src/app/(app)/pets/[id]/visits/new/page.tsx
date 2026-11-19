@@ -1,4 +1,4 @@
-import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { notFound, redirect } from "next/navigation";
 import VisitForm from "@/components/visits/VisitForm";
 import { requireRole } from "@/lib/auth/session";
@@ -25,7 +25,7 @@ export default async function NewWalkInPage({ params }: { params: Promise<{ id: 
 
     return (
         <main className="mx-auto w-full max-w-xl px-4 py-6 sm:px-6">
-            <Link href={`/pets/${pet.id}`} className="text-sm font-medium text-emerald-800">{pet.name}</Link>
+            <HistoryBack fallback={`/pets/${pet.id}`} className="cursor-pointer text-sm font-medium text-emerald-800">{pet.name}</HistoryBack>
             <h1 className="mt-3 text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.addVisit}</h1>
             <VisitForm
                 copy={copy}

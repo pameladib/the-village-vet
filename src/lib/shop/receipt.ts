@@ -1,6 +1,6 @@
 import type { Copy, Locale } from "@/lib/i18n";
 import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, shortOrderId } from "@/lib/shop/catalog";
-import { formatStored } from "@/lib/shop/money";
+import { formatStored, orderCharge } from "@/lib/shop/money";
 import { isDelivery } from "@/lib/shop/lifecycle";
 
 export type ReceiptSource = {
@@ -14,6 +14,7 @@ export type ReceiptSource = {
     deliveryAddress: string | null;
     deliveryPhone: string | null;
     deliveryNote: string | null;
+    deliveryFee: number;
     ownerName: string;
     ownerPhone: string;
     items: { name: string; fallbackName: string; quantity: number; unitPrice: number }[];
@@ -42,8 +43,10 @@ export type ReceiptDocument = {
     customerPhone: string;
     lines: ReceiptLine[];
     subtotal: string;
+    deliveryFee: string | null;
     total: string;
     plainSubtotal: string;
+    plainDeliveryFee: string | null;
     plainTotal: string;
     fulfillment: string;
     fulfillmentDetails: { label: string; value: string }[];
@@ -59,6 +62,7 @@ export type ReceiptDocument = {
         quantity: string;
         unit: string;
         subtotal: string;
+        deliveryFee: string;
         total: string;
         fulfillment: string;
         payment: string;
@@ -74,6 +78,7 @@ export type ReceiptDocument = {
         phone: string;
         items: string;
         subtotal: string;
+        deliveryFee: string;
         total: string;
         fulfillment: string;
         fulfillmentValue: string;
@@ -100,7 +105,7 @@ function when(date: Date, locale: Locale) {
 
 export function buildReceipt(order: ReceiptSource, locale: Locale, copy: Copy, english: Copy): ReceiptDocument {
     const money = (amount: number, language: Locale) => formatStored(amount, order.currency, language);
-    const subtotal = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    const charge = orderCharge(order.items, order.deliveryFee);
     const delivery = isDelivery(order.fulfillment);
     const paid = order.paid;
     const clinicLines = [order.clinicAddress, order.clinicPhone, order.clinicEmail].filter((line): line is string => Boolean(line?.trim()));
@@ -142,13 +147,15 @@ export function buildReceipt(order: ReceiptSource, locale: Locale, copy: Copy, e
             subtotal: money(item.unitPrice * item.quantity, locale),
             plain: `${formatLbp(item.quantity, "en")}  ${item.fallbackName}  ${money(item.unitPrice, "en")}  ${money(item.unitPrice * item.quantity, "en")}`,
         })),
-        subtotal: money(subtotal, locale),
-        total: money(subtotal, locale),
-        plainSubtotal: money(subtotal, "en"),
-        plainTotal: money(subtotal, "en"),
+        subtotal: money(charge.subtotal, locale),
+        deliveryFee: delivery ? money(charge.deliveryFee, locale) : null,
+        total: money(charge.total, locale),
+        plainSubtotal: money(charge.subtotal, "en"),
+        plainDeliveryFee: delivery ? money(charge.deliveryFee, "en") : null,
+        plainTotal: money(charge.total, "en"),
         fulfillment: orderFulfillmentLabel(order.fulfillment, copy),
         fulfillmentDetails,
-        paymentMethod: orderPaymentLabel(order.payment, order.fulfillment, copy),
+        paymentMethod: orderPaymentLabel(order.payment, copy),
         paymentStatus: paid ? copy.shopPayPaid : copy.shopPayUnpaid,
         labels: {
             title: copy.shopReceiptTitle,
@@ -160,6 +167,7 @@ export function buildReceipt(order: ReceiptSource, locale: Locale, copy: Copy, e
             quantity: copy.shopQty,
             unit: copy.shopUnitPrice,
             subtotal: copy.shopSubtotal,
+            deliveryFee: copy.shopDeliveryFee,
             total: copy.shopTotal,
             fulfillment: copy.shopColFulfilment,
             payment: copy.shopPayment,
@@ -175,11 +183,12 @@ export function buildReceipt(order: ReceiptSource, locale: Locale, copy: Copy, e
             phone: english.phone,
             items: english.shopColItems,
             subtotal: english.shopSubtotal,
+            deliveryFee: english.shopDeliveryFee,
             total: english.shopTotal,
             fulfillment: english.shopColFulfilment,
             fulfillmentValue: orderFulfillmentLabel(order.fulfillment, english),
             payment: english.shopPayment,
-            paymentValue: orderPaymentLabel(order.payment, order.fulfillment, english),
+            paymentValue: orderPaymentLabel(order.payment, english),
             paymentStatus: english.shopPayStatus,
             paymentStatusValue: paid ? english.shopPayPaid : english.shopPayUnpaid,
             disclaimer: paid ? english.shopReceiptRecorded : english.shopReceiptNotProof,
@@ -246,6 +255,7 @@ export function receiptHtml(receipt: ReceiptDocument) {
   </div>
   <div class="totals">
     <div><span>${escapeHtml(receipt.labels.subtotal)}</span><span>${escapeHtml(receipt.subtotal)}</span></div>
+    ${receipt.deliveryFee ? `<div><span>${escapeHtml(receipt.labels.deliveryFee)}</span><span>${escapeHtml(receipt.deliveryFee)}</span></div>` : ""}
     <div class="grand"><span>${escapeHtml(receipt.labels.total)}</span><span>${escapeHtml(receipt.total)}</span></div>
   </div>
   <h2>${escapeHtml(receipt.labels.fulfillment)}</h2>
@@ -286,6 +296,7 @@ export function receiptPdf(receipt: ReceiptDocument) {
         ...receipt.lines.map((line) => pdfText(`${line.quantity}  ${line.name}  ${line.unit}  ${line.subtotal}`, line.plain)),
         "",
         pdfText(`${receipt.labels.subtotal}  ${receipt.subtotal}`, `${plain.subtotal}  ${receipt.plainSubtotal}`),
+        ...(receipt.deliveryFee ? [pdfText(`${receipt.labels.deliveryFee}  ${receipt.deliveryFee}`, `${plain.deliveryFee}  ${receipt.plainDeliveryFee ?? ""}`)] : []),
         pdfText(`${receipt.labels.total}  ${receipt.total}`, `${plain.total}  ${receipt.plainTotal}`),
         "",
         pdfText(receipt.labels.fulfillment, plain.fulfillment),

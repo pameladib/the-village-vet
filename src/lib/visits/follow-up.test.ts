@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { canSeeClinicalRecords } from "../auth/permissions.ts";
 import { dateOnlyUtc } from "../clinic/vaccines.ts";
-import { applyFollowUp, attentionFollowUpCount, followUpAttention, followUpBuckets, followUpChatLink, followUpDueThrough, followUpText, outstandingFollowUps } from "./follow-up.ts";
+import { applyFollowUp, attentionFollowUpCount, followUpAttention, followUpBuckets, followUpChatLink, followUpCreateTab, followUpDueThrough, followUpText, outstandingFollowUps } from "./follow-up.ts";
 
 const now = new Date("2026-11-19T10:00:00.000Z");
 const today = dateOnlyUtc("2026-11-19")!;
@@ -77,6 +77,10 @@ describe("visit follow-ups", () => {
         assert.deepEqual(applyFollowUp("PENDING", "cancel"), { status: "CANCELLED" });
         assert.equal(applyFollowUp("PENDING", "reschedule", "2026-11-25")?.dueOn.toISOString(), "2026-11-25T00:00:00.000Z");
         assert.equal(applyFollowUp("PENDING", "reschedule", "tomorrow"), null);
+        assert.equal(followUpCreateTab("2026-11-18", now), null);
+        assert.equal(followUpCreateTab("2026-11-19", now), "today");
+        assert.equal(followUpCreateTab("2026-11-20", now), "upcoming");
+        assert.equal(followUpCreateTab("tomorrow", now), null);
         assert.equal(applyFollowUp("COMPLETED", "reschedule", "2026-11-25"), null);
         assert.equal(applyFollowUp("CANCELLED", "complete"), null);
     });

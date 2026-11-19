@@ -78,7 +78,6 @@ export function orderFulfillmentLabel(fulfillment: string, copy: { shopPickup: s
     return fulfillment === "DELIVERY" ? copy.shopDelivery : copy.shopPickup;
 }
 
-export function orderPaymentLabel(payment: string, fulfillment: string, copy: { shopPayWhish: string; shopPayCashDelivery: string; shopPayCashPickup: string }) {
-    if (payment === "WHISH") return copy.shopPayWhish;
-    return fulfillment === "DELIVERY" ? copy.shopPayCashDelivery : copy.shopPayCashPickup;
+export function orderPaymentLabel(payment: string, copy: { shopPayWhish: string; shopPayCash: string }) {
+    return payment === "WHISH" ? copy.shopPayWhish : copy.shopPayCash;
 }

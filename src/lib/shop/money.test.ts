@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { convertMinor, formatMoney, minorFromInput, validRate } from "./money.ts";
+import { convertMinor, formatMoney, minorFromInput, orderCharge, validDeliveryFee, validRate } from "./money.ts";
 
 describe("currency conversion", () => {
     it("turns $10.00 into 895,000 LBP at the example rate and back into cents", () => {
@@ -33,5 +33,13 @@ describe("currency conversion", () => {
         assert.equal(minorFromInput("10.555", "USD"), null);
         assert.equal(minorFromInput("895000", "LBP"), 895_000);
         assert.equal(minorFromInput("10.5", "LBP"), null);
+    });
+
+    it("adds a delivery fee to the product subtotal and drops a negative fee", () => {
+        assert.deepEqual(orderCharge([{ unitPrice: 1000, quantity: 2 }], 500), { subtotal: 2000, deliveryFee: 500, total: 2500 });
+        assert.equal(orderCharge([{ unitPrice: 1000, quantity: 1 }], 0).total, 1000);
+        assert.equal(orderCharge([{ unitPrice: 1000, quantity: 1 }], -10).deliveryFee, 0);
+        assert.equal(validDeliveryFee(0), true);
+        assert.equal(validDeliveryFee(-1), false);
     });
 });

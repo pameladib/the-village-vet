@@ -1,0 +1,1 @@
+ALTER TABLE "shop_order" ADD COLUMN "deliveryFee" INTEGER NOT NULL DEFAULT 0;

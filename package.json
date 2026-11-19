@@ -9,7 +9,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./scripts/register-test-types.mjs --experimental-strip-types --test src/lib/appointments/availability.test.ts src/lib/clinic/vaccines.test.ts src/lib/shop/reservation.test.ts src/lib/shop/inventory.test.ts src/lib/shop/lifecycle.test.ts src/lib/shop/money.test.ts src/lib/auth/permissions.test.ts src/lib/storage/files.test.ts src/lib/pwa/worker.test.ts src/lib/notifications/reminder-text.test.ts src/lib/visits/rules.test.ts src/lib/visits/follow-up.test.ts src/lib/public-url.test.ts"
+    "test": "node --import ./scripts/register-test-types.mjs --experimental-strip-types --test src/lib/appointments/availability.test.ts src/lib/appointments/upcoming-filter.test.ts src/lib/clinic/vaccines.test.ts src/lib/shop/reservation.test.ts src/lib/shop/inventory.test.ts src/lib/shop/lifecycle.test.ts src/lib/shop/money.test.ts src/lib/auth/permissions.test.ts src/lib/storage/files.test.ts src/lib/pwa/worker.test.ts src/lib/notifications/reminder-text.test.ts src/lib/visits/rules.test.ts src/lib/visits/follow-up.test.ts src/lib/public-url.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

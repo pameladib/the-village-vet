@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Ellipsis } from "lucide-react";
+import { toast } from "sonner";
 import { cancelVisitFollowUp, completeVisitFollowUp, rescheduleVisitFollowUp } from "@/lib/actions/follow-ups";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
+import { ownerChat } from "@/lib/clinic/phone";
 import { followUpChatLink, followUpText } from "@/lib/visits/follow-up";
 
 export type FollowUpItem = {
@@ -16,6 +18,7 @@ export type FollowUpItem = {
     timing: "overdue" | "due" | "upcoming";
     petId: string;
     petName: string;
+    ownerId: string;
     ownerName: string;
     phone: string;
     sex: "MALE" | "FEMALE";
@@ -26,18 +29,24 @@ const tabs: Tab[] = ["overdue", "today", "upcoming"];
 
 const quiet = "rounded-full border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:border-emerald-700 disabled:opacity-60 dark:border-stone-600 dark:text-stone-200";
 const solid = "rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950 disabled:opacity-60";
-const dateTone = {
-    overdue: "text-red-700 dark:text-red-300",
-    due: "text-amber-800 dark:text-amber-200",
-    upcoming: "text-stone-500",
-};
+const overdueTone = "text-red-700 dark:text-red-300";
+const dueTone = "text-[#9A6700] dark:text-[#FBBF24]";
+const upcomingTone = "text-[#6B7280] dark:text-[#D1D5DB]";
+const metaTone = "text-[#6B7280] dark:text-[#D1D5DB]";
+const noteTone = "text-[#525252] dark:text-stone-300";
+
+function dateTone(timing: FollowUpItem["timing"]) {
+    if (timing === "overdue") return overdueTone;
+    if (timing === "due") return dueTone;
+    return upcomingTone;
+}
 
 function writtenDate(value: string, locale: Locale) {
     const [year, month, day] = value.split("-").map(Number);
     return new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
-export default function FollowUpList({ copy, locale, rows, tab }: { copy: Copy; locale: Locale; rows: FollowUpItem[]; tab: Tab }) {
+export default function FollowUpList({ copy, locale, rows, tab, highlightId = null }: { copy: Copy; locale: Locale; rows: FollowUpItem[]; tab: Tab; highlightId?: string | null }) {
     const router = useRouter();
     const [query, setQuery] = useState("");
     const counts: Record<Tab, number> = {
@@ -63,6 +72,16 @@ export default function FollowUpList({ copy, locale, rows, tab }: { copy: Copy; 
         return row.petName.toLowerCase().includes(needle) || row.ownerName.toLowerCase().includes(needle);
     });
 
+    useEffect(() => {
+        if (!highlightId) return;
+        toast.success(copy.followUpAdded, { id: "follow-up-added" });
+        document.getElementById(`follow-up-${highlightId}`)?.scrollIntoView({ block: "center" });
+        const timer = window.setTimeout(() => {
+            router.replace(tab === "overdue" ? "/admin/follow-ups" : `/admin/follow-ups?tab=${tab}`, { scroll: false });
+        }, 5000);
+        return () => window.clearTimeout(timer);
+    }, [copy.followUpAdded, highlightId, router, tab]);
+
     function choose(next: Tab) {
         router.replace(next === "overdue" ? "/admin/follow-ups" : `/admin/follow-ups?tab=${next}`, { scroll: false });
     }
@@ -84,7 +103,13 @@ export default function FollowUpList({ copy, locale, rows, tab }: { copy: Copy; 
                     <div role="tablist" aria-label={copy.followUpReminders} className="flex w-max min-w-0 max-w-full gap-2 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {tabs.map((id) => {
                             const active = tab === id;
-                            const late = id === "overdue" && counts[id] > 0 && !active;
+                            const badge = active
+                                ? "rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold"
+                                : id === "overdue" && counts[id] > 0
+                                    ? "rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-900 dark:bg-red-900/60 dark:text-red-100"
+                                    : id === "today" && counts[id] > 0
+                                        ? "rounded-full bg-[#FBF3D5] px-1.5 py-0.5 text-xs font-semibold text-[#9A6700] dark:bg-[#9A6700]/25 dark:text-[#FBBF24]"
+                                        : "rounded-full bg-stone-100 px-1.5 py-0.5 text-xs font-semibold text-stone-600 dark:bg-stone-800 dark:text-stone-300";
                             return (
                                 <button
                                     key={id}
@@ -99,7 +124,7 @@ export default function FollowUpList({ copy, locale, rows, tab }: { copy: Copy; 
                                     }
                                 >
                                     {labels[id]}
-                                    <span className={late ? "rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-900 dark:bg-red-900/60 dark:text-red-100" : active ? "rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold" : "rounded-full bg-stone-100 px-1.5 py-0.5 text-xs font-semibold text-stone-600 dark:bg-stone-800 dark:text-stone-300"}>
+                                    <span className={badge}>
                                         {counts[id]}
                                     </span>
                                 </button>
@@ -111,7 +136,7 @@ export default function FollowUpList({ copy, locale, rows, tab }: { copy: Copy; 
                     <p className="mt-3 text-sm text-stone-500">{needle ? copy.followUpNoMatch : empty[tab]}</p>
                 ) : (
                     <ul className="mt-3 divide-y divide-stone-200 dark:divide-stone-800">
-                        {visible.map((row) => <FollowUpRow key={row.id} copy={copy} locale={locale} row={row} />)}
+                        {visible.map((row) => <FollowUpRow key={row.id} copy={copy} locale={locale} row={row} highlight={row.id === highlightId} />)}
                     </ul>
                 )}
             </div>
@@ -119,7 +144,7 @@ export default function FollowUpList({ copy, locale, rows, tab }: { copy: Copy; 
     );
 }
 
-function FollowUpRow({ copy, locale, row }: { copy: Copy; locale: Locale; row: FollowUpItem }) {
+function FollowUpRow({ copy, locale, row, highlight }: { copy: Copy; locale: Locale; row: FollowUpItem; highlight: boolean }) {
     const router = useRouter();
     const [panel, setPanel] = useState<"menu" | "complete" | "reschedule" | "cancel" | null>(null);
     const [date, setDate] = useState(row.dueOn);
@@ -128,6 +153,7 @@ function FollowUpRow({ copy, locale, row }: { copy: Copy; locale: Locale; row: F
     const ask = row.sex === "FEMALE" ? copy.followUpAskShe : copy.followUpAskHe;
     const message = followUpText(copy.followUpMessage, { owner: row.ownerName, pet: row.petName, clinic: copy.clinicName, ask });
     const chat = followUpChatLink(row.phone, message);
+    const ownerWhatsapp = ownerChat(row.phone);
 
     async function run(action: () => Promise<{ success: boolean; error?: string }>) {
         setPending(true);
@@ -143,13 +169,16 @@ function FollowUpRow({ copy, locale, row }: { copy: Copy; locale: Locale; row: F
     }
 
     return (
-        <li className="py-3">
+        <li id={`follow-up-${row.id}`} className={`rounded-xl px-3 py-3 transition-colors duration-700 ${highlight ? "bg-emerald-50 ring-2 ring-emerald-600/35 dark:bg-emerald-950/40" : ""}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <Link href={`/pets/${row.petId}`} className="text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">{row.petName}</Link>
-                    <p className="text-sm text-stone-500">{row.ownerName}</p>
-                    <p className={`mt-1 text-sm ${dateTone[row.timing]}`}>{writtenDate(row.dueOn, locale)}</p>
-                    {row.notes && <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-300">{row.notes}</p>}
+                    <p className={`text-sm ${metaTone}`}>
+                        <Link href={`/admin/owners/${row.ownerId}`} className="hover:underline">{row.ownerName}</Link>
+                        {ownerWhatsapp ? <>{" · "}<a href={ownerWhatsapp} target="_blank" rel="noopener noreferrer" className="hover:underline">{row.phone}</a></> : null}
+                    </p>
+                    <p className={`mt-1 text-sm ${dateTone(row.timing)}`}>{writtenDate(row.dueOn, locale)}</p>
+                    {row.notes && <p className={`mt-1 text-sm leading-6 ${noteTone}`}>{row.notes}</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {chat ? (

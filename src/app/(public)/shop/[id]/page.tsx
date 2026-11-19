@@ -1,4 +1,4 @@
-import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { notFound } from "next/navigation";
 import AddToCartButton from "@/components/shop/AddToCartButton";
 import ProductPhoto from "@/components/shop/ProductPhoto";
@@ -29,7 +29,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <ProductPhoto src={productPhotoSrc(product.id, product.photoUrl)} alt={name} sizes="(min-width: 1024px) 36rem, 100vw" />
                 </div>
                 <div className="flex flex-col justify-center">
-                    <Link href="/shop" className="text-sm font-medium text-emerald-800">{copy.shopBackStore}</Link>
+                    <HistoryBack fallback="/shop" className="cursor-pointer text-sm font-medium text-emerald-800">{copy.shopBackStore}</HistoryBack>
                     <p className="mt-6 text-xs font-medium tracking-[0.16em] text-emerald-800 uppercase">{shopText(locale, product.category.name, product.category.nameAr)}</p>
                     <h1 className="mt-2 text-4xl text-emerald-950">{name}</h1>
                     {description && <p className="mt-4 max-w-md text-base leading-7 text-stone-600">{description}</p>}

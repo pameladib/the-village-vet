@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { useEffect, useState } from "react";
 import { quoteCart } from "@/lib/actions/shop";
 import type { Copy, Locale } from "@/lib/i18n";
@@ -87,7 +88,7 @@ export default function CartView({ copy, locale, currency }: { copy: Copy; local
             {lines.length === 0 && (
                 <div className="rounded-3xl bg-white px-6 py-10 text-center ring-1 ring-stone-200">
                     <p className="text-stone-600">{copy.shopCartEmpty}</p>
-                    <Link href="/shop" className="mt-4 inline-flex rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white">{copy.shopBackStore}</Link>
+                    <HistoryBack fallback="/shop" className="mt-4 inline-flex cursor-pointer rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white">{copy.shopBackStore}</HistoryBack>
                 </div>
             )}
             {lines.map((line) => (

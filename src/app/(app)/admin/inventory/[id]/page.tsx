@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { notFound, redirect } from "next/navigation";
 import StockBadge from "@/components/shop/StockBadge";
 import StockDesk from "@/components/shop/StockDesk";
@@ -124,7 +125,7 @@ export default async function InventoryProductPage({ params }: { params: Promise
 
     return (
         <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-            <Link href="/admin/inventory" className="text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200">{copy.inventory}</Link>
+            <HistoryBack fallback="/admin/inventory" className="cursor-pointer text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200">{copy.inventory}</HistoryBack>
             <div className="mt-3 flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{shopText(locale, product.name, product.nameAr)}</h1>
                 <StockBadge state={state} label={state === "low" ? copy.invLowStock : state === "out" ? copy.invOutStock : copy.invInStock} />

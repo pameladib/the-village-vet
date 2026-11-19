@@ -327,8 +327,8 @@ model VisitFollowUp {
   petId String
   pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
 
-  medicalVisitId String       @unique
-  medicalVisit   MedicalVisit @relation(fields: [medicalVisitId], references: [id], onDelete: Cascade)
+  medicalVisitId String?       @unique
+  medicalVisit   MedicalVisit? @relation(fields: [medicalVisitId], references: [id], onDelete: Cascade)
 
   @@index([status, dueOn])
   @@index([petId])
@@ -538,6 +538,8 @@ model ShopOrder {
   deliveryAddress  String?
   deliveryPhone    String?
   deliveryNote     String?
+  // Saved with the order. Later fee changes do not rewrite this sale. Zero for pickup.
+  deliveryFee      Int             @default(0)
 
   // Copied at creation so a later account change does not rewrite the sale.
   customerName  String @default("")

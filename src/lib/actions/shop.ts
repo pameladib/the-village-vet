@@ -8,7 +8,7 @@ import type { Locale } from "@/lib/i18n";
 import { messages } from "@/lib/i18n";
 import { notify, notifyOwnerAndStaff } from "@/lib/notifications";
 import { adminMoves, customerCanCancel, staffCanCancel, stageStamp, stockEffect, type OrderStatus } from "@/lib/shop/lifecycle";
-import { convertMinor } from "@/lib/shop/money";
+import { convertMinor, validDeliveryFee } from "@/lib/shop/money";
 import { getDisplayCurrency, pricingFrom } from "@/lib/shop/pricing";
 import { planReservation } from "@/lib/shop/reservation";
 import { acceptPhoto, isSafeObjectKey, objectKey, PHOTO_TYPES, preparePhoto, PRODUCT_PHOTOS_BUCKET } from "@/lib/storage/files";
@@ -180,6 +180,8 @@ const staffOrderSchema = z.object({
     })).min(1).max(30),
     fulfillment: z.enum(["PICKUP", "DELIVERY"]).optional(),
     payment: z.enum(["CASH", "WHISH"]),
+    paid: z.boolean(),
+    deliveryFee: z.number().int().optional(),
     deliveryAddress: z.string().trim().max(200).optional(),
     deliveryPhone: z.string().trim().max(30).optional(),
     deliveryNote: z.string().trim().max(300).optional(),
@@ -189,7 +191,10 @@ export async function createStaffOrder(input: unknown) {
     const session = await shopStaff();
     if (!session) return { success: false as const, formErrors: ["You need a staff account."] };
     const parsed = staffOrderSchema.safeParse(input);
-    if (!parsed.success) return { success: false as const, formErrors: ["Choose at least one product."] };
+    if (!parsed.success) {
+        const fee = parsed.error.issues.some((issue) => issue.path[0] === "deliveryFee");
+        return { success: false as const, formErrors: [fee ? "Enter a delivery fee of zero or more." : "Choose at least one product."] };
+    }
     const sale = parsed.data.mode === "sale";
     const fulfillment = sale ? "PICKUP" as const : parsed.data.fulfillment;
     if (!fulfillment) return { success: false as const, formErrors: ["Choose at least one product."] };
@@ -203,6 +208,9 @@ export async function createStaffOrder(input: unknown) {
     if (!sale && !parsed.data.ownerId && (!(parsed.data.customerName ?? "").trim() || (parsed.data.customerPhone ?? "").trim().length < 6)) {
         return { success: false as const, formErrors: ["Enter the customer’s name and phone."] };
     }
+    const delivering = !sale && fulfillment === "DELIVERY";
+    const deliveryFee = delivering ? parsed.data.deliveryFee ?? 0 : 0;
+    if (!validDeliveryFee(deliveryFee)) return { success: false as const, formErrors: ["Enter a delivery fee of zero or more."] };
 
     const now = new Date();
     try {
@@ -234,7 +242,8 @@ export async function createStaffOrder(input: unknown) {
                     currency: pricing.currency,
                     exchangeRate: pricing.rate,
                     createdById: session.user.id,
-                    paidAt: sale ? now : null,
+                    paidAt: parsed.data.paid ? now : null,
+                    deliveryFee,
                     approvedAt: sale ? null : now,
                     completedAt: sale ? now : null,
                     deliveryAddress: fulfillment === "DELIVERY" ? parsed.data.deliveryAddress : null,

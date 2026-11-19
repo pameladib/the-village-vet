@@ -1,4 +1,4 @@
-const CACHE = "village-vet-static-v1";
+const CACHE = "village-vet-static-v2";
 const PRECACHE = ["/offline.html", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png", "/apple-touch-icon.png"];
 
 const privatePrefixes = [

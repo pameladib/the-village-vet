@@ -1,4 +1,4 @@
-import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { getLocale, messages } from "@/lib/i18n";
 
 export default async function PetNotFound() {
@@ -16,12 +16,12 @@ export default async function PetNotFound() {
         <p className="mt-3 text-sm leading-6 text-stone-600 dark:text-stone-300">
           {copy.petMissingLead}
         </p>
-        <Link
-          href="/dashboard"
+        <HistoryBack
+          fallback="/dashboard"
           className="mt-6 inline-flex cursor-pointer rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition duration-200 hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 dark:bg-emerald-700 dark:hover:bg-emerald-600"
         >
           {copy.bookBack}
-        </Link>
+        </HistoryBack>
       </div>
     </div>
   );

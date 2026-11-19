@@ -46,7 +46,7 @@ export default async function PetProfilePage({
         orderBy: { visitedAt: "desc" },
         select: { id: true, visitedAt: true, notes: true, type: true, services: true, appointmentId: true },
       },
-      owner: { select: { name: true, phoneNumber: true } },
+      owner: { select: { id: true, name: true, phoneNumber: true } },
       documents: {
         orderBy: { createdAt: "desc" },
         select: { id: true, title: true, contentType: true, createdAt: true },
@@ -96,7 +96,7 @@ export default async function PetProfilePage({
         status: careTiming(reminder.dueAt),
       }))}
       backHref={session.user.role === "ADMIN" ? "/admin/patients" : "/dashboard"}
-      owner={session.user.role === "ADMIN" ? { name: owner.name, phone: owner.phoneNumber } : undefined}
+      owner={session.user.role === "ADMIN" ? { id: owner.id, name: owner.name, phone: owner.phoneNumber } : undefined}
       copy={messages(locale)}
       locale={locale}
     />

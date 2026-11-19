@@ -137,6 +137,15 @@ export async function loadStaffAppointments() {
     };
 }
 
+export async function loadAppointmentsBetween(start: Date, end: Date) {
+    const visits = await prisma.appointment.findMany({
+        where: { status: "BOOKED", startAt: { gte: start, lt: end } },
+        orderBy: { startAt: "asc" },
+        include: visitInclude,
+    });
+    return visits.map(toVisit);
+}
+
 const pageSize = 10;
 
 export async function loadPatients(rawQuery: string, rawPage: string | undefined) {
@@ -180,7 +189,7 @@ export async function loadCareReminders() {
                     id: true,
                     name: true,
                     species: true,
-                    owner: { select: { id: true, name: true } },
+                    owner: { select: { id: true, name: true, phoneNumber: true } },
                     vaccinations: { where: { type: "ANNUAL", administeredAt: { not: null } }, select: { id: true } },
                 },
             },
@@ -195,6 +204,7 @@ export async function loadCareReminders() {
         petName: reminder.pet.name,
         ownerId: reminder.pet.owner.id,
         ownerName: reminder.pet.owner.name,
+        phone: reminder.pet.owner.phoneNumber,
         species: reminder.pet.species,
         annualsBefore: reminder.pet.vaccinations.length,
     }));

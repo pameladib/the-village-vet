@@ -49,6 +49,7 @@ export default async function CustomerOrderPage({ params }: { params: Promise<{ 
                         deliveryAddress: order.deliveryAddress,
                         deliveryPhone: order.deliveryPhone,
                         deliveryNote: order.deliveryNote,
+                        deliveryFee: order.deliveryFee,
                         ownerName: contact.name,
                         ownerPhone: contact.phone,
                         items: order.items.map((item) => ({

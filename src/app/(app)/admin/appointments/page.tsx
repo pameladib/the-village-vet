@@ -2,17 +2,23 @@ import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
 import { redirect } from "next/navigation";
 import AppointmentTabs, { type AppointmentTab } from "@/components/admin/AppointmentTabs";
+import UpcomingFilter from "@/components/admin/UpcomingFilter";
 import VisitTable from "@/components/dashboards/VisitTable";
 import { ownerChat } from "@/lib/clinic/public";
 import AppointmentOutcomes from "@/components/visits/AppointmentOutcomes";
-import { loadStaffAppointments } from "@/app/(app)/dashboard/load-staff";
+import { loadAppointmentsBetween, loadStaffAppointments } from "@/app/(app)/dashboard/load-staff";
 import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { appointmentDetail } from "@/lib/appointments/labels";
+import { spanBounds, tomorrowInBeirut, upcomingSpan, type UpcomingWhen } from "@/lib/appointments/upcoming-filter";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 
-export default async function StaffAppointmentsPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[] }> }) {
+function one(value: string | string[] | undefined) {
+    return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function StaffAppointmentsPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[]; when?: string | string[]; on?: string | string[] }> }) {
     let session;
     try {
         session = await requireRole(["ADMIN", "SECONDARY_ADMIN"]);
@@ -23,12 +29,18 @@ export default async function StaffAppointmentsPage({ searchParams }: { searchPa
     const locale = await getLocale();
     const copy = messages(locale);
     const clinical = canSeeClinicalRecords(session.user.role);
-    const requested = (await searchParams).tab;
-    const tabName = Array.isArray(requested) ? requested[0] : requested;
+    const params = await searchParams;
+    const tabName = one(params.tab);
     const tab: AppointmentTab = tabName === "awaiting" || tabName === "upcoming" ? tabName : "today";
+    const whenName = one(params.when);
+    const upcomingWhen: UpcomingWhen = whenName === "tomorrow" || whenName === "week" || whenName === "date" ? whenName : "all";
+    const chosenDate = one(params.on) ?? "";
     const { today, upcoming, awaiting } = await loadStaffAppointments();
     const todayIds = new Set(today.map((visit) => visit.id));
     const later = upcoming.filter((visit) => !todayIds.has(visit.id));
+    const span = upcomingSpan(upcomingWhen, chosenDate);
+    const bounds = typeof span === "object" ? spanBounds(span) : null;
+    const shown = span === "all" ? later : bounds ? await loadAppointmentsBetween(bounds.start, bounds.end) : [];
     const when = new Intl.DateTimeFormat(intlLocale(locale), {
         timeZone: "Asia/Beirut",
         weekday: "short",
@@ -85,7 +97,27 @@ export default async function StaffAppointmentsPage({ searchParams }: { searchPa
                             )}
                         </>
                     ),
-                    upcoming: later.length === 0 ? <p className="text-sm text-stone-500">{copy.noVisits}</p> : <VisitTable visits={later} copy={copy} locale={locale} clinical={clinical} showDate />,
+                    upcoming: (
+                        <div className="min-w-0">
+                            <UpcomingFilter
+                                when={upcomingWhen}
+                                date={span === "choose" ? "" : chosenDate}
+                                tomorrow={tomorrowInBeirut()}
+                                label={copy.apptFilterLabel}
+                                all={copy.apptFilterAll}
+                                tomorrowLabel={copy.apptFilterTomorrow}
+                                week={copy.apptFilterWeek}
+                                specific={copy.apptFilterDate}
+                            />
+                            {span === "choose" ? (
+                                <p className="mt-3 text-sm text-stone-500">{copy.apptFilterChoose}</p>
+                            ) : shown.length === 0 ? (
+                                <p className="mt-3 text-sm text-stone-500">{upcomingWhen === "all" ? copy.noVisits : copy.apptFilterEmpty}</p>
+                            ) : (
+                                <VisitTable visits={shown} copy={copy} locale={locale} clinical={clinical} showDate />
+                            )}
+                        </div>
+                    ),
                 }}
             />
         </main>

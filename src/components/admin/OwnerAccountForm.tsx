@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateCustomerAccount } from "@/lib/actions/owners";
+import { ownerChat } from "@/lib/clinic/phone";
 import type { Copy } from "@/lib/i18n";
 
 const inputClassName = "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-800 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50";
@@ -27,6 +28,7 @@ export default function OwnerAccountForm({
     const [error, setError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
+    const chat = ownerChat(form.phoneNumber);
 
     async function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -57,10 +59,17 @@ export default function OwnerAccountForm({
                 {copy.nameLabel}
                 <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} readOnly={!canEdit} autoComplete="name" className={inputClassName} />
             </label>
-            <label className="text-sm text-stone-500">
-                {copy.phone}
-                <input value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} readOnly={!canEdit} type="tel" autoComplete="tel" className={inputClassName} />
-            </label>
+            <div className="text-sm text-stone-500">
+                <label>
+                    {copy.phone}
+                    <input value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} readOnly={!canEdit} type="tel" autoComplete="tel" className={inputClassName} />
+                </label>
+                {chat && (
+                    <a href={chat} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex font-medium text-emerald-900 hover:underline dark:text-emerald-200">
+                        {copy.whatsappOwner.replace("{phone}", form.phoneNumber)}
+                    </a>
+                )}
+            </div>
             <div className="text-sm text-stone-500 sm:col-span-2">
                 <p>{copy.username}</p>
                 <p dir="ltr" className="mt-1 rounded-xl bg-stone-100 px-3 py-2.5 text-left text-sm text-stone-600 dark:bg-stone-800 dark:text-stone-300">{username}</p>

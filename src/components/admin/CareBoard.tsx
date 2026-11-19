@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TreatmentForm, VaccineForm } from "@/components/pets/pet-profile/tabs/CareRecordForm";
 import { rescheduleCareReminder } from "@/lib/actions/care";
+import { ownerChat } from "@/lib/clinic/phone";
 import { todayInBeirut } from "@/lib/appointments/availability";
 import { doseCopyKey, formatDateOnly } from "@/lib/clinic/vaccines";
 import type { Copy, Locale } from "@/lib/i18n";
@@ -22,6 +23,7 @@ export type CareRow = {
     petName: string;
     ownerId: string;
     ownerName: string;
+    phone: string;
     species: "CAT" | "DOG";
     annualsBefore: number;
 };
@@ -181,6 +183,7 @@ function CareItem({ row, copy, locale }: { row: CareRow; copy: Copy; locale: Loc
     const when = new Intl.DateTimeFormat(intlLocale(locale), { timeZone: "Asia/Beirut", day: "numeric", month: "short", year: "numeric" });
     const labelKey = doseCopyKey(row.dose) ?? (row.kind === "DEWORMING" ? "doseDeworming" : row.kind === "FLEA_TREATMENT" ? "doseFlea" : "doseAnnual");
     const status = row.timing === "due" ? copy.dueToday : row.timing === "overdue" ? copy.overdue : copy.careUpcoming;
+    const ownerWhatsapp = ownerChat(row.phone);
 
     async function move(event: FormEvent) {
         event.preventDefault();
@@ -209,6 +212,7 @@ function CareItem({ row, copy, locale }: { row: CareRow; copy: Copy; locale: Loc
                     </p>
                     <p className="truncate text-sm text-stone-500">
                         <Link href={`/admin/owners/${row.ownerId}`} className="hover:underline">{row.ownerName}</Link>
+                        {ownerWhatsapp ? <>{" · "}<a href={ownerWhatsapp} target="_blank" rel="noopener noreferrer" className="hover:underline">{row.phone}</a></> : null}
                     </p>
                     <p className="mt-1 text-sm text-stone-700 dark:text-stone-200">{copy[labelKey]}</p>
                     <p className="mt-0.5 text-xs text-stone-500">{when.format(new Date(row.dueAt))}</p>

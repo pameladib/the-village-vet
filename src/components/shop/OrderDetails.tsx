@@ -1,9 +1,10 @@
 import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { ownerChat, whatsappHref } from "@/lib/clinic/public";
 import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId } from "@/lib/shop/catalog";
-import { formatStored } from "@/lib/shop/money";
+import { formatStored, orderCharge } from "@/lib/shop/money";
 import { isDelivery, orderOrigin, progressStages, showsProgress, staffCanCancel, stageState, type ProgressStage } from "@/lib/shop/lifecycle";
 import OrderControls from "./OrderControls";
 import OrderPayment from "./OrderPayment";
@@ -26,6 +27,8 @@ export type OrderDetailModel = {
     deliveryAddress: string | null;
     deliveryPhone: string | null;
     deliveryNote: string | null;
+    deliveryFee: number;
+    ownerId?: string | null;
     ownerName: string;
     ownerPhone: string;
     items: { id: string; name: string; quantity: number; unitPrice: number }[];
@@ -82,7 +85,7 @@ export default function OrderDetails({
         minute: "2-digit",
         hourCycle: "h23",
     });
-    const subtotal = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    const charge = orderCharge(order.items, order.deliveryFee);
     const delivery = isDelivery(order.fulfillment);
     const staff = role === "staff";
     const customerChat = order.ownerPhone ? ownerChat(order.ownerPhone) : null;
@@ -97,7 +100,7 @@ export default function OrderDetails({
 
     return (
         <div className={staff ? "w-full min-w-0" : "mx-auto w-full min-w-0 max-w-3xl"}>
-            <Link href={backHref} className="text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200">{backLabel}</Link>
+            <HistoryBack fallback={backHref} className="cursor-pointer text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200">{backLabel}</HistoryBack>
             <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</h1>
@@ -198,11 +201,17 @@ export default function OrderDetails({
                 <dl className="border-t border-[#E5E7EB] px-4 py-3 text-sm dark:border-stone-800">
                     <div className="flex justify-between gap-3 py-1">
                         <dt className="text-stone-500">{copy.shopSubtotal}</dt>
-                        <dd>{formatStored(subtotal, order.currency, locale)}</dd>
+                        <dd>{formatStored(charge.subtotal, order.currency, locale)}</dd>
                     </div>
+                    {delivery && (
+                        <div className="flex justify-between gap-3 py-1">
+                            <dt className="text-stone-500">{copy.shopDeliveryFee}</dt>
+                            <dd>{formatStored(charge.deliveryFee, order.currency, locale)}</dd>
+                        </div>
+                    )}
                     <div className="flex justify-between gap-3 py-1 font-medium text-emerald-950 dark:text-emerald-50">
                         <dt>{copy.shopTotal}</dt>
-                        <dd>{formatStored(subtotal, order.currency, locale)}</dd>
+                        <dd>{formatStored(charge.total, order.currency, locale)}</dd>
                     </div>
                 </dl>
             </section>
@@ -213,7 +222,11 @@ export default function OrderDetails({
                     <dl className="mt-3 grid gap-3 text-sm">
                         <div>
                             <dt className="sr-only">{copy.shopColCustomer}</dt>
-                            <dd className="font-medium text-stone-900 dark:text-stone-50">{order.ownerName}</dd>
+                            <dd className="font-medium text-stone-900 dark:text-stone-50">
+                                {staff && order.ownerId ? (
+                                    <Link href={`/admin/owners/${order.ownerId}`} className="text-emerald-900 hover:underline dark:text-emerald-200">{order.ownerName}</Link>
+                                ) : order.ownerName}
+                            </dd>
                         </div>
                         {order.ownerPhone && (
                             <div>
@@ -276,7 +289,7 @@ export default function OrderDetails({
                     <dl className="mt-3 grid gap-3 text-sm">
                         <div>
                             <dt className="text-stone-500">{copy.shopPayment}</dt>
-                            <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{orderPaymentLabel(order.payment, order.fulfillment, copy)}</dd>
+                            <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{orderPaymentLabel(order.payment, copy)}</dd>
                         </div>
                         <div>
                             <dt className="text-stone-500">{copy.shopPayStatus}</dt>

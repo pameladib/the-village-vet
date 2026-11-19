@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { ChevronLeft } from "lucide-react";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 import { notFound, redirect } from "next/navigation";
@@ -7,6 +8,7 @@ import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { getLocale, messages, type Copy, type Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
+import { ownerChat } from "@/lib/clinic/phone";
 import { prisma } from "@/lib/prisma";
 
 function ageText(
@@ -66,7 +68,7 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
             dateOfBirth: true,
             estimatedAgeValue: true,
             estimatedAgeUnit: true,
-            owner: { select: { name: true, phoneNumber: true } },
+            owner: { select: { id: true, name: true, phoneNumber: true } },
             appointments: {
                 where: { status: { in: ["BOOKED", "COMPLETED"] } },
                 orderBy: { startAt: "desc" },
@@ -86,13 +88,14 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
     const breed = pet.breed?.trim();
     const age = ageText(pet, copy, locale);
     const lifestyle = pet.lifestyle === "INDOOR" ? copy.lifestyleIndoor : pet.lifestyle === "OUTDOOR" ? copy.lifestyleOutdoor : pet.lifestyle === "HYBRID" ? copy.lifestyleHybrid : copy.notProvided;
+    const ownerWhatsapp = ownerChat(pet.owner.phoneNumber);
 
     return (
         <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-            <Link href="/admin/patients" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">
+            <HistoryBack fallback="/admin/patients" className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">
                 <ChevronLeft className="size-4 rtl:rotate-180" />
                 {copy.patients}
-            </Link>
+            </HistoryBack>
             <div className="mt-4 flex items-center gap-3">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
                     <SpeciesMark species={pet.species} className="size-6" />
@@ -121,8 +124,15 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
 
             <section className="mt-3 rounded-2xl bg-white px-4 py-4 dark:bg-stone-900">
                 <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.columnOwner}</h2>
-                <p className="mt-2 text-sm text-stone-800 dark:text-stone-100">{pet.owner.name}</p>
-                <p className="text-sm text-stone-500">{copy.phone}: {pet.owner.phoneNumber}</p>
+                <p className="mt-2 text-sm text-stone-800 dark:text-stone-100">
+                    <Link href={`/admin/owners/${pet.owner.id}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{pet.owner.name}</Link>
+                </p>
+                <p className="text-sm text-stone-500">
+                    {copy.phone}:{" "}
+                    {ownerWhatsapp ? (
+                        <a href={ownerWhatsapp} target="_blank" rel="noopener noreferrer" className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{pet.owner.phoneNumber}</a>
+                    ) : pet.owner.phoneNumber}
+                </p>
                 <Link href={`/admin/appointments/new?petId=${pet.id}`} className="mt-3 inline-flex rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.book}</Link>
             </section>
 

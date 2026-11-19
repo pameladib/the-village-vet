@@ -76,6 +76,15 @@ export function followUpDueOn(date: string) {
     return dateOnlyUtc(date);
 }
 
+// A reminder added from the form is due today or later. Past dates are rejected.
+export function followUpCreateTab(date: string, now = new Date()) {
+    const dueOn = followUpDueOn(date);
+    if (!dueOn) return null;
+    const timing = careTiming(dueOn, now);
+    if (timing === "overdue") return null;
+    return timing === "due" ? "today" as const : "upcoming" as const;
+}
+
 export function applyFollowUp(status: FollowUpStatus, action: "complete" | "cancel" | "reschedule", date?: string) {
     if (status !== "PENDING") return null;
     if (action === "complete") return { status: "COMPLETED" as const };

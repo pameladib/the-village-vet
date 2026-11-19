@@ -36,6 +36,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         deliveryAddress: order.deliveryAddress,
         deliveryPhone: order.deliveryPhone,
         deliveryNote: order.deliveryNote,
+        deliveryFee: order.deliveryFee,
         ownerName: contact.name,
         ownerPhone: contact.phone,
         items: order.items.map((item) => ({

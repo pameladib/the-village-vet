@@ -1,4 +1,4 @@
-import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { notFound, redirect } from "next/navigation";
 import DeleteVisit from "@/components/visits/DeleteVisit";
 import VisitForm from "@/components/visits/VisitForm";
@@ -45,7 +45,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
 
     return (
         <main className="mx-auto w-full max-w-xl px-4 py-6 sm:px-6">
-            <Link href={`/pets/${visit.pet.id}`} className="text-sm font-medium text-emerald-800">{visit.pet.name}</Link>
+            <HistoryBack fallback={`/pets/${visit.pet.id}`} className="cursor-pointer text-sm font-medium text-emerald-800">{visit.pet.name}</HistoryBack>
             <h1 className="mt-3 text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">
                 {appointmentDetail(visit.type, visit.services, null, copy)}
             </h1>

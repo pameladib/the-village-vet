@@ -1,11 +1,12 @@
 import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
 import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId, shopText } from "@/lib/shop/catalog";
-import { formatStored } from "@/lib/shop/money";
+import { formatStored, orderCharge } from "@/lib/shop/money";
 
 export default async function MyOrdersPage() {
     let session;
@@ -27,15 +28,15 @@ export default async function MyOrdersPage() {
     return (
         <main className="bg-[#f6f1e8]">
             <div className="mx-auto w-full max-w-2xl px-5 py-10">
-                <Link href="/shop" className="text-sm font-medium text-emerald-800">{copy.shopBackStore}</Link>
+                <HistoryBack fallback="/shop" className="cursor-pointer text-sm font-medium text-emerald-800">{copy.shopBackStore}</HistoryBack>
                 <h1 className="mt-3 text-4xl text-emerald-950">{copy.shopOrders}</h1>
                 <ul className="mt-8 flex flex-col gap-4">
                     {orders.map((order) => {
-                        const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+                        const total = orderCharge(order.items, order.deliveryFee).total;
                         const statusTone = orderStatusTone(order.status);
                         const details = [
                             [copy.shopReceive, orderFulfillmentLabel(order.fulfillment, copy)],
-                            [copy.shopPayment, orderPaymentLabel(order.payment, order.fulfillment, copy)],
+                            [copy.shopPayment, orderPaymentLabel(order.payment, copy)],
                             order.deliveryAddress ? [copy.shopDeliveryAddress, order.deliveryAddress] : null,
                             order.deliveryPhone ? [copy.shopDeliveryPhone, order.deliveryPhone] : null,
                             order.deliveryNote ? [copy.shopDeliveryNote, order.deliveryNote] : null,

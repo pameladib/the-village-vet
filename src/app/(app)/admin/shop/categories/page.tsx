@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
@@ -33,7 +34,7 @@ export default async function ShopCategoriesPage({ searchParams }: { searchParam
 
     return (
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-            <Link href="/admin/shop" className="text-sm text-emerald-800">{copy.shopBackProducts}</Link>
+            <HistoryBack fallback="/admin/shop" className="cursor-pointer text-sm text-emerald-800">{copy.shopBackProducts}</HistoryBack>
             <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
                 <h1 className="text-2xl font-semibold">{copy.shopManageCategories}</h1>
                 <Link href="/admin/shop/categories/new" className="rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-950">{copy.shopAddCategory}</Link>

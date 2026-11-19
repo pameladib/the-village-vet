@@ -46,6 +46,8 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
                     deliveryAddress: order.deliveryAddress,
                     deliveryPhone: order.deliveryPhone,
                     deliveryNote: order.deliveryNote,
+                    deliveryFee: order.deliveryFee,
+                    ownerId: order.ownerId,
                     ownerName: contact.name,
                     ownerPhone: contact.phone,
                     items: order.items.map((item) => ({

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Search } from "lucide-react";
 import { createStaffOrder, searchOrderCustomers, searchOrderProducts } from "@/lib/actions/shop";
+import { ownerChat } from "@/lib/clinic/phone";
 import type { Copy, Locale } from "@/lib/i18n";
 import { shopText } from "@/lib/shop/catalog";
-import { formatMoney, type Currency } from "@/lib/shop/money";
+import { formatMoney, inputFromMinor, minorFromInput, type Currency } from "@/lib/shop/money";
 import { mapShopError } from "./ShopAdmin";
 
 type Mode = "sale" | "later";
@@ -35,6 +37,8 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
     const [mode, setMode] = useState<Mode>("sale");
     const [customerKind, setCustomerKind] = useState<"account" | "walkin">("account");
     const [payment, setPayment] = useState<"CASH" | "WHISH">("CASH");
+    const [paid, setPaid] = useState(false);
+    const [feeInput, setFeeInput] = useState(() => inputFromMinor(0, currency));
     const [fulfillment, setFulfillment] = useState<"PICKUP" | "DELIVERY">("PICKUP");
     const [address, setAddress] = useState("");
     const [deliveryPhone, setDeliveryPhone] = useState("");
@@ -131,7 +135,11 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
         setLines((current) => current.map((item) => item.id === id ? { ...item, quantity: next } : item));
     }
 
-    const total = useMemo(() => lines.reduce((sum, line) => sum + line.price * line.quantity, 0), [lines]);
+    const customerChat = customer ? ownerChat(customer.phoneNumber) : null;
+    const subtotal = useMemo(() => lines.reduce((sum, line) => sum + line.price * line.quantity, 0), [lines]);
+    const delivering = mode === "later" && fulfillment === "DELIVERY";
+    const parsedFee = delivering ? minorFromInput(feeInput, currency) : 0;
+    const deliveryFee = parsedFee ?? 0;
 
     function addProduct(product: ProductHit) {
         setLines((current) => {
@@ -157,6 +165,11 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
             setError(copy.shopErrCustomer);
             return;
         }
+        const fee = delivering ? minorFromInput(feeInput, currency) : 0;
+        if (fee == null) {
+            setError(copy.shopErrDeliveryFee);
+            return;
+        }
         setPending(true);
         const result = await createStaffOrder({
             mode,
@@ -166,6 +179,8 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
             items: lines.map((line) => ({ productId: line.id, quantity: line.quantity })),
             fulfillment,
             payment,
+            paid,
+            deliveryFee: fee,
             deliveryAddress: address,
             deliveryPhone: deliveryPhone || (walkIn ? phone : customer?.phoneNumber) || "",
             deliveryNote: note,
@@ -183,7 +198,9 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
 
     return (
         <form className="mt-8 grid min-w-0 gap-8" onSubmit={(event) => void submit(event)}>
-            <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={copy.shopNewOrder}>
+            <section className="grid gap-3">
+                <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopOrderType}</h2>
+            <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={copy.shopOrderType}>
                 <button type="button" aria-pressed={mode === "sale"} onClick={() => setMode("sale")} className={option(mode === "sale")}>
                     <Mark active={mode === "sale"} />
                     <span className="min-w-0">
@@ -199,13 +216,14 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                     </span>
                 </button>
             </div>
+            </section>
 
             <section className="grid gap-3">
                 <div>
-                    <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopCustomerInfo}</h2>
+                    <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopColCustomer}</h2>
                     <p className="mt-1 text-sm text-stone-500">{copy.shopCustomerInfoLead}</p>
                 </div>
-                <div className="flex flex-wrap gap-2" role="group" aria-label={copy.shopCustomerInfo}>
+                <div className="flex flex-wrap gap-2" role="group" aria-label={copy.shopColCustomer}>
                     <button type="button" aria-pressed={customerKind === "account"} onClick={() => chooseCustomerKind("account")} className={segment(customerKind === "account")}>{copy.shopExistingCustomer}</button>
                     <button type="button" aria-pressed={customerKind === "walkin"} onClick={() => chooseCustomerKind("walkin")} className={segment(customerKind === "walkin")}>{copy.shopWalkInCustomer}</button>
                 </div>
@@ -213,8 +231,14 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                     customer ? (
                         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 dark:bg-stone-900">
                             <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-stone-900 dark:text-stone-50">{customer.name}</p>
-                                <p className="text-sm text-stone-500">{customer.phoneNumber}</p>
+                                <p className="truncate text-sm font-medium text-stone-900 dark:text-stone-50">
+                                    <Link href={`/admin/owners/${customer.id}`} className="text-emerald-900 hover:underline dark:text-emerald-200">{customer.name}</Link>
+                                </p>
+                                <p className="text-sm text-stone-500">
+                                    {customerChat ? (
+                                        <a href={customerChat} target="_blank" rel="noopener noreferrer" className="text-emerald-900 hover:underline dark:text-emerald-200">{customer.phoneNumber}</a>
+                                    ) : customer.phoneNumber}
+                                </p>
                             </div>
                             <button type="button" onClick={() => { setCustomer(null); customerQueryRef.current = ""; }} className="text-sm text-stone-500 hover:text-emerald-900 dark:hover:text-emerald-200">{copy.shopChangeCustomer}</button>
                         </div>
@@ -338,32 +362,6 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                 )}
             </section>
 
-            <section className="rounded-2xl bg-emerald-50 px-4 py-4 dark:bg-emerald-950/40">
-                <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopOrderSummary}</h2>
-                <dl className="mt-3">
-                    <div className="flex items-baseline justify-between gap-3 text-sm text-stone-600 dark:text-stone-300">
-                        <dt>{copy.shopSubtotal}</dt>
-                        <dd>{formatMoney(total, currency, locale)}</dd>
-                    </div>
-                    <div className="mt-2 flex items-baseline justify-between gap-3 text-lg font-semibold text-emerald-950 dark:text-emerald-50">
-                        <dt>{copy.shopTotal}</dt>
-                        <dd>{formatMoney(total, currency, locale)}</dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section className="grid gap-3">
-                <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopPayment}</h2>
-                <div className="flex flex-wrap gap-2" role="group" aria-label={copy.shopPayment}>
-                    {(["CASH", "WHISH"] as const).map((method) => (
-                        <button key={method} type="button" aria-pressed={payment === method} onClick={() => setPayment(method)} className={segment(payment === method)}>
-                            {method === "WHISH" ? copy.shopPayWhish : copy.shopPayCashPickup}
-                        </button>
-                    ))}
-                </div>
-                <p className="text-sm text-stone-500">{mode === "sale" ? copy.shopSaleNote : copy.shopLaterNote}</p>
-            </section>
-
             {mode === "later" && (
                 <section className="grid gap-3">
                     <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopFulfilmentDetails}</h2>
@@ -388,10 +386,51 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                                 {copy.shopDeliveryNote}
                                 <input value={note} onChange={(event) => setNote(event.target.value)} className={`${field} mt-1`} />
                             </label>
+                            <label className="text-sm text-stone-600 dark:text-stone-300">
+                                {copy.shopDeliveryFee}
+                                <input inputMode="decimal" value={feeInput} onChange={(event) => setFeeInput(event.target.value)} className={`${field} mt-1`} />
+                            </label>
                         </div>
                     )}
                 </section>
             )}
+
+            <section className="grid gap-3">
+                <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopPayment}</h2>
+                <div className="flex flex-wrap gap-2" role="group" aria-label={copy.shopPayment}>
+                    {(["CASH", "WHISH"] as const).map((method) => (
+                        <button key={method} type="button" aria-pressed={payment === method} onClick={() => setPayment(method)} className={segment(payment === method)}>
+                            {method === "WHISH" ? copy.shopPayWhish : copy.shopPayCash}
+                        </button>
+                    ))}
+                </div>
+                <label className="flex items-start gap-3 text-sm text-stone-800 dark:text-stone-100">
+                    <input type="checkbox" checked={paid} onChange={(event) => setPaid(event.target.checked)} className="mt-1 size-4 accent-emerald-800" />
+                    <span>
+                        <span className="font-medium">{copy.shopPaymentReceived}</span>
+                        <span className="mt-1 block text-stone-500">{copy.shopPaymentReceivedHint}</span>
+                    </span>
+                </label>
+            </section>
+
+            <section className="border-t border-stone-200 pt-4 dark:border-stone-800">
+                <dl>
+                    <div className="flex items-baseline justify-between gap-3 text-sm text-stone-600 dark:text-stone-300">
+                        <dt>{copy.shopSubtotal}</dt>
+                        <dd>{formatMoney(subtotal, currency, locale)}</dd>
+                    </div>
+                    {delivering && (
+                        <div className="mt-2 flex items-baseline justify-between gap-3 text-sm text-stone-600 dark:text-stone-300">
+                            <dt>{copy.shopDeliveryFee}</dt>
+                            <dd>{formatMoney(deliveryFee, currency, locale)}</dd>
+                        </div>
+                    )}
+                    <div className="mt-3 flex items-baseline justify-between gap-3 text-xl font-semibold text-emerald-950 dark:text-emerald-50">
+                        <dt>{copy.shopTotal}</dt>
+                        <dd>{formatMoney(subtotal + deliveryFee, currency, locale)}</dd>
+                    </div>
+                </dl>
+            </section>
 
             {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
             <button type="submit" disabled={pending || lines.length === 0} className="h-11 w-full rounded-full bg-emerald-900 px-5 text-sm font-medium text-white hover:bg-emerald-950 disabled:opacity-60 sm:w-fit">

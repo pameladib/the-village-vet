@@ -4,6 +4,8 @@ import type { AppointmentType, GroomingService, Pet, VisitService } from "../../
 import Link from "next/link";
 import { ChevronLeft, SquarePen } from "lucide-react";
 import { useState } from "react";
+import HistoryBack from "@/components/HistoryBack";
+import { ownerChat } from "@/lib/clinic/phone";
 import GeneralTab from "./tabs/GeneralTab";
 import AppointmentsTab from "./tabs/AppointmentsTab";
 import VaccinationsTab from "./tabs/VaccinationsTab";
@@ -86,11 +88,12 @@ export default function PetProfile({
     canRecord?: boolean;
     reminders?: ProfileReminder[];
     backHref?: string;
-    owner?: { name: string; phone: string };
+    owner?: { id: string; name: string; phone: string };
     copy: Copy;
     locale?: Locale;
 }) {
     const [activeTab, setActiveTab] = useState("general");
+    const ownerWhatsapp = owner ? ownerChat(owner.phone) : null;
 
     const tabs = [ // this array lets us define the tabs once and generate the buttons dynamically instead of writing four buttons manually
         { id: "general", label: copy.tabGeneral }, // id identifies the tab in our code, and label is the text displayed on the button
@@ -107,13 +110,13 @@ export default function PetProfile({
         <div className="flex flex-1 justify-center px-4 py-6 sm:px-6">
             <div className="w-full max-w-5xl">
                 <header className="flex items-center justify-between gap-3">
-                    <Link
-                        href={backHref}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
+                    <HistoryBack
+                        fallback={backHref}
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
                     >
                         <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
                         {copy.profileBack}
-                    </Link>
+                    </HistoryBack>
                     <Link
                         href={`/pets/${pet.id}/edit`}
                         className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
@@ -141,9 +144,13 @@ export default function PetProfile({
                         </p>
                         {owner && (
                             <p className="mt-2 text-sm text-stone-500">
-                                {copy.profileOwner}: {owner.name}
+                                {copy.profileOwner}:{" "}
+                                <Link href={`/admin/owners/${owner.id}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{owner.name}</Link>
                                 <span className="px-2">·</span>
-                                {copy.profilePhone}: {owner.phone}
+                                {copy.profilePhone}:{" "}
+                                {ownerWhatsapp ? (
+                                    <a href={ownerWhatsapp} target="_blank" rel="noopener noreferrer" className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{owner.phone}</a>
+                                ) : owner.phone}
                             </p>
                         )}
                     </div>

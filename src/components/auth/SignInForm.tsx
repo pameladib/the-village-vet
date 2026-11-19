@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { authClient } from "@/lib/auth/auth-client";
 import type { SuccessContext } from "@better-fetch/fetch";
+import ClinicLogo from "@/components/ClinicLogo";
 import PasswordInput from "@/components/auth/PasswordInput";
 import LocaleSwitch from "@/components/LocaleSwitch";
 import { loginFailureReason } from "@/lib/actions/login";
@@ -144,7 +146,10 @@ export default function LogInForm({ nextPath = "/dashboard", copy, locale }: { n
                     onSubmit={handleSubmit}
                     className="w-full max-w-md min-w-0 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8 dark:border-stone-800 dark:bg-stone-900"
                 >
-                    <h2 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">
+                    <Link href="/" className="inline-flex rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40">
+                        <ClinicLogo locale={locale} name={copy.clinicName} className="h-16 w-auto dark:invert" />
+                    </Link>
+                    <h2 className="mt-6 text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">
                         {copy.logIn}
                     </h2>
             

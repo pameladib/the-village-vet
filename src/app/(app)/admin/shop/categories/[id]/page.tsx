@@ -1,4 +1,4 @@
-import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { notFound, redirect } from "next/navigation";
 import CategoryForm from "@/components/shop/CategoryForm";
 import { requireRole } from "@/lib/auth/session";
@@ -21,7 +21,7 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
 
     return (
         <main className="mx-auto w-full max-w-xl flex-1 px-4 py-8">
-            <Link href="/admin/shop/categories" className="text-sm text-emerald-800">{copy.shopBackCategories}</Link>
+            <HistoryBack fallback="/admin/shop/categories" className="cursor-pointer text-sm text-emerald-800">{copy.shopBackCategories}</HistoryBack>
             <h1 className="mt-3 text-2xl font-semibold">{copy.shopEditCategory}</h1>
             <CategoryForm copy={copy} category={category} />
         </main>

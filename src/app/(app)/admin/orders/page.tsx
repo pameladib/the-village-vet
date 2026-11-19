@@ -4,9 +4,10 @@ import OrderSort from "@/components/shop/OrderSort";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
+import { ownerChat } from "@/lib/clinic/phone";
 import { prisma } from "@/lib/prisma";
 import { orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId } from "@/lib/shop/catalog";
-import { formatStored } from "@/lib/shop/money";
+import { formatStored, orderCharge } from "@/lib/shop/money";
 import { orderContact, orderOrigin } from "@/lib/shop/lifecycle";
 
 const statusFilters = {
@@ -158,20 +159,30 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                 <>
                     <ul className="mt-4 flex flex-col gap-2 md:hidden">
                         {orders.map((order) => {
-                            const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+                            const total = orderCharge(order.items, order.deliveryFee).total;
                             const items = order.items.reduce((sum, item) => sum + item.quantity, 0);
                             const contact = orderContact(order, copy.shopWalkIn);
                             const origin = orderOrigin(order);
                             const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : copy.shopOriginCustomer;
+                            const chat = contact.phone ? ownerChat(contact.phone) : null;
                             return (
-                                <li key={order.id}>
-                                    <Link href={`/admin/orders/${order.id}`} className={`block rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 ${order.status === "PENDING" ? "ring-1 ring-amber-300" : ""}`}>
+                                <li key={order.id} className={`relative rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 ${order.status === "PENDING" ? "ring-1 ring-amber-300" : ""}`}>
+                                    <Link href={`/admin/orders/${order.id}`} aria-label={shortOrderId(order.id)} className="absolute inset-0 rounded-2xl" />
+                                    <div className="pointer-events-none relative">
                                         <div className="flex items-center justify-between gap-3">
                                             <p className="font-medium text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</p>
                                             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${orderStatusTone(order.status)}`}>{orderStatusLabel(order.status, copy)}</span>
                                         </div>
-                                        <p className="mt-1 text-sm text-stone-800 dark:text-stone-100">{contact.name}</p>
-                                        <p className="text-xs text-stone-500">{contact.phone ? `${contact.phone} · ` : ""}{originLabel}</p>
+                                        <p className="mt-1 text-sm text-stone-800 dark:text-stone-100">
+                                            {order.ownerId ? (
+                                                <Link href={`/admin/owners/${order.ownerId}`} className="pointer-events-auto relative z-10 font-medium text-emerald-900 hover:underline dark:text-emerald-200">{contact.name}</Link>
+                                            ) : contact.name}
+                                        </p>
+                                        <p className="text-xs text-stone-500">
+                                            {chat ? <a href={chat} target="_blank" rel="noopener noreferrer" className="pointer-events-auto relative z-10 hover:underline">{contact.phone}</a> : contact.phone}
+                                            {contact.phone ? " · " : ""}
+                                            {originLabel}
+                                        </p>
                                         <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
                                             {count.format(items)} {copy.shopOrderItems}
                                             {" · "}
@@ -179,9 +190,9 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                             {" · "}
                                             {orderFulfillmentLabel(order.fulfillment, copy)}
                                             {" · "}
-                                            {orderPaymentLabel(order.payment, order.fulfillment, copy)}
+                                            {orderPaymentLabel(order.payment, copy)}
                                         </p>
-                                    </Link>
+                                    </div>
                                 </li>
                             );
                         })}
@@ -202,22 +213,31 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                             </thead>
                             <tbody>
                                 {orders.map((order) => {
-                                    const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+                                    const total = orderCharge(order.items, order.deliveryFee).total;
                                     const items = order.items.reduce((sum, item) => sum + item.quantity, 0);
                                     const contact = orderContact(order, copy.shopWalkIn);
                                     const origin = orderOrigin(order);
                                     const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : copy.shopOriginCustomer;
+                                    const chat = contact.phone ? ownerChat(contact.phone) : null;
                                     return (
                                         <tr key={order.id} className={order.status === "PENDING" ? "bg-amber-50/80 dark:bg-amber-950/20" : "bg-white dark:bg-stone-900"}>
                                             <td className="rounded-s-xl px-3 py-3 font-medium text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</td>
                                             <td className="px-3 py-3">
-                                                <p className="text-stone-900 dark:text-stone-50">{contact.name}</p>
-                                                <p className="text-xs text-stone-500">{contact.phone ? `${contact.phone} · ` : ""}{originLabel}</p>
+                                                <p className="text-stone-900 dark:text-stone-50">
+                                                    {order.ownerId ? (
+                                                        <Link href={`/admin/owners/${order.ownerId}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{contact.name}</Link>
+                                                    ) : contact.name}
+                                                </p>
+                                                <p className="text-xs text-stone-500">
+                                                    {chat ? <a href={chat} target="_blank" rel="noopener noreferrer" className="hover:underline">{contact.phone}</a> : contact.phone}
+                                                    {contact.phone ? " · " : ""}
+                                                    {originLabel}
+                                                </p>
                                             </td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{count.format(items)} {copy.shopOrderItems}</td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{formatStored(total, order.currency, locale)}</td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{orderFulfillmentLabel(order.fulfillment, copy)}</td>
-                                            <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{orderPaymentLabel(order.payment, order.fulfillment, copy)}</td>
+                                            <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{orderPaymentLabel(order.payment, copy)}</td>
                                             <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${orderStatusTone(order.status)}`}>{orderStatusLabel(order.status, copy)}</span></td>
                                             <td className="rounded-e-xl px-3 py-3"><Link href={`/admin/orders/${order.id}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{copy.viewAppointment}</Link></td>
                                         </tr>

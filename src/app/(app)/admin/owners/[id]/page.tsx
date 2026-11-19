@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { ChevronLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import OwnerAccountForm from "@/components/admin/OwnerAccountForm";
@@ -11,7 +12,7 @@ import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
 import { orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId } from "@/lib/shop/catalog";
-import { formatStored } from "@/lib/shop/money";
+import { formatStored, orderCharge } from "@/lib/shop/money";
 import { petPhotoSrc } from "@/lib/storage/files";
 
 export default async function OwnerProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,6 +56,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                 payment: true,
                 fulfillment: true,
                 currency: true,
+                deliveryFee: true,
                 createdAt: true,
                 items: { select: { quantity: true, unitPrice: true } },
             },
@@ -72,10 +74,10 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
 
     return (
         <Page width="medium">
-            <Link href="/admin/patients" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">
+            <HistoryBack fallback="/admin/patients" className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">
                 <ChevronLeft className="size-4 rtl:rotate-180" />
-                {copy.patients}
-            </Link>
+                {copy.profileBack}
+            </HistoryBack>
             <h1 className="mt-4 text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{owner.name}</h1>
             <p className="mt-1 text-sm text-stone-500">{copy.ownerSince} {since.format(owner.createdAt)}</p>
 
@@ -146,7 +148,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                 ) : (
                     <ul className="mt-3 flex flex-col gap-1">
                         {recentOrders.map((order) => {
-                            const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+                            const total = orderCharge(order.items, order.deliveryFee).total;
                             return (
                                 <li key={order.id}>
                                     <Link href={`/admin/orders/${order.id}`} className="block rounded-xl px-2 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
@@ -162,7 +164,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                                         <span className="block text-sm text-stone-500">
                                             {orderFulfillmentLabel(order.fulfillment, copy)}
                                             {" · "}
-                                            {orderPaymentLabel(order.payment, order.fulfillment, copy)}
+                                            {orderPaymentLabel(order.payment, copy)}
                                         </span>
                                     </Link>
                                 </li>

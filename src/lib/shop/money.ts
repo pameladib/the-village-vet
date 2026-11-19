@@ -60,6 +60,16 @@ export function minorFromInput(raw: string, currency: Currency) {
     return cents <= 1_000_000_000 ? cents : null;
 }
 
+export function orderCharge(items: { unitPrice: number; quantity: number }[], deliveryFee = 0) {
+    const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    const fee = Number.isInteger(deliveryFee) && deliveryFee >= 0 ? deliveryFee : 0;
+    return { subtotal, deliveryFee: fee, total: subtotal + fee };
+}
+
+export function validDeliveryFee(amount: number) {
+    return Number.isInteger(amount) && amount >= 0 && amount <= 1_000_000_000;
+}
+
 export function inputFromMinor(amount: number, currency: Currency) {
     if (currency === "LBP") return String(amount);
     return (amount / 100).toFixed(2);

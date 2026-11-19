@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import ClinicLogo from "@/components/ClinicLogo";
 import LogOutButton from "@/components/auth/LogOutButton";
 import CurrencySwitch from "@/components/CurrencySwitch";
 import LocaleSwitch from "@/components/LocaleSwitch";
@@ -42,9 +43,9 @@ export default function PublicHeader({
 
     return (
         <header className="sticky top-0 z-20 border-b border-stone-200/80 bg-white">
-            <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-6 px-5">
-                <Link href="/" className="shrink-0 text-[0.95rem] font-semibold tracking-wide text-emerald-950">
-                    {copy.clinicName}
+            <div className="mx-auto flex min-h-16 w-full max-w-6xl items-center gap-4 px-5 py-2 sm:gap-6">
+                <Link href="/" className="shrink-0 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40">
+                    <ClinicLogo locale={locale} name={copy.clinicName} className={locale === "ar" ? "h-10 w-auto sm:h-11" : "h-12 w-auto max-w-[9.5rem] sm:h-14 sm:max-w-none"} />
                 </Link>
                 <nav className="ms-auto hidden items-center gap-1 lg:flex" aria-label={copy.menu}>
                     {links.map((link) => {

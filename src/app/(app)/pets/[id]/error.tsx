@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import HistoryBack from "@/components/HistoryBack";
 import { useEffect, useState } from "react";
 
 const text = {
@@ -56,12 +56,12 @@ export default function PetProfileError({
           >
             {copy.retry}
           </button>
-          <Link
-            href="/dashboard"
-            className="text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-200"
+          <HistoryBack
+            fallback="/dashboard"
+            className="cursor-pointer text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-200"
           >
             {copy.back}
-          </Link>
+          </HistoryBack>
         </div>
       </div>
     </div>
