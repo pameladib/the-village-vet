@@ -4,6 +4,16 @@ export function canSeeClinicalRecords(role: string) {
     return role === "ADMIN";
 }
 
+export function canRecordPetWeight(role: string) {
+    return role === "ADMIN";
+}
+
+export function canViewPetWeights(role: string, userId: string, ownerId: string) {
+    if (role === "ADMIN") return true;
+    if (role === "SECONDARY_ADMIN") return false;
+    return role === "OWNER" && userId === ownerId;
+}
+
 export function canManageScheduleBlocks(role: string) {
     return role === "ADMIN";
 }

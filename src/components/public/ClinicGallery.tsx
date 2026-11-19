@@ -58,7 +58,7 @@ export default function ClinicGallery({ copy, locale, photos }: { copy: Copy; lo
 
     return (
         <section
-            className="bg-stone-50"
+            className="bg-white"
             aria-roledescription="carousel"
             aria-label={copy.galleryHeading}
             onMouseEnter={() => setHovered(true)}
@@ -84,7 +84,7 @@ export default function ClinicGallery({ copy, locale, photos }: { copy: Copy; lo
                     <p className="mt-4 text-base leading-7 text-stone-600">{copy.galleryLead}</p>
                 </div>
 
-                <div className="relative mt-10">
+                <div className="relative mx-auto mt-10 max-w-5xl">
                     <div
                         className="touch-pan-y overflow-hidden rounded-2xl"
                         onTouchStart={(event) => {
@@ -100,7 +100,7 @@ export default function ClinicGallery({ copy, locale, photos }: { copy: Copy; lo
                         <div className={motion} style={shift}>
                             {photos.map((photo, photoIndex) => (
                                 <div key={photo.src} className="relative aspect-video w-full shrink-0 bg-stone-200" aria-hidden={photoIndex !== index}>
-                                    <ClinicPicture src={photo.src} alt={photo.caption} sizes="(min-width: 1152px) 72rem, 100vw" />
+                                    <ClinicPicture src={photo.src} alt={photo.caption || copy.galleryHeading} sizes="(min-width: 1152px) 64rem, 100vw" />
                                 </div>
                             ))}
                         </div>
@@ -123,19 +123,21 @@ export default function ClinicGallery({ copy, locale, photos }: { copy: Copy; lo
                     </button>
                 </div>
 
-                <div className="overflow-hidden">
-                    <div className={motion} style={shift}>
-                        {photos.map((photo, photoIndex) => (
-                            <p
-                                key={`${photo.src}-caption`}
-                                className="w-full shrink-0 pt-4 text-center text-lg text-emerald-950"
-                                aria-hidden={photoIndex !== index}
-                            >
-                                {photo.caption}
-                            </p>
-                        ))}
+                {photos.some((photo) => photo.caption) && (
+                    <div className="overflow-hidden">
+                        <div className={motion} style={shift}>
+                            {photos.map((photo, photoIndex) => (
+                                <p
+                                    key={`${photo.src}-caption`}
+                                    className="w-full shrink-0 pt-4 text-center text-lg text-emerald-950"
+                                    aria-hidden={photoIndex !== index}
+                                >
+                                    {photo.caption}
+                                </p>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className="mt-5 flex items-center justify-center gap-2">
                     {photos.map((photo, photoIndex) => (

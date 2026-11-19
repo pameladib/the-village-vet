@@ -33,6 +33,7 @@ export default function PublicHeader({
 }) {
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
+    const showCurrency = pathname === "/shop" || pathname.startsWith("/shop/");
     const accountHref = loggedIn ? "/dashboard" : "/login";
     const accountLabel = loggedIn ? copy.dashboard : copy.logIn;
 
@@ -63,7 +64,7 @@ export default function PublicHeader({
                     })}
                 </nav>
                 <div className="ms-auto flex items-center gap-3 lg:ms-2">
-                    <CurrencySwitch currency={currency} label={copy.currency} />
+                    {showCurrency && <CurrencySwitch currency={currency} label={copy.currency} />}
                     <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50" />
                     {showProfile && (
                         <Link href="/profile" className="text-sm font-semibold text-emerald-950 hover:text-emerald-800">
@@ -89,9 +90,11 @@ export default function PublicHeader({
             </div>
             {open && (
                 <nav id="public-menu" className="flex flex-col gap-1 border-t border-stone-200 px-5 py-3 lg:hidden">
-                    <div className="px-2 py-2">
-                        <CurrencySwitch currency={currency} label={copy.currency} />
-                    </div>
+                    {showCurrency && (
+                        <div className="px-2 py-2">
+                            <CurrencySwitch currency={currency} label={copy.currency} />
+                        </div>
+                    )}
                     {links.map((link) => {
                         const active = current(link.href);
                         return (

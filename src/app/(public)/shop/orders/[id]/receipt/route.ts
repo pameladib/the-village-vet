@@ -1,7 +1,6 @@
 import { requireAuth } from "@/lib/auth/session";
 import { getClinicSettings } from "@/lib/clinic/public";
-import { getLocale, messages } from "@/lib/i18n";
-import { shopText } from "@/lib/shop/catalog";
+import { messages } from "@/lib/i18n";
 import { canSeeOrder, orderContact } from "@/lib/shop/lifecycle";
 import { loadOrder } from "@/lib/shop/load-order";
 import { buildReceipt, receiptHtml, receiptPdf } from "@/lib/shop/receipt";
@@ -21,10 +20,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
     }
 
-    const locale = await getLocale();
-    const copy = messages(locale);
+    const english = messages("en");
     const clinic = await getClinicSettings();
-    const contact = orderContact(order, copy.shopWalkIn);
+    const contact = orderContact(order, english.shopWalkIn);
     const receipt = buildReceipt({
         id: order.id,
         status: order.status,
@@ -40,15 +38,14 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         ownerName: contact.name,
         ownerPhone: contact.phone,
         items: order.items.map((item) => ({
-            name: shopText(locale, item.product.name, item.product.nameAr),
-            fallbackName: item.product.name,
+            name: item.product.name,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
         })),
         clinicAddress: clinic?.address ?? null,
         clinicPhone: clinic?.phone ?? null,
         clinicEmail: clinic?.email ?? null,
-    }, locale, copy, messages("en"));
+    }, english);
 
     const view = new URL(request.url).searchParams.get("view") === "1";
     if (view) {

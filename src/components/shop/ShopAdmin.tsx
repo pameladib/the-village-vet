@@ -14,6 +14,10 @@ export function mapShopError(message: string | undefined, copy: Copy) {
     if (message === "This product is on an order, so it can be hidden instead of deleted.") return copy.shopErrOnOrder;
     if (message === "This order changed.") return copy.shopErrConflict;
     if (message === "Enter the customer’s name and phone.") return copy.shopErrCustomer;
+    if (message === "Choose at least one product.") return copy.shopErrItems;
+    if (message === "Enter the delivery address.") return copy.shopAddressRequired;
+    if (message === "Enter a contact number.") return copy.shopPhoneRequired;
+    if (message === "Something in the cart is no longer in stock.") return copy.shopErrLineStock;
     if (message === "Enter a delivery fee of zero or more.") return copy.shopErrDeliveryFee;
     if (message === "The pricing currency changed. Refresh the page and enter the price again.") return copy.pricingErrCurrency;
     if (message === "That order can no longer be changed." || message === "That status change is not allowed.") return message === "That status change is not allowed." ? copy.shopErrTransition : copy.shopErrOrder;

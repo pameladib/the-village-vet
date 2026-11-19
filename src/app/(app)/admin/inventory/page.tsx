@@ -99,12 +99,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
 
     return (
         <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.inventory}</h1>
-                    <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{copy.invLead}</p>
-                </div>
-                <Link href="/admin/shop" className="text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">{copy.products}</Link>
+            <div>
+                <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.inventory}</h1>
+                <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{copy.invLead}</p>
             </div>
             <InventoryFilters
                 copy={copy}

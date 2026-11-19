@@ -72,6 +72,12 @@ describe("care reminder plans", () => {
         assert.equal(doseConflict("DOG", existing, { id: "a", type: "FIRST", administeredAt: "2026-01-01" }), null);
     });
 
+    it("allows another annual on a later day and keeps the same day as one dose", () => {
+        const existing = [{ id: "a", type: "ANNUAL", administeredAt: "2026-11-19" }];
+        assert.equal(doseConflict("CAT", existing, { type: "ANNUAL", administeredAt: "2027-10-19" }), null);
+        assert.equal(doseConflict("CAT", existing, { type: "ANNUAL", administeredAt: "2026-11-19" }), "annualDate");
+    });
+
     it("updates the linked reminder instead of creating another", () => {
         assert.deepEqual(planFollowUp({ linked: { id: "r", open: true }, openForKind: { id: "r" }, nextDue: due }), { type: "update", id: "r" });
     });

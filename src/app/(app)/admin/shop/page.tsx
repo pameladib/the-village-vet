@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import CurrencySwitch from "@/components/CurrencySwitch";
 import ProductPhoto from "@/components/shop/ProductPhoto";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { adminShopHref, formatLbp, parseShopQuery, shopText } from "@/lib/shop/catalog";
-import { formatMoney } from "@/lib/shop/money";
-import { getPricing } from "@/lib/shop/pricing";
+import { presentPrice } from "@/lib/shop/money";
+import { getDisplayCurrency, getPricing } from "@/lib/shop/pricing";
 import { productPhotoSrc } from "@/lib/storage/files";
 
 function first(value: string | string[] | undefined) {
@@ -22,7 +23,7 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
 
     const raw = await searchParams;
     const filters = parseShopQuery({ cat: first(raw.cat), q: first(raw.q) });
-    const [locale, pricing] = await Promise.all([getLocale(), getPricing()]);
+    const [locale, pricing, display] = await Promise.all([getLocale(), getPricing(), getDisplayCurrency()]);
     const copy = messages(locale);
     const categories = await prisma.productCategory.findMany({ orderBy: { position: "asc" } });
     const selected = categories.find((category) => category.id === filters.cat);
@@ -49,7 +50,8 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
                 <div>
                     <h1 className="text-2xl font-semibold">{copy.products}</h1>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <CurrencySwitch currency={display} label={copy.currency} />
                     <Link href="/admin/shop/categories" className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-50">{copy.shopManageCategories}</Link>
                     <Link href="/admin/shop/new" className="rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-950">{copy.shopAddProduct}</Link>
                 </div>
@@ -85,7 +87,7 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
                                     <Link href={`/admin/shop/${product.id}`} className="mt-1 block font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
                                     <p className="text-sm text-stone-500">{locale === "ar" ? product.name : product.nameAr}</p>
                                     <div className="mt-3 flex items-center justify-between gap-2 text-sm">
-                                        <span>{formatMoney(product.price, pricing.currency, locale)}</span>
+                                        <span>{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</span>
                                         <span className="text-stone-500">{product.stock > 0 ? formatLbp(product.stock, locale) : copy.shopOut}</span>
                                     </div>
                                     {!product.available && <p className="mt-2 text-xs font-medium text-stone-500">{copy.shopHidden}</p>}

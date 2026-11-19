@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { applyRecordedFollowUps, syncVaccineReminder } from "@/lib/clinic/reminders";
 import { canChangePetPhoto } from "@/lib/auth/permissions";
+import { petWeightFromGrams } from "@/lib/pets/weight";
 import { PET_PHOTOS_BUCKET, isSafeObjectKey } from "@/lib/storage/files";
 import { removeStoredObject } from "@/lib/storage/supabase";
 
@@ -118,6 +119,8 @@ export async function createPet(data: PetForm) {
                 ? Math.round(result.data.currentWeight * 1000) // if unit selected is KG must convert to grams
                 : Math.round(result.data.currentWeight) // else
             : null; // else return null
+    const recordedAt = new Date();
+    const historyWeight = weightGrams == null ? null : petWeightFromGrams(weightGrams);
 
     const followUp = followUpError(result.data.species, result.data.vaccinations, result.data.treatments, {
         vaccine: result.data.vaccineNextDueAt,
@@ -164,7 +167,8 @@ export async function createPet(data: PetForm) {
                         followUpCleared: true,
                     })),
                 },
-                ...(weightGrams != null ? { weightRecords: { create: { weightGrams } } } : {}),
+                ...(weightGrams != null ? { weightRecords: { create: { weightGrams, recordedAt } } } : {}),
+                ...(historyWeight ? { weights: { create: { weight: historyWeight, recordedAt } } } : {}),
             },
         });
 
@@ -350,9 +354,16 @@ export async function updatePet(id: string, data: PetForm) {
                 weightGrams != null &&
                 (latestWeight == null || weightGrams !== gramsShownInForm(latestWeight))
             ) {
+                const recordedAt = new Date();
                 await tx.weightRecord.create({
-                    data: { petId: id, weightGrams },
+                    data: { petId: id, weightGrams, recordedAt },
                 });
+                const historyWeight = petWeightFromGrams(weightGrams);
+                if (historyWeight) {
+                    await tx.petWeight.create({
+                        data: { petId: id, weight: historyWeight, recordedAt },
+                    });
+                }
             }
         });
     }

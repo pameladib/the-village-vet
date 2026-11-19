@@ -121,6 +121,7 @@ model Pet {
   careReminders     CareReminder[]
   visitFollowUps    VisitFollowUp[]
   documents         MedicalDocument[]
+  weights           PetWeight[]
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -297,9 +298,30 @@ model MedicalVisit {
   vaccinations Vaccination[]
   treatments   Treatment[]
   followUp     VisitFollowUp?
+  weight       PetWeight?
 
   @@index([petId])
   @@map("medical_visit")
+}
+
+// A measured weight. It may belong to one medical visit, or stand alone when recorded from the pet profile.
+model PetWeight {
+  id         String   @id @default(uuid())
+  // Kilograms. Three decimal places keep a weight under 1 kg exact in grams.
+  weight     Decimal  @db.Decimal(7, 3)
+  recordedAt DateTime
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  petId String
+  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  medicalVisitId String?       @unique
+  medicalVisit   MedicalVisit? @relation(fields: [medicalVisitId], references: [id], onDelete: Cascade)
+
+  @@index([petId, recordedAt])
+  @@map("pet_weight")
 }
 
 enum ReminderType {

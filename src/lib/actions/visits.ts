@@ -7,7 +7,8 @@ import { orderedVisitServices } from "@/lib/appointments/labels";
 import { requireRole } from "@/lib/auth/session";
 import { addVisitTreatment, addVisitVaccination } from "@/lib/clinic/visit-care";
 import { prisma } from "@/lib/prisma";
-import { followUpDueOn } from "@/lib/visits/follow-up";
+import { writeVisitWeight } from "@/lib/pets/save-weight";
+import { followUpCreateTab, followUpDueOn } from "@/lib/visits/follow-up";
 import { canCompleteClinical, canMarkGroomingDone, canMarkMissed } from "@/lib/visits/rules";
 import type { AppointmentType, VisitService } from "../../../generated/prisma/client";
 
@@ -58,38 +59,56 @@ const vaccineInput = z.object({
     nextDueAt: z.string(),
 }).nullable().optional();
 
-const treatmentInput = z.object({
+const treatmentShape = z.object({
     type: z.enum(["DEWORMING", "FLEA_TICK"]),
     administeredAt: z.string(),
     nextDueAt: z.string(),
-}).nullable().optional();
+});
+
+const treatmentInput = treatmentShape.nullable().optional();
+
+type VisitTreatment = z.infer<typeof treatmentShape>;
 
 type VisitCare = {
     vaccination?: { type: "FIRST" | "SECOND" | "THIRD" | "ANNUAL"; administeredAt: string; nextDueAt: string } | null;
-    treatment?: { type: "DEWORMING" | "FLEA_TICK"; administeredAt: string; nextDueAt: string } | null;
+    treatment?: VisitTreatment | null;
+    treatments?: VisitTreatment[];
 };
 
 function visitCareCode(error: unknown) {
     if (!(error instanceof Error) || error.message !== "visit-care") return null;
     const code = error.cause;
-    if (code === "duplicate" || code === "species" || code === "due" || code === "doseDate") return code;
+    if (code === "duplicate" || code === "annualDate" || code === "species" || code === "due" || code === "doseDate") return code;
     return null;
 }
 
 function storedFollowUp(value: { date: string; notes: string } | null | undefined) {
     if (!value) return null;
-    const dueOn = followUpDueOn(value.date);
+    const dueOn = followUpCreateTab(value.date) ? followUpDueOn(value.date) : null;
     const notes = value.notes.trim();
     if (!dueOn || notes.length > 1000) return false as const;
     return { dueOn, notes: notes || null };
 }
 
-export async function completeAppointment(appointmentId: string, notes: string, followUp?: { date: string; notes: string } | null, care?: VisitCare) {
+function visitTreatments(care: VisitCare | undefined) {
+    const parsed = z.array(treatmentShape).max(8).safeParse(care?.treatments ?? (care?.treatment ? [care.treatment] : []));
+    if (!parsed.success) return null;
+    const seen = new Set<string>();
+    for (const item of parsed.data) {
+        if (seen.has(item.type)) return null;
+        seen.add(item.type);
+    }
+    return parsed.data;
+}
+
+export async function completeAppointment(appointmentId: string, notes: string, followUp?: { date: string; notes: string } | null, care?: VisitCare, weight = "") {
     if (!await clinician()) return { success: false as const, error: "denied" as const };
     const parsedId = z.uuid().safeParse(appointmentId);
     const parsedNotes = notesSchema.safeParse(notes);
     const reminder = storedFollowUp(followUp);
+    const treatments = visitTreatments(care);
     if (!parsedId.success || !parsedNotes.success) return { success: false as const, error: "notes" as const };
+    if (!treatments) return { success: false as const, error: "treatment" as const };
     if (reminder === false) return { success: false as const, error: "followUp" as const };
 
     try {
@@ -124,7 +143,8 @@ export async function completeAppointment(appointmentId: string, notes: string, 
                 },
             });
             if (care?.vaccination) await addVisitVaccination(tx, { petId: appointment.petId, medicalVisitId: visit.id, ...care.vaccination });
-            if (care?.treatment) await addVisitTreatment(tx, { petId: appointment.petId, medicalVisitId: visit.id, ...care.treatment });
+            for (const item of treatments) await addVisitTreatment(tx, { petId: appointment.petId, medicalVisitId: visit.id, ...item });
+            await writeVisitWeight(tx, { petId: appointment.petId, visitId: visit.id, visitedAt: appointment.startAt, raw: weight });
             return { visitId: visit.id, petId: appointment.petId };
         });
         if ("error" in saved) {
@@ -139,6 +159,7 @@ export async function completeAppointment(appointmentId: string, notes: string, 
         revalidatePath(`/admin/appointments/${parsedId.data}`);
         return { success: true as const, visitId: saved.visitId, petId: saved.petId };
     } catch (error) {
+        if (error instanceof Error && error.message === "weight") return { success: false as const, error: "weight" as const };
         const careError = visitCareCode(error);
         if (careError) return { success: false as const, error: careError };
         if (!duplicateVisit(error)) return { success: false as const, error: "closed" as const };
@@ -151,7 +172,7 @@ export async function completeAppointment(appointmentId: string, notes: string, 
     }
 }
 
-export async function createWalkIn(input: { petId: string; date: string; type: "VETERINARY_VISIT" | "OPERATION"; services: VisitService[]; notes: string; followUp?: { date: string; notes: string } | null; vaccination?: VisitCare["vaccination"]; treatment?: VisitCare["treatment"] }) {
+export async function createWalkIn(input: { petId: string; date: string; type: "VETERINARY_VISIT" | "OPERATION"; services: VisitService[]; notes: string; followUp?: { date: string; notes: string } | null; vaccination?: VisitCare["vaccination"]; treatment?: VisitCare["treatment"]; weight?: string }) {
     if (!await clinician()) return { success: false as const, error: "denied" as const };
     const parsed = z.object({
         petId: z.uuid(),
@@ -162,6 +183,7 @@ export async function createWalkIn(input: { petId: string; date: string; type: "
         followUp: z.object({ date: z.string(), notes: z.string() }).nullable().optional(),
         vaccination: vaccineInput,
         treatment: treatmentInput,
+        weight: z.string().optional(),
     }).safeParse(input);
     if (!parsed.success) return { success: false as const, error: "notes" as const };
     const visitedAt = walkInInstant(parsed.data.date);
@@ -187,18 +209,20 @@ export async function createWalkIn(input: { petId: string; date: string; type: "
             });
             if (parsed.data.vaccination) await addVisitVaccination(tx, { petId: pet.id, medicalVisitId: created.id, ...parsed.data.vaccination });
             if (parsed.data.treatment) await addVisitTreatment(tx, { petId: pet.id, medicalVisitId: created.id, ...parsed.data.treatment });
+            await writeVisitWeight(tx, { petId: pet.id, visitId: created.id, visitedAt, raw: parsed.data.weight ?? "" });
             return created;
         });
         refresh(pet.id, visit.id);
         return { success: true as const, visitId: visit.id, petId: pet.id };
     } catch (error) {
+        if (error instanceof Error && error.message === "weight") return { success: false as const, error: "weight" as const };
         const careError = visitCareCode(error);
         if (careError) return { success: false as const, error: careError };
         return { success: false as const, error: "closed" as const };
     }
 }
 
-export async function updateVisit(input: { visitId: string; notes: string; date?: string; type?: "VETERINARY_VISIT" | "OPERATION"; services?: VisitService[] }) {
+export async function updateVisit(input: { visitId: string; notes: string; date?: string; type?: "VETERINARY_VISIT" | "OPERATION"; services?: VisitService[]; weight?: string }) {
     if (!await clinician()) return { success: false as const, error: "denied" as const };
     const parsed = z.object({
         visitId: z.uuid(),
@@ -206,32 +230,40 @@ export async function updateVisit(input: { visitId: string; notes: string; date?
         date: z.string().optional(),
         type: z.enum(["VETERINARY_VISIT", "OPERATION"]).optional(),
         services: z.array(visitServices).optional(),
+        weight: z.string().optional(),
     }).safeParse(input);
     if (!parsed.success) return { success: false as const, error: "notes" as const };
 
     const visit = await prisma.medicalVisit.findUnique({
         where: { id: parsed.data.visitId },
-        select: { id: true, petId: true, appointmentId: true },
+        select: { id: true, petId: true, appointmentId: true, visitedAt: true },
     });
     if (!visit) return { success: false as const, error: "closed" as const };
 
-    if (visit.appointmentId) {
-        await prisma.medicalVisit.update({
-            where: { id: visit.id },
-            data: { notes: parsed.data.notes || null },
+    const visitedAt = visit.appointmentId ? null : parsed.data.date ? walkInInstant(parsed.data.date) : null;
+    if (!visit.appointmentId && parsed.data.date && !visitedAt) return { success: false as const, error: "date" as const };
+    const recordedAt = visitedAt ?? visit.visitedAt;
+    const type = parsed.data.type;
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.medicalVisit.update({
+                where: { id: visit.id },
+                data: visit.appointmentId
+                    ? { notes: parsed.data.notes || null }
+                    : {
+                        notes: parsed.data.notes || null,
+                        ...(visitedAt ? { visitedAt } : {}),
+                        ...(type ? { type, services: type === "VETERINARY_VISIT" ? orderedVisitServices(parsed.data.services ?? []) : [] } : {}),
+                    },
+            });
+            if (parsed.data.weight !== undefined) {
+                await writeVisitWeight(tx, { petId: visit.petId, visitId: visit.id, visitedAt: recordedAt, raw: parsed.data.weight });
+            }
         });
-    } else {
-        const visitedAt = parsed.data.date ? walkInInstant(parsed.data.date) : null;
-        if (parsed.data.date && !visitedAt) return { success: false as const, error: "date" as const };
-        const type = parsed.data.type;
-        await prisma.medicalVisit.update({
-            where: { id: visit.id },
-            data: {
-                notes: parsed.data.notes || null,
-                ...(visitedAt ? { visitedAt } : {}),
-                ...(type ? { type, services: type === "VETERINARY_VISIT" ? orderedVisitServices(parsed.data.services ?? []) : [] } : {}),
-            },
-        });
+    } catch (error) {
+        if (error instanceof Error && error.message === "weight") return { success: false as const, error: "weight" as const };
+        return { success: false as const, error: "closed" as const };
     }
     refresh(visit.petId, visit.id);
     return { success: true as const, visitId: visit.id, petId: visit.petId };

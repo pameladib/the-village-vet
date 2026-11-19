@@ -10,7 +10,7 @@ export default function CurrencySwitch({ currency, label }: { currency: Currency
     const router = useRouter();
 
     return (
-        <div className="inline-flex items-center rounded-full border border-stone-200 p-0.5" role="group" aria-label={label}>
+        <div className="inline-flex items-center rounded-full border border-stone-200 p-0.5 dark:border-stone-700" role="group" aria-label={label}>
             {options.map((option) => (
                 <button
                     key={option}
@@ -22,7 +22,7 @@ export default function CurrencySwitch({ currency, label }: { currency: Currency
                     }}
                     className={currency === option
                         ? "rounded-full bg-emerald-900 px-2 py-1 text-xs font-medium text-white"
-                        : "rounded-full px-2 py-1 text-xs text-stone-600 hover:bg-stone-50"}
+                        : "rounded-full px-2 py-1 text-xs text-stone-600 hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-stone-800"}
                 >
                     {option}
                 </button>

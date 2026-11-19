@@ -2,18 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { clinicHomePhoto, clinicVisitPhoto } from "@/components/public/photos";
+import { clinicVisitPhoto } from "@/components/public/photos";
 import { deleteClinicPhoto, moveClinicPhoto, prepareClinicPhoto, saveClinicPhoto } from "@/lib/actions/clinic";
 import type { Copy } from "@/lib/i18n";
 import { uploadToSignedUrl } from "@/lib/storage/direct-upload";
 
 type SavedPhoto = {
     id: string;
-    kind: "HERO" | "ABOUT" | "GALLERY";
+    kind: "HERO" | "GALLERY";
     captionEn: string;
     captionAr: string;
     version: string;
 };
+
+const preview = "relative aspect-[2/1] w-full overflow-hidden rounded-xl bg-stone-100";
+const field = "mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-emerald-800 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50";
 
 function savedSrc(photo: SavedPhoto) {
     return `/clinic-media/${photo.id}?v=${encodeURIComponent(photo.version)}`;
@@ -57,8 +60,6 @@ function PictureField({ copy, name, onFile }: { copy: Copy; name: string | null;
     );
 }
 
-const field = "mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-emerald-800 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50";
-
 function messageFor(copy: Copy, message?: string) {
     if (message === "Enter the caption in English and Arabic.") return copy.clinicPhotoNeedCaption;
     if (message === "Choose a picture to upload.") return copy.clinicPhotoNeedFile;
@@ -77,45 +78,16 @@ async function storeFile(file: File) {
     return { success: true as const, key: prepared.key, contentType: file.type };
 }
 
-function Captions({
-    copy,
-    captionEn,
-    captionAr,
-}: {
-    copy: Copy;
-    captionEn: string;
-    captionAr: string;
-}) {
-    return (
-        <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
-                {copy.captionEnglish}
-                <input name="captionEn" dir="ltr" required defaultValue={captionEn} className={field} />
-            </label>
-            <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
-                {copy.captionArabic}
-                <input name="captionAr" dir="rtl" required defaultValue={captionAr} className={field} />
-            </label>
-        </div>
-    );
-}
-
 export default function ClinicPhotosForm({ copy, photos }: { copy: Copy; photos: SavedPhoto[] }) {
     const router = useRouter();
     const hero = photos.find((photo) => photo.kind === "HERO") ?? null;
-    const about = photos.find((photo) => photo.kind === "ABOUT") ?? null;
     const gallery = photos.filter((photo) => photo.kind === "GALLERY");
 
     return (
-        <section className="mt-10 flex flex-col gap-6">
-            <div>
-                <h2 className="text-lg font-semibold text-emerald-950 dark:text-emerald-50">{copy.clinicPhotos}</h2>
-                <p className="mt-1 text-sm leading-6 text-stone-500">{copy.clinicPhotosLead}</p>
-            </div>
-            <SinglePhoto copy={copy} kind="HERO" title={copy.clinicHero} photo={hero} fallback={clinicVisitPhoto} onDone={() => router.refresh()} />
-            <SinglePhoto copy={copy} kind="ABOUT" title={copy.clinicAboutPhoto} photo={about} fallback={clinicHomePhoto} onDone={() => router.refresh()} />
+        <section className="mt-8 flex flex-col gap-6">
+            <SinglePhoto copy={copy} title={copy.clinicHero} photo={hero} fallback={clinicVisitPhoto} onDone={() => router.refresh()} />
             <div className="rounded-2xl border border-stone-200 p-4 dark:border-stone-700">
-                <h3 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.clinicCarousel}</h3>
+                <h3 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.galleryHeading}</h3>
                 <p className="mt-1 text-sm leading-6 text-stone-500">{gallery.length === 0 ? copy.clinicCarouselFallback : copy.clinicCarouselLead}</p>
                 <div className="mt-4 flex flex-col gap-4">
                     {gallery.map((photo, index) => (
@@ -137,14 +109,12 @@ export default function ClinicPhotosForm({ copy, photos }: { copy: Copy; photos:
 
 function SinglePhoto({
     copy,
-    kind,
     title,
     photo,
     fallback,
     onDone,
 }: {
     copy: Copy;
-    kind: "HERO" | "ABOUT";
     title: string;
     photo: SavedPhoto | null;
     fallback: string;
@@ -183,9 +153,7 @@ function SinglePhoto({
                     return;
                 }
                 const result = await saveClinicPhoto({
-                    kind,
-                    captionEn: "",
-                    captionAr: "",
+                    kind: "HERO",
                     storageKey,
                     contentType,
                 });
@@ -199,7 +167,7 @@ function SinglePhoto({
             }}
         >
             <h3 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{title}</h3>
-            <div className="relative h-40 overflow-hidden rounded-xl bg-stone-100">
+            <div className={preview}>
                 <img src={chosen.preview ?? (photo ? savedSrc(photo) : fallback)} alt="" className="size-full object-cover" />
             </div>
             {!photo && !chosen.preview && <p className="text-sm text-stone-500">{copy.clinicPhotoFallback}</p>}
@@ -235,6 +203,21 @@ function SinglePhoto({
     );
 }
 
+function Captions({ copy, captionEn, captionAr }: { copy: Copy; captionEn: string; captionAr: string }) {
+    return (
+        <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
+                {copy.captionEnglish}
+                <input name="captionEn" dir="ltr" required defaultValue={captionEn} className={field} />
+            </label>
+            <label className="text-sm font-medium text-emerald-950 dark:text-emerald-50">
+                {copy.captionArabic}
+                <input name="captionAr" dir="rtl" required defaultValue={captionAr} className={field} />
+            </label>
+        </div>
+    );
+}
+
 function GalleryPhoto({
     copy,
     photo,
@@ -251,37 +234,21 @@ function GalleryPhoto({
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
-    const chosen = useChosenPicture();
 
     return (
         <form
             className="flex flex-col gap-3 rounded-xl bg-stone-50 p-3 dark:bg-stone-950"
             onSubmit={async (event) => {
                 event.preventDefault();
-                const form = new FormData(event.currentTarget);
-                const file = form.get("file");
+                const data = new FormData(event.currentTarget);
                 setPending(true);
                 setError(null);
                 setMessage(null);
-                let storageKey: string | undefined;
-                let contentType: string | undefined;
-                if (file instanceof File && file.size > 0) {
-                    const stored = await storeFile(file);
-                    if (!stored.success) {
-                        setPending(false);
-                        setError(messageFor(copy, stored.formErrors[0]));
-                        return;
-                    }
-                    storageKey = stored.key;
-                    contentType = stored.contentType;
-                }
                 const result = await saveClinicPhoto({
                     id: photo.id,
                     kind: "GALLERY",
-                    captionEn: String(form.get("captionEn") ?? ""),
-                    captionAr: String(form.get("captionAr") ?? ""),
-                    storageKey,
-                    contentType,
+                    captionEn: String(data.get("captionEn") ?? ""),
+                    captionAr: String(data.get("captionAr") ?? ""),
                 });
                 setPending(false);
                 if (!result.success) {
@@ -292,11 +259,10 @@ function GalleryPhoto({
                 onDone();
             }}
         >
-            <div className="relative h-32 overflow-hidden rounded-lg bg-stone-200">
-                <img src={chosen.preview ?? savedSrc(photo)} alt="" className="size-full object-cover" />
+            <div className={preview}>
+                <img src={savedSrc(photo)} alt="" className="size-full object-cover" />
             </div>
             <Captions copy={copy} captionEn={photo.captionEn} captionAr={photo.captionAr} />
-            <PictureField copy={copy} name={chosen.name} onFile={chosen.choose} />
             {error && <p className="text-sm text-red-700">{error}</p>}
             {message && <p className="text-sm text-emerald-800">{message}</p>}
             <div className="flex flex-wrap gap-2">
@@ -376,7 +342,7 @@ function AddGalleryPhoto({ copy, onDone }: { copy: Copy; onDone: () => void }) {
         >
             <p className="text-sm font-medium text-emerald-950 dark:text-emerald-50">{copy.clinicPhotoAdd}</p>
             {chosen.preview && (
-                <div className="relative h-32 overflow-hidden rounded-lg bg-stone-200">
+                <div className={preview}>
                     <img src={chosen.preview} alt="" className="size-full object-cover" />
                 </div>
             )}

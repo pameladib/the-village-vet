@@ -118,47 +118,6 @@ export async function savePricing(input: unknown) {
     return { success: true as const, converted: converted };
 }
 
-const homepageSchema = z.object({
-    heroTitleEn: z.string().trim().max(200),
-    heroTitleAr: z.string().trim().max(200),
-    heroBodyEn: z.string().trim().max(600),
-    heroBodyAr: z.string().trim().max(600),
-    aboutLeadEn: z.string().trim().max(400),
-    aboutLeadAr: z.string().trim().max(400),
-    aboutBodyEn: z.string().trim().max(800),
-    aboutBodyAr: z.string().trim().max(800),
-});
-
-export async function saveHomepageCopy(input: unknown) {
-    try {
-        await requireRole(["ADMIN"]);
-    } catch {
-        return { success: false as const, formErrors: ["Only the veterinarian can edit the homepage."] };
-    }
-    const parsed = homepageSchema.safeParse(input);
-    if (!parsed.success) return { success: false as const, formErrors: ["Could not save the homepage."] };
-
-    const text = {
-        heroTitleEn: emptyToNull(parsed.data.heroTitleEn),
-        heroTitleAr: emptyToNull(parsed.data.heroTitleAr),
-        heroBodyEn: emptyToNull(parsed.data.heroBodyEn),
-        heroBodyAr: emptyToNull(parsed.data.heroBodyAr),
-        aboutLeadEn: emptyToNull(parsed.data.aboutLeadEn),
-        aboutLeadAr: emptyToNull(parsed.data.aboutLeadAr),
-        aboutBodyEn: emptyToNull(parsed.data.aboutBodyEn),
-        aboutBodyAr: emptyToNull(parsed.data.aboutBodyAr),
-    };
-    await prisma.clinicSetting.upsert({
-        where: { id: "clinic" },
-        update: text,
-        create: { id: "clinic", ...text },
-    });
-    revalidatePath("/", "layout");
-    revalidatePath("/about");
-    revalidatePath("/admin/homepage");
-    return { success: true as const };
-}
-
 function refreshPhotos() {
     revalidatePath("/", "layout");
     revalidatePath("/about");
@@ -209,8 +168,8 @@ async function storedClinicPhoto(key: string, contentType: string) {
 const clinicPhotoSchema = z.object({
     id: z.uuid().optional(),
     kind: z.enum(photoKinds),
-    captionEn: z.string().trim().max(160),
-    captionAr: z.string().trim().max(160),
+    captionEn: z.string().trim().max(160).optional(),
+    captionAr: z.string().trim().max(160).optional(),
     storageKey: z.string().optional(),
     contentType: z.string().optional(),
 });
@@ -219,8 +178,7 @@ export async function saveClinicPhoto(input: unknown) {
     if (!(await veterinarian())) return { success: false as const, formErrors: ["Only the veterinarian can edit the clinic page."] };
     const parsed = clinicPhotoSchema.safeParse(input);
     if (!parsed.success) return { success: false as const, formErrors: ["Check the picture and captions."] };
-    const captions = parsed.data.kind === "GALLERY";
-    if (captions && (!parsed.data.captionEn || !parsed.data.captionAr)) {
+    if (parsed.data.kind === "GALLERY" && (!parsed.data.captionEn || !parsed.data.captionAr)) {
         return { success: false as const, formErrors: ["Enter the caption in English and Arabic."] };
     }
 
@@ -246,8 +204,8 @@ export async function saveClinicPhoto(input: unknown) {
                 await prisma.clinicPhoto.update({
                     where: { id: current.id },
                     data: {
-                        captionEn: parsed.data.captionEn,
-                        captionAr: parsed.data.captionAr,
+                        ...(parsed.data.captionEn != null ? { captionEn: parsed.data.captionEn } : {}),
+                        ...(parsed.data.captionAr != null ? { captionAr: parsed.data.captionAr } : {}),
                         ...(key ? { storageKey: key } : {}),
                     },
                 });
@@ -265,8 +223,8 @@ export async function saveClinicPhoto(input: unknown) {
                         kind: "GALLERY",
                         position: (last._max.position ?? 0) + 1,
                         storageKey: key,
-                        captionEn: parsed.data.captionEn,
-                        captionAr: parsed.data.captionAr,
+                        captionEn: parsed.data.captionEn ?? "",
+                        captionAr: parsed.data.captionAr ?? "",
                     },
                 });
             }

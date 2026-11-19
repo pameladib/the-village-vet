@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { setOrderPaid } from "@/lib/actions/shop";
 import type { Copy } from "@/lib/i18n";
 import { mapShopError } from "./ShopAdmin";
@@ -25,11 +26,12 @@ export default function OrderPayment({ orderId, paid, copy }: { orderId: string;
             setError(mapShopError(result.formErrors?.[0], copy));
             return;
         }
+        toast.success(next ? copy.shopPayPaid : copy.shopPayUnpaid);
         router.refresh();
     }
 
     return (
-        <div className="mt-4">
+        <div className={confirm ? "basis-full" : "shrink-0"}>
             {confirm ? (
                 <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950">
                     <p>{copy.shopUnpaidConfirm}</p>

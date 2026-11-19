@@ -3,6 +3,7 @@
 import { beirutInstant, clinicDayRange, todayInBeirut } from "@/lib/appointments/availability";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
+import { stockState } from "@/lib/shop/inventory";
 import { followUpBuckets } from "@/lib/visits/follow-up";
 import type { AppointmentType, GroomingService, VisitService } from "../../../../generated/prisma/client";
 
@@ -97,7 +98,7 @@ export async function loadStaffDashboard(role: string) {
         clinical,
         today: todayVisits.map(toVisit),
         pendingOrders,
-        lowStock: lowStock.filter((product) => product.stock <= product.lowStockAt).length,
+        lowStock: lowStock.filter((product) => stockState(product.stock, product.lowStockAt) === "low").length,
         overdueCare,
         awaitingCount,
         followUps: (() => {
@@ -215,5 +216,5 @@ export async function loadLowStock() {
         select: { id: true, name: true, nameAr: true, stock: true, lowStockAt: true },
         orderBy: { stock: "asc" },
     });
-    return products.filter((product) => product.stock <= product.lowStockAt).slice(0, 20);
+    return products.filter((product) => stockState(product.stock, product.lowStockAt) === "low").slice(0, 20);
 }

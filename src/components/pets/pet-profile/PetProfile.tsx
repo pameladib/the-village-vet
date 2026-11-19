@@ -10,6 +10,7 @@ import GeneralTab from "./tabs/GeneralTab";
 import AppointmentsTab from "./tabs/AppointmentsTab";
 import VaccinationsTab from "./tabs/VaccinationsTab";
 import MedicalTab from "./tabs/MedicalTab";
+import WeightHistory, { type WeightEntry } from "./tabs/WeightHistory";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 import type { Copy, Locale } from "@/lib/i18n";
 import { petPhotoSrc } from "@/lib/storage/files";
@@ -61,7 +62,7 @@ export type ProfileVisit = {
     linked: boolean;
 };
 
-export type PetProfileData = Omit<Pet, "estimatedAgeValue" | "medicalVisits"> & { // keep every other property from Pet
+export type PetProfileData = Omit<Pet, "estimatedAgeValue" | "medicalVisits" | "weights"> & { // keep every other property from Pet
     estimatedAgeValue: number | null; // except estimatedAgeValue which is either a number or null
     currentWeightGrams: number | null; // latest weight, in grams. Null when the pet has no weight record
     vaccinations: ProfileVaccination[];
@@ -76,6 +77,8 @@ export default function PetProfile({
     canUpload = false,
     canRecord = false,
     reminders = [],
+    weights = [],
+    today = "",
     backHref = "/dashboard",
     owner,
     copy,
@@ -87,6 +90,8 @@ export default function PetProfile({
     canUpload?: boolean;
     canRecord?: boolean;
     reminders?: ProfileReminder[];
+    weights?: WeightEntry[];
+    today?: string;
     backHref?: string;
     owner?: { id: string; name: string; phone: string };
     copy: Copy;
@@ -100,6 +105,7 @@ export default function PetProfile({
         { id: "appointments", label: copy.tabAppointments },
         { id: "vaccinations", label: copy.tabCare },
         { id: "medical", label: copy.tabMedical },
+        { id: "weight", label: copy.tabWeight },
     ]
 
     const breed = pet.breed?.trim();
@@ -183,6 +189,7 @@ export default function PetProfile({
                     {activeTab === "appointments" && <AppointmentsTab pet={pet} visits={visits} canRecord={canRecord} copy={copy} locale={locale} />}
                     {activeTab === "vaccinations" && <VaccinationsTab pet={pet} reminders={reminders} canRecord={canRecord} copy={copy} locale={locale} />}
                     {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload} copy={copy} locale={locale} />}
+                    {activeTab === "weight" && <WeightHistory petId={pet.id} today={today} weights={weights} canRecord={canRecord} copy={copy} locale={locale} />}
                 </div>
             </div>
         </div>

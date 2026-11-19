@@ -13,7 +13,7 @@ export function doseDates(administeredAt: string, nextDueAt: string) {
     return { given, due };
 }
 
-function rollback(code: "duplicate" | "species" | "due" | "doseDate"): never {
+function rollback(code: "duplicate" | "annualDate" | "species" | "due" | "doseDate"): never {
     throw new Error("visit-care", { cause: code });
 }
 
@@ -62,6 +62,7 @@ export async function addVisitVaccination(tx: Tx, input: {
 }) {
     const when = doseDates(input.administeredAt, input.nextDueAt);
     if ("error" in when) rollback(when.error === "date" ? "doseDate" : "due");
+    if (when.due && formatDateOnly(when.due) < todayInBeirut()) rollback("due");
     const pet = await tx.pet.findUnique({
         where: { id: input.petId },
         select: { id: true, species: true, vaccinations: { select: { id: true, type: true, administeredAt: true } } },
@@ -110,6 +111,7 @@ export async function addVisitTreatment(tx: Tx, input: {
 }) {
     const when = doseDates(input.administeredAt, input.nextDueAt);
     if ("error" in when) rollback(when.error === "date" ? "doseDate" : "due");
+    if (when.due && formatDateOnly(when.due) < todayInBeirut()) rollback("due");
     const pet = await tx.pet.findUnique({ where: { id: input.petId }, select: { id: true } });
     if (!pet) rollback("doseDate");
     const kind = input.type === "DEWORMING" ? "DEWORMING" as const : "FLEA_TREATMENT" as const;

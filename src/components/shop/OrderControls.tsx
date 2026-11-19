@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, X } from "lucide-react";
+import { toast } from "sonner";
 import { advanceOrder, cancelOrder, cancelStaffOrder } from "@/lib/actions/shop";
 import type { Copy } from "@/lib/i18n";
 import { adminMoves, customerCanCancel, type OrderOrigin } from "@/lib/shop/lifecycle";
@@ -33,7 +34,6 @@ export default function OrderControls({
     const router = useRouter();
     const viewer = useRef<HTMLDialogElement>(null);
     const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [openReceipt, setOpenReceipt] = useState(false);
     const [confirm, setConfirm] = useState<"REJECTED" | "FULFILLED" | "CANCELLED" | null>(null);
@@ -52,7 +52,7 @@ export default function OrderControls({
             setError(mapShopError(result.formErrors?.[0], copy));
             return;
         }
-        setNotice(done);
+        toast.success(done);
         router.refresh();
     }
 
@@ -74,12 +74,12 @@ export default function OrderControls({
     };
     const showActions = confirm != null || moves.length > 0 || cancelAllowed || staffCancel || cancelClosed;
     const destructiveConfirm = confirm === "REJECTED" || confirm === "CANCELLED";
+    const cardRow = error ? "lg:row-start-2" : "lg:row-start-1";
 
     return (
-        <div className="flex flex-col gap-4">
-            {notice && <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-950">{notice}</p>}
-            {error && <p className="text-sm text-red-700">{error}</p>}
-            <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+        <div className={showActions ? "grid items-stretch gap-4 lg:grid-cols-2 lg:[direction:ltr]" : "grid gap-4"}>
+            {error && <p className="text-sm text-red-700 lg:col-span-2 rtl:lg:[direction:rtl]">{error}</p>}
+            <section className={`order-2 h-full rounded-2xl border border-[#E5E7EB] bg-white p-4 lg:order-none dark:border-stone-800 dark:bg-stone-900 ${showActions ? `lg:col-start-2 rtl:lg:[direction:rtl] ${cardRow}` : ""}`}>
                 <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopReceiptGroup}</h2>
                 <div className="mt-3 flex flex-wrap gap-2">
                     <button type="button" onClick={() => { setOpenReceipt(true); viewer.current?.showModal(); }} className={primary}>{copy.shopViewReceipt}</button>
@@ -87,7 +87,7 @@ export default function OrderControls({
                 </div>
             </section>
             {showActions && (
-                <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+                <section className={`order-1 h-full rounded-2xl border border-[#E5E7EB] bg-white p-4 lg:order-none lg:col-start-1 rtl:lg:[direction:rtl] dark:border-stone-800 dark:bg-stone-900 ${cardRow}`}>
                     <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopOrderActions}</h2>
                     {confirm ? (
                         <div className={`mt-3 rounded-2xl px-4 py-3 text-sm ${destructiveConfirm ? "bg-red-50 text-red-950" : "bg-amber-50 text-amber-950"}`}>
@@ -127,13 +127,14 @@ export default function OrderControls({
                     )}
                 </section>
             )}
+            <style>{`@media print { body:has(dialog[open]) > :not(dialog) { display: none !important; } body:has(dialog[open]) dialog[open] { position: absolute !important; inset: 0 !important; width: 100% !important; max-width: none !important; height: auto !important; max-height: none !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: white !important; } body:has(dialog[open]) dialog[open] header { display: none !important; } body:has(dialog[open]) dialog[open] iframe { width: 100% !important; min-height: 100vh !important; border: 0 !important; } }`}</style>
             <dialog
                 ref={viewer}
-                className="m-0 h-dvh w-full max-h-none max-w-none rounded-none border-0 bg-white p-0 text-stone-900 shadow-lg backdrop:bg-stone-950/50 sm:m-auto sm:h-[min(90dvh,52rem)] sm:w-[min(64rem,calc(100%-2rem))] sm:rounded-2xl sm:border sm:border-[#E5E7EB] dark:bg-stone-950 dark:text-stone-50 sm:dark:border-stone-700"
+                className="m-0 h-dvh w-full max-h-none max-w-none rounded-none border-0 bg-[#f3f4f6] p-0 text-stone-900 shadow-lg backdrop:bg-stone-950/50 sm:m-auto sm:h-[min(90dvh,52rem)] sm:w-[min(64rem,calc(100%-2rem))] sm:rounded-2xl sm:border sm:border-[#E5E7EB] rtl:[direction:rtl] dark:bg-stone-950 dark:text-stone-50 sm:dark:border-stone-700"
                 onClose={() => setOpenReceipt(false)}
             >
                 <div className="flex h-full flex-col">
-                    <header className="flex items-center gap-2 border-b border-[#E5E7EB] px-4 py-3 dark:border-stone-800">
+                    <header className="flex items-center gap-2 border-b border-[#E5E7EB] bg-white px-4 py-3 print:hidden dark:border-stone-800 dark:bg-stone-950">
                         <h3 className="min-w-0 flex-1 truncate text-base font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopReceiptTitle}</h3>
                         <a href={receipt} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">
                             <Download className="size-3.5" strokeWidth={1.75} />
@@ -143,7 +144,7 @@ export default function OrderControls({
                             <X className="size-4" strokeWidth={1.75} />
                         </button>
                     </header>
-                    {openReceipt && <iframe title={copy.shopReceiptTitle} src={`${receipt}?view=1`} className="min-h-0 w-full flex-1 bg-white" />}
+                    {openReceipt && <iframe title={copy.shopReceiptTitle} src={`${receipt}?view=1`} className="min-h-0 w-full flex-1 bg-[#f3f4f6]" />}
                 </div>
             </dialog>
         </div>

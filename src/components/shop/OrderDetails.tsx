@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import HistoryBack from "@/components/HistoryBack";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
@@ -94,23 +95,24 @@ export default function OrderDetails({
     const showDeliveryPhone = delivery && deliveryPhone.length > 0 && phoneKey(deliveryPhone) !== phoneKey(order.ownerPhone);
     const origin = orderOrigin(order);
     const staffCreated = origin !== "customer";
-    const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : copy.shopOriginCustomer;
     const noteTime = order.status === "CANCELLED" ? order.cancelledAt : order.status === "REJECTED" ? order.rejectedAt : order.completedAt;
     const steps = progressStages(order.fulfillment, staffCreated);
 
     return (
         <div className={staff ? "w-full min-w-0" : "mx-auto w-full min-w-0 max-w-3xl"}>
-            <HistoryBack fallback={backHref} className="cursor-pointer text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200">{backLabel}</HistoryBack>
+            <HistoryBack fallback={backHref} className={staff ? "inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200" : "cursor-pointer text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200"}>
+                {staff && <ChevronLeft className="size-4 rtl:rotate-180" />}
+                {backLabel}
+            </HistoryBack>
             <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.shopOrderWord} <span dir="ltr">#{shortOrderId(order.id)}</span></h1>
                     <p className="mt-1 text-sm text-stone-500">{when.format(order.createdAt)}</p>
-                    <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{originLabel}</p>
                 </div>
                 <p className={`rounded-full px-3 py-1 text-sm font-medium ${orderStatusTone(order.status)}`}>{orderStatusLabel(order.status, copy)}</p>
             </div>
 
-            <section className="mt-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+            <section className="mt-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 pb-3 dark:border-stone-800 dark:bg-stone-900">
                 <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopProgress}</h2>
                 {showsProgress(order.status, origin) ? (
                     <>
@@ -132,7 +134,7 @@ export default function OrderDetails({
                                 );
                             })}
                         </ol>
-                        <div className="relative mt-5 hidden min-h-24 md:block">
+                        <div className="relative mt-5 hidden min-h-[4.5rem] md:block">
                             {steps.slice(0, -1).map((stage, index) => {
                                 const state = stageState(order.status, stage, order.fulfillment, staffCreated);
                                 const span = 100 / (steps.length - 1);
@@ -216,8 +218,8 @@ export default function OrderDetails({
                 </dl>
             </section>
 
-            <div className="mt-4 grid items-start gap-4 lg:grid-cols-3">
-                <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+            <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-3">
+                <section className="flex h-full flex-col rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
                     <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopColCustomer}</h2>
                     <dl className="mt-3 grid gap-3 text-sm">
                         <div>
@@ -248,7 +250,7 @@ export default function OrderDetails({
                         )}
                     </dl>
                 </section>
-                <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+                <section className="flex h-full flex-col rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
                     <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{staff ? copy.shopFulfilmentDetails : copy.shopColFulfilment}</h2>
                     <dl className="mt-3 grid gap-3 text-sm">
                         <div>
@@ -284,16 +286,19 @@ export default function OrderDetails({
                         )}
                     </dl>
                 </section>
-                <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+                <section className="flex h-full flex-col rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
                     <h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">{copy.shopPayment}</h2>
                     <dl className="mt-3 grid gap-3 text-sm">
                         <div>
                             <dt className="text-stone-500">{copy.shopPayment}</dt>
                             <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{orderPaymentLabel(order.payment, copy)}</dd>
                         </div>
-                        <div>
-                            <dt className="text-stone-500">{copy.shopPayStatus}</dt>
-                            <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{order.paidAt ? copy.shopPayPaid : copy.shopPayUnpaid}</dd>
+                        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <dt className="text-stone-500">{copy.shopPayStatus}</dt>
+                                <dd className="mt-0.5 text-stone-900 dark:text-stone-50">{order.paidAt ? copy.shopPayPaid : copy.shopPayUnpaid}</dd>
+                            </div>
+                            {staff && <OrderPayment orderId={order.id} paid={order.paidAt != null} copy={copy} />}
                         </div>
                         {order.paidAt && (
                             <div>
@@ -302,8 +307,7 @@ export default function OrderDetails({
                             </div>
                         )}
                     </dl>
-                    {!order.paidAt && <p className="mt-3 text-sm leading-6 text-stone-500">{copy.shopPayArranged}</p>}
-                    {staff && <OrderPayment orderId={order.id} paid={order.paidAt != null} copy={copy} />}
+                    {!staff && !order.paidAt && <p className="mt-3 text-sm leading-6 text-stone-500">{copy.shopPayArranged}</p>}
                 </section>
             </div>
 

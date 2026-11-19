@@ -1,5 +1,7 @@
 import PetProfile from "@/components/pets/pet-profile/PetProfile";
-import { careTiming } from "@/lib/appointments/availability";
+import { calendarDateInBeirut, careTiming, todayInBeirut } from "@/lib/appointments/availability";
+import { canViewPetWeights } from "@/lib/auth/permissions";
+import { historyWeightsFromRecords } from "@/lib/pets/weight";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/session";
@@ -32,8 +34,7 @@ export default async function PetProfilePage({
     include: {
       weightRecords: { // current weight is the latest weight record, not a column on the pet
         orderBy: { recordedAt: "desc" },
-        take: 1,
-        select: { weightGrams: true },
+        select: { weightGrams: true, recordedAt: true },
       },
       vaccinations: { select: { id: true, type: true, administeredAt: true } },
       treatments: { select: { id: true, type: true, administeredAt: true } },
@@ -56,6 +57,10 @@ export default async function PetProfilePage({
         orderBy: { dueAt: "asc" },
         select: { id: true, kind: true, dueAt: true, dose: true, vaccinationId: true, treatmentId: true },
       },
+      weights: {
+        orderBy: { recordedAt: "desc" },
+        select: { id: true, weight: true, recordedAt: true, notes: true, medicalVisitId: true },
+      },
     },
   });
 
@@ -67,7 +72,21 @@ export default async function PetProfilePage({
   Client components do not support Decimal props so we must convert the Decimal object into a normal JS number before passing it to PetProfile
   We cannot just remove it because the pet profile needs to display the age
   */
-  const { weightRecords, estimatedAgeValue, vaccinations, treatments, appointments, medicalVisits, documents, careReminders, owner, ...petFields } = pet;
+  if (!canViewPetWeights(session.user.role, session.user.id, pet.ownerId)) notFound();
+
+  const { weightRecords, weights, estimatedAgeValue, vaccinations, treatments, appointments, medicalVisits, documents, careReminders, owner, ...petFields } = pet;
+  const carried = historyWeightsFromRecords(
+    weightRecords,
+    weights.map((row) => ({ weight: row.weight.toFixed(2), recordedAt: row.recordedAt })),
+  );
+  if (carried.length > 0) {
+    const created = await prisma.petWeight.createManyAndReturn({
+      data: carried.map((row) => ({ petId: pet.id, weight: row.weight, recordedAt: row.recordedAt })),
+      select: { id: true, weight: true, recordedAt: true, notes: true, medicalVisitId: true },
+    });
+    weights.push(...created);
+    weights.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
+  }
   const locale = await getLocale();
 
   const profilePet = {
@@ -95,6 +114,14 @@ export default async function PetProfilePage({
         ...reminder,
         status: careTiming(reminder.dueAt),
       }))}
+      weights={weights.map((row) => ({
+        id: row.id,
+        weight: row.weight.toFixed(2),
+        date: calendarDateInBeirut(row.recordedAt),
+        notes: row.notes,
+        linked: Boolean(row.medicalVisitId),
+      }))}
+      today={todayInBeirut()}
       backHref={session.user.role === "ADMIN" ? "/admin/patients" : "/dashboard"}
       owner={session.user.role === "ADMIN" ? { id: owner.id, name: owner.name, phone: owner.phoneNumber } : undefined}
       copy={messages(locale)}

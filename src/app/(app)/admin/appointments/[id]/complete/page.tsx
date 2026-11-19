@@ -42,14 +42,16 @@ export default async function CompleteVisitPage({ params }: { params: Promise<{ 
     }).format(appointment.startAt);
 
     return (
-        <main className="mx-auto w-full max-w-xl px-4 py-6 sm:px-6">
+        <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
             <HistoryBack fallback={`/admin/appointments/${appointment.id}`} className="cursor-pointer text-sm font-medium text-emerald-800">{copy.appointments}</HistoryBack>
             <h1 className="mt-3 text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.completeVisit}</h1>
+            <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-300">{copy.visitCompleteLead}</p>
             <VisitForm
                 copy={copy}
                 mode={{
                     kind: "complete",
                     appointmentId: appointment.id,
+                    petId: appointment.pet.id,
                     petName: appointment.pet.name,
                     when,
                     detail: appointmentDetail(appointment.type, appointment.services, appointment.groomingService, copy),

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { productIssueCode, type ProductField, type ProductFieldCode } from "@/lib/shop/product-form";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/session";
 import type { Locale } from "@/lib/i18n";
@@ -30,11 +31,11 @@ const productSchema = z.object({
     id: z.uuid().optional(),
     name: z.string().trim().min(1).max(120),
     nameAr: z.string().trim().min(1).max(120),
-    description: z.string().trim().max(500).optional(),
-    descriptionAr: z.string().trim().max(500).optional(),
+    description: z.string().trim().optional(),
+    descriptionAr: z.string().trim().optional(),
     price: z.number().int().min(0),
     priceCurrency: z.enum(["USD", "LBP"]),
-    stock: z.number().int().min(0),
+    stock: z.number().int().min(0).optional(),
     categoryId: z.uuid(),
     available: z.boolean().optional(),
     photoUrl: z.string().trim().min(1).max(300),
@@ -45,6 +46,17 @@ const categorySchema = z.object({
     name: z.string().trim().min(1).max(80),
     nameAr: z.string().trim().min(1).max(80),
 });
+
+function productFieldErrors(error: z.ZodError): Partial<Record<ProductField, ProductFieldCode>> {
+    const fields: Partial<Record<ProductField, ProductFieldCode>> = {};
+    for (const issue of error.issues) {
+        const key = issue.path[0];
+        if (typeof key !== "string" || key in fields) continue;
+        const code = productIssueCode(key, issue.code);
+        if (code) fields[key as ProductField] = code;
+    }
+    return fields;
+}
 
 function storedPhoto(value: string) {
     if (value.startsWith("/images/") || value.startsWith("https://") || isSafeObjectKey(value)) return value;
@@ -171,7 +183,7 @@ export async function placeOrder(input: unknown) {
 
 const staffOrderSchema = z.object({
     mode: z.enum(["sale", "later"]),
-    ownerId: z.uuid().optional(),
+    ownerId: z.string().trim().min(1).max(64).optional(),
     customerName: z.string().trim().max(120).optional(),
     customerPhone: z.string().trim().max(30).optional(),
     items: z.array(z.object({
@@ -187,30 +199,45 @@ const staffOrderSchema = z.object({
     deliveryNote: z.string().trim().max(300).optional(),
 });
 
+type StaffOrderField = "customer" | "customerName" | "customerPhone" | "items" | "deliveryAddress" | "deliveryPhone" | "deliveryFee" | "deliveryNote";
+type StaffOrderCode = "required" | "invalid" | "long" | "stock";
+
+function staffOrderIssues(error: z.ZodError) {
+    const fieldErrors: Partial<Record<StaffOrderField, StaffOrderCode>> = {};
+    for (const issue of error.issues) {
+        const key = issue.path[0];
+        if (key === "items") fieldErrors.items = issue.path.length > 1 ? "stock" : "required";
+        else if (key === "ownerId") fieldErrors.customer = "invalid";
+        else if (key === "customerName") fieldErrors.customerName = issue.code === "too_big" ? "long" : "required";
+        else if (key === "customerPhone") fieldErrors.customerPhone = issue.code === "too_big" ? "long" : "required";
+        else if (key === "deliveryAddress") fieldErrors.deliveryAddress = issue.code === "too_big" ? "long" : "required";
+        else if (key === "deliveryPhone") fieldErrors.deliveryPhone = issue.code === "too_big" ? "long" : "required";
+        else if (key === "deliveryNote") fieldErrors.deliveryNote = "long";
+        else if (key === "deliveryFee") fieldErrors.deliveryFee = "invalid";
+    }
+    return fieldErrors;
+}
+
 export async function createStaffOrder(input: unknown) {
     const session = await shopStaff();
     if (!session) return { success: false as const, formErrors: ["You need a staff account."] };
     const parsed = staffOrderSchema.safeParse(input);
-    if (!parsed.success) {
-        const fee = parsed.error.issues.some((issue) => issue.path[0] === "deliveryFee");
-        return { success: false as const, formErrors: [fee ? "Enter a delivery fee of zero or more." : "Choose at least one product."] };
-    }
+    if (!parsed.success) return { success: false as const, fieldErrors: staffOrderIssues(parsed.error) };
     const sale = parsed.data.mode === "sale";
     const fulfillment = sale ? "PICKUP" as const : parsed.data.fulfillment;
-    if (!fulfillment) return { success: false as const, formErrors: ["Choose at least one product."] };
+    if (!fulfillment) return { success: false as const, fieldErrors: { items: "required" as const } };
     const deliveryPhone = (parsed.data.deliveryPhone || parsed.data.customerPhone || "").trim();
-    if (!sale && fulfillment === "DELIVERY" && !parsed.data.deliveryAddress) {
-        return { success: false as const, formErrors: ["Enter the delivery address."] };
+    const fieldErrors: Partial<Record<StaffOrderField, StaffOrderCode>> = {};
+    if (!sale && fulfillment === "DELIVERY" && !parsed.data.deliveryAddress?.trim()) fieldErrors.deliveryAddress = "required";
+    if (!sale && fulfillment === "DELIVERY" && deliveryPhone.length < 6) fieldErrors.deliveryPhone = "required";
+    if (!sale && !parsed.data.ownerId) {
+        if (!(parsed.data.customerName ?? "").trim()) fieldErrors.customerName = "required";
+        if ((parsed.data.customerPhone ?? "").trim().length < 6) fieldErrors.customerPhone = "required";
     }
-    if (!sale && fulfillment === "DELIVERY" && deliveryPhone.length < 6) {
-        return { success: false as const, formErrors: ["Enter a contact number."] };
-    }
-    if (!sale && !parsed.data.ownerId && (!(parsed.data.customerName ?? "").trim() || (parsed.data.customerPhone ?? "").trim().length < 6)) {
-        return { success: false as const, formErrors: ["Enter the customer’s name and phone."] };
-    }
+    if (Object.keys(fieldErrors).length > 0) return { success: false as const, fieldErrors };
     const delivering = !sale && fulfillment === "DELIVERY";
     const deliveryFee = delivering ? parsed.data.deliveryFee ?? 0 : 0;
-    if (!validDeliveryFee(deliveryFee)) return { success: false as const, formErrors: ["Enter a delivery fee of zero or more."] };
+    if (!validDeliveryFee(deliveryFee)) return { success: false as const, fieldErrors: { deliveryFee: "invalid" as const } };
 
     const now = new Date();
     try {
@@ -273,7 +300,10 @@ export async function createStaffOrder(input: unknown) {
         return { success: true as const, id: order.id };
     } catch (error) {
         if (error instanceof Error && error.message === "customer") {
-            return { success: false as const, formErrors: ["Enter the customer’s name and phone."] };
+            return { success: false as const, fieldErrors: { customer: "invalid" as const } };
+        }
+        if (error instanceof Error && error.message === "stock") {
+            return { success: false as const, fieldErrors: { items: "stock" as const } };
         }
         return { success: false as const, formErrors: ["Something in the cart is no longer in stock."] };
     }
@@ -335,15 +365,17 @@ export async function saveProduct(input: unknown) {
     const session = await shopStaff();
     if (!session) return { success: false as const, formErrors: ["You need a staff account."] };
     const parsed = productSchema.safeParse(input);
-    if (!parsed.success) return { success: false as const, formErrors: ["Check the product details."] };
+    if (!parsed.success) {
+        return { success: false as const, formErrors: [] as string[], fieldErrors: productFieldErrors(parsed.error) };
+    }
     const photoUrl = storedPhoto(parsed.data.photoUrl);
-    if (!photoUrl) return { success: false as const, formErrors: ["Add a photo."] };
+    if (!photoUrl) return { success: false as const, formErrors: [] as string[], fieldErrors: { photoUrl: "photoLink" as const } };
     const pricing = pricingFrom(await prisma.clinicSetting.findUnique({
         where: { id: "clinic" },
         select: { priceCurrency: true, usdRate: true },
     }));
     if (parsed.data.priceCurrency !== pricing.currency) {
-        return { success: false as const, formErrors: ["The pricing currency changed. Refresh the page and enter the price again."] };
+        return { success: false as const, formErrors: [] as string[], fieldErrors: { price: "currency" as const } };
     }
     const data = {
         name: parsed.data.name,
@@ -351,32 +383,25 @@ export async function saveProduct(input: unknown) {
         description: parsed.data.description || null,
         descriptionAr: parsed.data.descriptionAr || null,
         price: parsed.data.price,
-        stock: parsed.data.stock,
         categoryId: parsed.data.categoryId,
         available: parsed.data.available ?? true,
         photoUrl,
     };
     if (parsed.data.id) {
-        const existing = await prisma.product.findUnique({ where: { id: parsed.data.id }, select: { photoUrl: true, stock: true } });
+        const existing = await prisma.product.findUnique({ where: { id: parsed.data.id }, select: { photoUrl: true } });
         if (!existing) return { success: false as const, formErrors: ["That product was not found."] };
-        const delta = data.stock - existing.stock;
-        await prisma.$transaction(async (tx) => {
-            await tx.product.update({ where: { id: parsed.data.id }, data });
-            if (delta !== 0) {
-                await tx.stockMovement.create({
-                    data: { productId: parsed.data.id!, type: "CORRECT", delta, staffId: session.user.id },
-                });
-            }
-        });
+        await prisma.product.update({ where: { id: parsed.data.id }, data });
         if (existing.photoUrl && existing.photoUrl !== photoUrl && isSafeObjectKey(existing.photoUrl)) {
             await removeStoredObject(PRODUCT_PHOTOS_BUCKET, existing.photoUrl).catch(() => undefined);
         }
     } else {
+        if (parsed.data.stock == null) return { success: false as const, formErrors: [] as string[], fieldErrors: { stock: "stock" as const } };
+        const stock = parsed.data.stock;
         await prisma.$transaction(async (tx) => {
-            const created = await tx.product.create({ data });
-            if (data.stock > 0) {
+            const created = await tx.product.create({ data: { ...data, stock } });
+            if (stock > 0) {
                 await tx.stockMovement.create({
-                    data: { productId: created.id, type: "RECEIVE", delta: data.stock, staffId: session.user.id },
+                    data: { productId: created.id, type: "RECEIVE", delta: stock, staffId: session.user.id },
                 });
             }
         });

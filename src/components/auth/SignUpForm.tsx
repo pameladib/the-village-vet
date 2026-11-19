@@ -123,7 +123,7 @@ export default function SignUpForm({ copy, locale }: { copy: Copy; locale: Local
 
     return (
         <div className="flex min-h-full w-full min-w-0 flex-1 flex-col overflow-x-hidden bg-stone-100 font-sans lg:grid lg:grid-cols-[minmax(0,46%)_minmax(0,1fr)] dark:bg-stone-950">
-            <section className="relative flex min-w-0 flex-col justify-between bg-emerald-950 px-6 py-6 text-emerald-50 sm:px-10 lg:px-14 lg:py-16">
+            <section className="relative flex min-w-0 flex-col bg-emerald-950 px-6 py-6 text-emerald-50 sm:px-10 lg:h-full lg:px-14 lg:py-16">
                 <div className="pointer-events-none absolute inset-0 overflow-hidden">
                     <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-700/40 blur-3xl" />
                     <div className="absolute bottom-0 -left-16 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
@@ -136,15 +136,17 @@ export default function SignUpForm({ copy, locale }: { copy: Copy; locale: Local
                     <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-700 px-2.5 py-1 text-xs text-emerald-50 hover:bg-emerald-900" />
                 </div>
 
-                <div className="relative mt-4 w-full min-w-0 lg:mt-0 lg:max-w-md">
-                    <h1 className="max-w-full text-3xl leading-tight font-semibold tracking-tight text-white lg:text-5xl">
-                        {copy.signUpWelcome}
-                        <br />
-                        {copy.clinicName}
-                    </h1>
-                    <p className="mt-3 max-w-full text-sm leading-6 text-emerald-100/90 lg:mt-5 lg:text-lg lg:leading-7">
-                        {copy.signUpLead}
-                    </p>
+                <div className="relative flex flex-1 items-center pb-8 lg:pb-16">
+                    <div className="w-full min-w-0 lg:max-w-md">
+                        <h1 className="max-w-full text-3xl leading-tight font-semibold tracking-tight text-white lg:text-5xl">
+                            {copy.signUpWelcome}
+                            <br />
+                            {copy.clinicName}
+                        </h1>
+                        <p className="mt-3 max-w-full text-sm leading-6 text-emerald-100/90 lg:mt-5 lg:text-lg lg:leading-7">
+                            {copy.signUpLead}
+                        </p>
+                    </div>
                 </div>
 
             </section>

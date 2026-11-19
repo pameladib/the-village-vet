@@ -25,6 +25,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
             pet: { select: { id: true, name: true, ownerId: true } },
             vaccinations: { select: { id: true, type: true, administeredAt: true }, orderBy: { administeredAt: "desc" } },
             treatments: { select: { id: true, type: true, administeredAt: true }, orderBy: { administeredAt: "desc" } },
+            weight: { select: { weight: true } },
         },
     });
     if (!visit) notFound();
@@ -62,6 +63,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
                         visitType: visit.type === "OPERATION" ? "OPERATION" : "VETERINARY_VISIT",
                         services: visit.services,
                         notes: visit.notes ?? "",
+                        weight: visit.weight ? visit.weight.weight.toFixed(2) : "",
                     }}
                 />
             ) : (

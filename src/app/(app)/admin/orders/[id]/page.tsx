@@ -25,7 +25,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             <OrderDetails
                 role="staff"
                 backHref="/admin/orders"
-                backLabel={copy.shopAdminOrders}
+                backLabel={copy.profileBack}
                 copy={copy}
                 locale={locale}
                 order={{

@@ -73,7 +73,7 @@ export function VaccineForm({
         const result = await saveVaccination({ petId, recordId: draft?.id, medicalVisitId: draft?.id ? undefined : medicalVisitId, type, administeredAt, nextDueAt });
         setPending(false);
         if (!result.success) {
-            setError(result.error === "duplicate" ? copy.errDoseDuplicate : result.error === "species" ? copy.errDoseSpecies : result.error === "due" ? copy.errDueDate : result.error === "date" ? copy.errDoseDate : copy.errCareSave);
+            setError(result.error === "duplicate" ? copy.errDoseDuplicate : result.error === "annualDate" ? copy.errDoseAnnualDate : result.error === "species" ? copy.errDoseSpecies : result.error === "due" ? copy.errDueDate : result.error === "date" ? copy.errDoseDate : copy.errCareSave);
             return;
         }
         onClose();

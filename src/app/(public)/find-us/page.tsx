@@ -14,6 +14,7 @@ export default async function FindUsPage() {
     const call = phone ? phoneHref(phone) : null;
     const chat = whatsapp ? whatsappHref(whatsapp) : null;
     const map = clinicMapEmbed(locale, mapsUrl, address);
+    const mapHref = mapsUrl || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null);
 
     return (
         <main className="mx-auto grid w-full max-w-6xl items-start gap-12 px-5 py-16 lg:grid-cols-2 lg:items-center lg:gap-16 lg:py-24">
@@ -71,15 +72,22 @@ export default async function FindUsPage() {
                 </section>
             </div>
 
-            {map && (
-                <div className="aspect-[4/3] w-full min-w-0 overflow-hidden rounded-2xl bg-stone-100">
+            {map && mapHref && (
+                <div className="relative aspect-[4/3] w-full min-w-0 overflow-hidden rounded-2xl bg-stone-100">
                     <iframe
                         title={copy.mapTitle}
                         src={map}
-                        className="h-full w-full border-0"
+                        tabIndex={-1}
+                        className="pointer-events-none h-full w-full border-0"
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
-                        allowFullScreen
+                    />
+                    <a
+                        href={mapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={copy.mapTitle}
+                        className="absolute inset-0"
                     />
                 </div>
             )}

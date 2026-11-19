@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Search } from "lucide-react";
-import { createStaffOrder, searchOrderCustomers, searchOrderProducts } from "@/lib/actions/shop";
+import { createStaffOrder } from "@/lib/actions/shop";
 import { ownerChat } from "@/lib/clinic/phone";
 import type { Copy, Locale } from "@/lib/i18n";
 import { shopText } from "@/lib/shop/catalog";
@@ -24,6 +24,29 @@ const segment = (active: boolean) => active
     ? "h-10 rounded-full bg-emerald-900 px-4 text-sm font-medium text-white"
     : "h-10 rounded-full border border-stone-300 bg-white px-4 text-sm font-medium text-stone-800 hover:border-emerald-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100";
 
+type OrderField = "customer" | "customerName" | "customerPhone" | "items" | "deliveryAddress" | "deliveryPhone" | "deliveryFee" | "deliveryNote";
+type OrderCode = "required" | "invalid" | "long" | "stock";
+
+function orderMessage(copy: Copy, field: OrderField, code: OrderCode) {
+    if (field === "customer") return code === "invalid" ? copy.shopErrCustomerMissing : copy.shopErrPickCustomer;
+    if (field === "customerName") return code === "long" ? copy.shopErrCustomerNameLong : copy.shopErrCustomerName;
+    if (field === "customerPhone") return code === "long" ? copy.shopErrPhoneLong : copy.shopErrCustomerPhone;
+    if (field === "items") return code === "stock" ? copy.shopErrLineStock : copy.shopErrItems;
+    if (field === "deliveryAddress") return code === "long" ? copy.shopErrAddressLong : copy.shopAddressRequired;
+    if (field === "deliveryPhone") return code === "long" ? copy.shopErrPhoneLong : copy.shopPhoneRequired;
+    if (field === "deliveryNote") return copy.shopErrNoteLong;
+    return copy.shopErrDeliveryFee;
+}
+
+function FieldNote({ message }: { message?: string }) {
+    if (!message) return null;
+    return <span className="mt-1 block text-sm font-normal text-red-700 dark:text-red-300">{message}</span>;
+}
+
+function ring(invalid: boolean) {
+    return invalid ? "ring-2 ring-red-600 dark:ring-red-400" : "";
+}
+
 function Mark({ active }: { active: boolean }) {
     return (
         <span className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${active ? "border-white" : "border-stone-300 dark:border-stone-600"}`}>
@@ -32,7 +55,32 @@ function Mark({ active }: { active: boolean }) {
     );
 }
 
-export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy; locale: Locale; currency: Currency }) {
+function matchesCustomer(person: Customer, query: string) {
+    const q = query.trim().slice(0, 80);
+    if (!q) return false;
+    return person.name.toLowerCase().includes(q.toLowerCase()) || person.phoneNumber.includes(q);
+}
+
+function matchesProduct(product: ProductHit, query: string) {
+    const q = query.trim().slice(0, 80);
+    if (!q) return false;
+    const needle = q.toLowerCase();
+    return product.name.toLowerCase().includes(needle) || product.nameAr.toLowerCase().includes(needle);
+}
+
+export default function StaffOrderForm({
+    copy,
+    locale,
+    currency,
+    customers: customerDirectory,
+    products: productDirectory,
+}: {
+    copy: Copy;
+    locale: Locale;
+    currency: Currency;
+    customers: Customer[];
+    products: ProductHit[];
+}) {
     const router = useRouter();
     const [mode, setMode] = useState<Mode>("sale");
     const [customerKind, setCustomerKind] = useState<"account" | "walkin">("account");
@@ -44,23 +92,26 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
     const [deliveryPhone, setDeliveryPhone] = useState("");
     const [note, setNote] = useState("");
     const [customerQuery, setCustomerQuery] = useState("");
-    const [customers, setCustomers] = useState<Customer[]>([]);
     const [customerOpen, setCustomerOpen] = useState(false);
     const [customer, setCustomer] = useState<Customer | null>(null);
     const customerBox = useRef<HTMLDivElement>(null);
-    const customerSearch = useRef(0);
-    const customerQueryRef = useRef("");
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [productQuery, setProductQuery] = useState("");
-    const [products, setProducts] = useState<ProductHit[]>([]);
     const [productOpen, setProductOpen] = useState(false);
     const productBox = useRef<HTMLDivElement>(null);
-    const productSearch = useRef(0);
-    const productQueryRef = useRef("");
+    const customers = useMemo(
+        () => customerDirectory.filter((person) => matchesCustomer(person, customerQuery)).slice(0, 8),
+        [customerDirectory, customerQuery],
+    );
+    const products = useMemo(
+        () => productDirectory.filter((product) => matchesProduct(product, productQuery)).slice(0, 8),
+        [productDirectory, productQuery],
+    );
     const [lines, setLines] = useState<Line[]>([]);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fields, setFields] = useState<Partial<Record<OrderField, OrderCode>>>({});
 
     useEffect(() => {
         function close(event: PointerEvent) {
@@ -74,52 +125,12 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
 
     function lookUpCustomer(value: string) {
         setCustomerQuery(value);
-        const q = value.trim();
-        const previous = customerQueryRef.current;
-        customerQueryRef.current = q;
-        if (!q) {
-            customerSearch.current += 1;
-            setCustomers([]);
-            setCustomerOpen(false);
-            return;
-        }
-        setCustomerOpen(true);
-        if (previous && (q.startsWith(previous) || previous.startsWith(q))) {
-            const needle = q.toLowerCase();
-            setCustomers((current) => current.filter((person) => person.name.toLowerCase().includes(needle) || person.phoneNumber.includes(q)));
-        } else {
-            setCustomers([]);
-        }
-        const request = ++customerSearch.current;
-        void searchOrderCustomers(q).then((people) => {
-            if (customerSearch.current !== request) return;
-            setCustomers(people);
-        });
+        setCustomerOpen(value.trim().length > 0);
     }
 
     function lookUpProduct(value: string) {
         setProductQuery(value);
-        const q = value.trim();
-        const previous = productQueryRef.current;
-        productQueryRef.current = q;
-        if (!q) {
-            productSearch.current += 1;
-            setProducts([]);
-            setProductOpen(false);
-            return;
-        }
-        setProductOpen(true);
-        if (previous && (q.startsWith(previous) || previous.startsWith(q))) {
-            const needle = q.toLowerCase();
-            setProducts((current) => current.filter((product) => product.name.toLowerCase().includes(needle) || product.nameAr.toLowerCase().includes(needle)));
-        } else {
-            setProducts([]);
-        }
-        const request = ++productSearch.current;
-        void searchOrderProducts(q).then((found) => {
-            if (productSearch.current !== request) return;
-            setProducts(found);
-        });
+        setProductOpen(value.trim().length > 0);
     }
 
     function chooseCustomerKind(kind: "account" | "walkin") {
@@ -148,28 +159,42 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
             return current.map((line) => line.id === product.id ? { ...line, quantity: Math.min(line.stock, line.quantity + 1) } : line);
         });
         setProductQuery("");
-        setProducts([]);
         setProductOpen(false);
-        productQueryRef.current = "";
+    }
+
+    function fieldNote(field: OrderField) {
+        const code = fields[field];
+        return code ? orderMessage(copy, field, code) : undefined;
     }
 
     async function submit(event: FormEvent) {
         event.preventDefault();
         setError(null);
         const walkIn = customerKind === "walkin";
-        if (mode === "later" && !walkIn && !customer) {
-            setError(copy.shopErrCustomer);
-            return;
-        }
-        if (mode === "later" && walkIn && (!name.trim() || phone.trim().length < 6)) {
-            setError(copy.shopErrCustomer);
-            return;
+        const next: Partial<Record<OrderField, OrderCode>> = {};
+        if (lines.length === 0) next.items = "required";
+        if (mode === "later" && !walkIn && !customer) next.customer = "required";
+        if (mode === "later" && walkIn) {
+            if (!name.trim()) next.customerName = "required";
+            else if (name.trim().length > 120) next.customerName = "long";
+            if (phone.trim().length < 6) next.customerPhone = "required";
+            else if (phone.trim().length > 30) next.customerPhone = "long";
         }
         const fee = delivering ? minorFromInput(feeInput, currency) : 0;
-        if (fee == null) {
-            setError(copy.shopErrDeliveryFee);
+        if (delivering) {
+            if (!address.trim()) next.deliveryAddress = "required";
+            else if (address.trim().length > 200) next.deliveryAddress = "long";
+            const contactPhone = (deliveryPhone || (walkIn ? phone : customer?.phoneNumber) || "").trim();
+            if (contactPhone.length < 6) next.deliveryPhone = "required";
+            else if (contactPhone.length > 30) next.deliveryPhone = "long";
+            if (note.trim().length > 300) next.deliveryNote = "long";
+            if (fee == null) next.deliveryFee = "invalid";
+        }
+        if (Object.keys(next).length > 0) {
+            setFields(next);
             return;
         }
+        setFields({});
         setPending(true);
         const result = await createStaffOrder({
             mode,
@@ -180,14 +205,19 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
             fulfillment,
             payment,
             paid,
-            deliveryFee: fee,
+            deliveryFee: fee ?? 0,
             deliveryAddress: address,
             deliveryPhone: deliveryPhone || (walkIn ? phone : customer?.phoneNumber) || "",
             deliveryNote: note,
         });
         setPending(false);
         if (!result.success) {
-            setError(mapShopError(result.formErrors?.[0], copy));
+            if ("fieldErrors" in result && result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
+                setFields(result.fieldErrors);
+                return;
+            }
+            const message = "formErrors" in result ? result.formErrors?.[0] : undefined;
+            setError(mapShopError(message, copy));
             return;
         }
         router.push(`/admin/orders/${result.id}`);
@@ -229,7 +259,7 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                 </div>
                 {customerKind === "account" ? (
                     customer ? (
-                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 dark:bg-stone-900">
+                        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 ${ring(Boolean(fields.customer))}`}>
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-medium text-stone-900 dark:text-stone-50">
                                     <Link href={`/admin/owners/${customer.id}`} className="text-emerald-900 hover:underline dark:text-emerald-200">{customer.name}</Link>
@@ -240,7 +270,7 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                                     ) : customer.phoneNumber}
                                 </p>
                             </div>
-                            <button type="button" onClick={() => { setCustomer(null); customerQueryRef.current = ""; }} className="text-sm text-stone-500 hover:text-emerald-900 dark:hover:text-emerald-200">{copy.shopChangeCustomer}</button>
+                            <button type="button" onClick={() => setCustomer(null)} className="text-sm text-stone-500 hover:text-emerald-900 dark:hover:text-emerald-200">{copy.shopChangeCustomer}</button>
                         </div>
                     ) : (
                         <div ref={customerBox} className="relative">
@@ -250,13 +280,14 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                                 value={customerQuery}
                                 autoComplete="off"
                                 role="combobox"
+                                aria-invalid={Boolean(fields.customer)}
                                 aria-expanded={customerOpen && customers.length > 0}
                                 aria-controls="order-customer-list"
                                 placeholder={copy.shopFindCustomer}
                                 onChange={(event) => lookUpCustomer(event.target.value)}
                                 onFocus={() => { if (customerQuery.trim() && customers.length > 0) setCustomerOpen(true); }}
                                 onKeyDown={(event) => { if (event.key === "Escape") setCustomerOpen(false); }}
-                                className={`${field} ${customerOpen && customers.length > 0 ? "rounded-b-none focus:border-stone-300 focus:ring-0 dark:focus:border-stone-700" : ""}`}
+                                className={`${field} ${ring(Boolean(fields.customer))} ${customerOpen && customers.length > 0 ? "rounded-b-none focus:border-stone-300 focus:ring-0 dark:focus:border-stone-700" : ""}`}
                             />
                             {customerOpen && customers.length > 0 && (
                                 <ul id="order-customer-list" role="listbox" className="absolute inset-x-0 top-full z-20 max-h-60 overflow-auto rounded-b-xl border border-t-0 border-stone-300 bg-white shadow-lg dark:border-stone-700 dark:bg-stone-900">
@@ -267,7 +298,7 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                                                 role="option"
                                                 aria-selected={false}
                                                 onMouseDown={(event) => event.preventDefault()}
-                                                onClick={() => { setCustomer(person); setCustomerQuery(""); setCustomers([]); setCustomerOpen(false); customerQueryRef.current = ""; }}
+                                                onClick={() => { setCustomer(person); setCustomerQuery(""); setCustomerOpen(false); }}
                                                 className="flex w-full min-w-0 flex-col px-3 py-2 text-start hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                                             >
                                                 <span className="truncate text-sm font-medium text-stone-900 dark:text-stone-50">{person.name}</span>
@@ -283,15 +314,18 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="text-sm text-stone-600 dark:text-stone-300">
                             {copy.shopColCustomer}
-                            <input required={walkInLater} value={name} onChange={(event) => setName(event.target.value)} className={`${field} mt-1`} />
+                            <input required={walkInLater} value={name} aria-invalid={Boolean(fields.customerName)} onChange={(event) => setName(event.target.value)} className={`${field} mt-1 ${ring(Boolean(fields.customerName))}`} />
+                            <FieldNote message={fieldNote("customerName")} />
                         </label>
                         <label className="text-sm text-stone-600 dark:text-stone-300">
                             {copy.phone}
-                            <input required={walkInLater} value={phone} onChange={(event) => setPhone(event.target.value)} className={`${field} mt-1`} />
+                            <input required={walkInLater} value={phone} aria-invalid={Boolean(fields.customerPhone)} onChange={(event) => setPhone(event.target.value)} className={`${field} mt-1 ${ring(Boolean(fields.customerPhone))}`} />
+                            <FieldNote message={fieldNote("customerPhone")} />
                         </label>
                         {mode === "sale" && <p className="text-xs text-stone-500 sm:col-span-2">{copy.shopWalkInHint}</p>}
                     </div>
                 )}
+                {customerKind === "account" && <FieldNote message={fieldNote("customer")} />}
             </section>
 
             <section className="grid gap-3">
@@ -336,7 +370,7 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                     )}
                 </div>
                 {lines.length > 0 && (
-                    <ul className="divide-y divide-stone-200 dark:divide-stone-800">
+                    <ul className={`divide-y divide-stone-200 dark:divide-stone-800 ${fields.items ? "rounded-xl ring-2 ring-red-600 dark:ring-red-400" : ""}`}>
                         {lines.map((line) => (
                             <li key={line.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-4">
                                 <div className="min-w-0 sm:flex-1">
@@ -360,6 +394,7 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                         ))}
                     </ul>
                 )}
+                <FieldNote message={fieldNote("items")} />
             </section>
 
             {mode === "later" && (
@@ -376,19 +411,23 @@ export default function StaffOrderForm({ copy, locale, currency }: { copy: Copy;
                         <div className="grid gap-3 sm:grid-cols-2">
                             <label className="text-sm text-stone-600 sm:col-span-2 dark:text-stone-300">
                                 {copy.shopDeliveryAddress}
-                                <input required value={address} onChange={(event) => setAddress(event.target.value)} className={`${field} mt-1`} />
+                                <input required value={address} aria-invalid={Boolean(fields.deliveryAddress)} onChange={(event) => setAddress(event.target.value)} className={`${field} mt-1 ${ring(Boolean(fields.deliveryAddress))}`} />
+                                <FieldNote message={fieldNote("deliveryAddress")} />
                             </label>
                             <label className="text-sm text-stone-600 dark:text-stone-300">
                                 {copy.shopDeliveryPhone}
-                                <input value={deliveryPhone} onChange={(event) => setDeliveryPhone(event.target.value)} placeholder={customerKind === "account" ? customer?.phoneNumber : phone} className={`${field} mt-1`} />
+                                <input value={deliveryPhone} aria-invalid={Boolean(fields.deliveryPhone)} onChange={(event) => setDeliveryPhone(event.target.value)} placeholder={customerKind === "account" ? customer?.phoneNumber : phone} className={`${field} mt-1 ${ring(Boolean(fields.deliveryPhone))}`} />
+                                <FieldNote message={fieldNote("deliveryPhone")} />
                             </label>
                             <label className="text-sm text-stone-600 dark:text-stone-300">
                                 {copy.shopDeliveryNote}
-                                <input value={note} onChange={(event) => setNote(event.target.value)} className={`${field} mt-1`} />
+                                <input value={note} aria-invalid={Boolean(fields.deliveryNote)} onChange={(event) => setNote(event.target.value)} className={`${field} mt-1 ${ring(Boolean(fields.deliveryNote))}`} />
+                                <FieldNote message={fieldNote("deliveryNote")} />
                             </label>
                             <label className="text-sm text-stone-600 dark:text-stone-300">
                                 {copy.shopDeliveryFee}
-                                <input inputMode="decimal" value={feeInput} onChange={(event) => setFeeInput(event.target.value)} className={`${field} mt-1`} />
+                                <input inputMode="decimal" value={feeInput} aria-invalid={Boolean(fields.deliveryFee)} onChange={(event) => setFeeInput(event.target.value)} className={`${field} mt-1 ${ring(Boolean(fields.deliveryFee))}`} />
+                                <FieldNote message={fieldNote("deliveryFee")} />
                             </label>
                         </div>
                     )}

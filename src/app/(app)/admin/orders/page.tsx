@@ -163,7 +163,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                             const items = order.items.reduce((sum, item) => sum + item.quantity, 0);
                             const contact = orderContact(order, copy.shopWalkIn);
                             const origin = orderOrigin(order);
-                            const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : copy.shopOriginCustomer;
+                            const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : null;
                             const chat = contact.phone ? ownerChat(contact.phone) : null;
                             return (
                                 <li key={order.id} className={`relative rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 ${order.status === "PENDING" ? "ring-1 ring-amber-300" : ""}`}>
@@ -178,11 +178,13 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                                 <Link href={`/admin/owners/${order.ownerId}`} className="pointer-events-auto relative z-10 font-medium text-emerald-900 hover:underline dark:text-emerald-200">{contact.name}</Link>
                                             ) : contact.name}
                                         </p>
-                                        <p className="text-xs text-stone-500">
-                                            {chat ? <a href={chat} target="_blank" rel="noopener noreferrer" className="pointer-events-auto relative z-10 hover:underline">{contact.phone}</a> : contact.phone}
-                                            {contact.phone ? " · " : ""}
-                                            {originLabel}
-                                        </p>
+                                        {(contact.phone || originLabel) && (
+                                            <p className="text-xs text-stone-500">
+                                                {chat ? <a href={chat} target="_blank" rel="noopener noreferrer" className="pointer-events-auto relative z-10 hover:underline">{contact.phone}</a> : contact.phone}
+                                                {contact.phone && originLabel ? " · " : ""}
+                                                {originLabel}
+                                            </p>
+                                        )}
                                         <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
                                             {count.format(items)} {copy.shopOrderItems}
                                             {" · "}
@@ -191,6 +193,8 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                             {orderFulfillmentLabel(order.fulfillment, copy)}
                                             {" · "}
                                             {orderPaymentLabel(order.payment, copy)}
+                                            {" · "}
+                                            {order.paidAt ? copy.shopPayPaid : copy.shopPayUnpaid}
                                         </p>
                                     </div>
                                 </li>
@@ -198,7 +202,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                         })}
                     </ul>
                     <div className="mt-4 hidden overflow-x-auto md:block">
-                        <table className="w-full text-start text-sm">
+                        <table className="w-full text-center text-sm">
                             <thead className="text-xs font-medium text-stone-500">
                                 <tr>
                                     <th className="px-3 py-2 font-medium">{copy.shopColOrder}</th>
@@ -206,7 +210,8 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                     <th className="px-3 py-2 font-medium">{copy.shopColItems}</th>
                                     <th className="px-3 py-2 font-medium">{copy.shopTotal}</th>
                                     <th className="px-3 py-2 font-medium">{copy.shopColFulfilment}</th>
-                                    <th className="px-3 py-2 font-medium">{copy.shopPayment}</th>
+                                    <th className="px-3 py-2 font-medium">{copy.shopPayMethod}</th>
+                                    <th className="px-3 py-2 font-medium">{copy.shopPayStatus}</th>
                                     <th className="px-3 py-2 font-medium">{copy.shopColStatus}</th>
                                     <th className="px-3 py-2 font-medium">{copy.shopColActions}</th>
                                 </tr>
@@ -217,7 +222,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                     const items = order.items.reduce((sum, item) => sum + item.quantity, 0);
                                     const contact = orderContact(order, copy.shopWalkIn);
                                     const origin = orderOrigin(order);
-                                    const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : copy.shopOriginCustomer;
+                                    const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : null;
                                     const chat = contact.phone ? ownerChat(contact.phone) : null;
                                     return (
                                         <tr key={order.id} className={order.status === "PENDING" ? "bg-amber-50/80 dark:bg-amber-950/20" : "bg-white dark:bg-stone-900"}>
@@ -228,16 +233,19 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                                         <Link href={`/admin/owners/${order.ownerId}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{contact.name}</Link>
                                                     ) : contact.name}
                                                 </p>
-                                                <p className="text-xs text-stone-500">
-                                                    {chat ? <a href={chat} target="_blank" rel="noopener noreferrer" className="hover:underline">{contact.phone}</a> : contact.phone}
-                                                    {contact.phone ? " · " : ""}
-                                                    {originLabel}
-                                                </p>
+                                                {(contact.phone || originLabel) && (
+                                                    <p className="text-xs text-stone-500">
+                                                        {chat ? <a href={chat} target="_blank" rel="noopener noreferrer" className="hover:underline">{contact.phone}</a> : contact.phone}
+                                                        {contact.phone && originLabel ? " · " : ""}
+                                                        {originLabel}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{count.format(items)} {copy.shopOrderItems}</td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{formatStored(total, order.currency, locale)}</td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{orderFulfillmentLabel(order.fulfillment, copy)}</td>
                                             <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{orderPaymentLabel(order.payment, copy)}</td>
+                                            <td className="px-3 py-3 text-stone-700 dark:text-stone-200">{order.paidAt ? copy.shopPayPaid : copy.shopPayUnpaid}</td>
                                             <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${orderStatusTone(order.status)}`}>{orderStatusLabel(order.status, copy)}</span></td>
                                             <td className="rounded-e-xl px-3 py-3"><Link href={`/admin/orders/${order.id}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{copy.viewAppointment}</Link></td>
                                         </tr>

@@ -126,7 +126,7 @@ export function doseConflict(
     if (species === "CAT" && incoming.type === "THIRD") return "species" as const;
     const others = existing.filter((row) => row.id !== incoming.id);
     if (incoming.type !== "ANNUAL" && others.some((row) => row.type === incoming.type)) return "duplicate" as const;
-    if (others.some((row) => row.type === incoming.type && row.administeredAt === incoming.administeredAt)) return "duplicate" as const;
+    if (incoming.type === "ANNUAL" && others.some((row) => row.type === "ANNUAL" && row.administeredAt === incoming.administeredAt)) return "annualDate" as const;
     return null;
 }
 

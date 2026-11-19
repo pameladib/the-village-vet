@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import HistoryBack from "@/components/HistoryBack";
 import { completeAppointment, createWalkIn, updateVisit } from "@/lib/actions/visits";
 import { todayInBeirut } from "@/lib/appointments/availability";
 import { visitServiceOrder } from "@/lib/appointments/labels";
@@ -10,6 +12,11 @@ import type { Copy } from "@/lib/i18n";
 import type { VisitService } from "../../../generated/prisma/client";
 
 const field = "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-800 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50";
+const completeLabel = "block text-sm font-medium text-stone-700 dark:text-stone-200";
+const sectionTitle = "text-base font-semibold text-emerald-950 dark:text-emerald-50";
+const addAction = "inline-flex h-9 shrink-0 items-center rounded-full border border-stone-300 bg-white px-3 text-sm font-medium text-stone-800 hover:border-emerald-800 hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800";
+const primaryAction = "inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 px-5 text-sm font-medium text-white hover:bg-emerald-950 disabled:opacity-60 sm:w-auto";
+const secondaryAction = "inline-flex h-11 w-full items-center justify-center rounded-full border border-stone-300 bg-white px-5 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800 sm:w-auto";
 
 type VisitKind = "VETERINARY_VISIT" | "OPERATION";
 
@@ -34,6 +41,15 @@ export type WalkInPet = {
 
 type VaccineDraft = { type: Dose; administeredAt: string; nextDueAt: string };
 type TreatmentDraft = { type: TreatmentKind; administeredAt: string; nextDueAt: string };
+type TreatmentRow = {
+    key: string;
+    kind: "saved" | "draft";
+    type: TreatmentKind;
+    nextDueAt: string;
+    savedKey: string | null;
+    original: { type: TreatmentKind; nextDueAt: string } | null;
+    error: string | null;
+};
 
 export default function VisitForm({
     copy,
@@ -41,9 +57,9 @@ export default function VisitForm({
 }: {
     copy: Copy;
     mode:
-        | { kind: "complete"; appointmentId: string; petName: string; when: string; detail: string; visitDay: string; care: PetCare }
+        | { kind: "complete"; appointmentId: string; petId: string; petName: string; when: string; detail: string; visitDay: string; care: PetCare }
         | { kind: "walkin"; petId?: string; petName?: string; pets?: WalkInPet[]; care?: PetCare }
-        | { kind: "edit"; visitId: string; linked: boolean; date: string; visitType: VisitKind; services: VisitService[]; notes: string };
+        | { kind: "edit"; visitId: string; linked: boolean; date: string; visitType: VisitKind; services: VisitService[]; notes: string; weight: string };
 }) {
     const router = useRouter();
     const initialType: VisitKind = mode.kind === "edit" ? mode.visitType : "VETERINARY_VISIT";
@@ -51,6 +67,7 @@ export default function VisitForm({
     const [services, setServices] = useState<VisitService[]>(mode.kind === "edit" ? mode.services : []);
     const [date, setDate] = useState(mode.kind === "edit" ? mode.date : todayInBeirut());
     const [notes, setNotes] = useState(mode.kind === "edit" ? mode.notes : "");
+    const [weight, setWeight] = useState(mode.kind === "edit" ? mode.weight : "");
     const [remind, setRemind] = useState(false);
     const [followDate, setFollowDate] = useState("");
     const [followNotes, setFollowNotes] = useState("");
@@ -63,6 +80,8 @@ export default function VisitForm({
     const [vaccineDue, setVaccineDue] = useState<{ key: string; value: string } | null>(null);
     const [treatmentType, setTreatmentType] = useState<TreatmentKind>("DEWORMING");
     const [treatmentDue, setTreatmentDue] = useState("");
+    const [treatmentRows, setTreatmentRows] = useState<TreatmentRow[]>([]);
+    const treatmentSeq = useRef(0);
     const [error, setError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [pending, setPending] = useState(false);
@@ -80,6 +99,58 @@ export default function VisitForm({
         FLEA_TREATMENT: copy.svcFlea,
         FOLLOW_UP: copy.svcFollowUp,
     };
+
+    function nextTreatmentKey() {
+        treatmentSeq.current += 1;
+        return `treatment-${treatmentSeq.current}`;
+    }
+
+    function addTreatmentRow() {
+        setTreatmentRows((current) => [...current, {
+            key: nextTreatmentKey(),
+            kind: "draft",
+            type: "DEWORMING",
+            nextDueAt: "",
+            savedKey: null,
+            original: null,
+            error: null,
+        }]);
+    }
+
+    function openTreatment(key: string) {
+        setTreatmentRows((current) => current.map((row) => row.key === key && row.kind === "saved" ? {
+            ...row,
+            kind: "draft",
+            savedKey: row.key,
+            original: { type: row.type, nextDueAt: row.nextDueAt },
+            error: null,
+        } : row));
+    }
+
+    function changeTreatment(key: string, patch: Partial<Pick<TreatmentRow, "type" | "nextDueAt">>) {
+        setTreatmentRows((current) => current.map((row) => row.key === key ? { ...row, ...patch, error: null } : row));
+    }
+
+    function cancelTreatment(key: string) {
+        setTreatmentRows((current) => current.flatMap((row) => {
+            if (row.key !== key || row.kind !== "draft") return [row];
+            if (!row.savedKey || !row.original) return [];
+            return [{ ...row, kind: "saved" as const, type: row.original.type, nextDueAt: row.original.nextDueAt, error: null }];
+        }));
+    }
+
+    function commitTreatment(key: string) {
+        setTreatmentRows((current) => {
+            const row = current.find((item) => item.key === key);
+            if (!row || row.kind !== "draft") return current;
+            if (row.nextDueAt && row.nextDueAt < todayInBeirut()) {
+                return current.map((item) => item.key === key ? { ...item, error: copy.visitFutureDate } : item);
+            }
+            const taken = current.some((item) => item.kind === "saved" && item.type === row.type && item.key !== row.savedKey);
+            if (taken) return current.map((item) => item.key === key ? { ...item, error: copy.visitTreatmentDuplicate } : item);
+            return current.map((item) => item.key === key ? { ...item, kind: "saved" as const, savedKey: null, original: null, error: null } : item);
+        });
+    }
 
     function toggle(service: VisitService) {
         setServices((current) => current.includes(service) ? current.filter((item) => item !== service) : [...current, service]);
@@ -100,14 +171,31 @@ export default function VisitForm({
             setError(copy.followUpDateError);
             return;
         }
+        if (mode.kind !== "edit" && remind && followDate < todayInBeirut()) {
+            setPending(false);
+            setError(copy.visitFutureDate);
+            return;
+        }
+        if (mode.kind === "complete" && treatmentRows.some((row) => row.kind === "draft")) {
+            setPending(false);
+            setError(copy.visitTreatmentPending);
+            return;
+        }
         const followUp = mode.kind !== "edit" && remind ? { date: followDate, notes: followNotes } : null;
         const vaccination = mode.kind === "edit" ? null : vaccineDraft(vaccineOpen, care, visitDay, vaccineType, vaccineDue);
-        const treatment = mode.kind === "edit" ? null : treatmentDraft(treatmentOpen, care, visitDay, treatmentType, treatmentDue);
+        const treatment = mode.kind === "edit" || mode.kind === "complete" ? null : treatmentDraft(treatmentOpen, care, visitDay, treatmentType, treatmentDue);
+        const dueIsPast = (value: string | undefined) => value != null && value !== "" && value < todayInBeirut();
+        if (dueIsPast(vaccination?.nextDueAt) || dueIsPast(treatment?.nextDueAt)) {
+            setPending(false);
+            setError(copy.visitFutureDate);
+            return;
+        }
+        const treatments = treatmentRows.flatMap((row) => row.kind === "saved" ? [{ type: row.type, administeredAt: visitDay, nextDueAt: row.nextDueAt }] : []);
         const result = mode.kind === "complete"
-            ? await completeAppointment(mode.appointmentId, notes, followUp, { vaccination, treatment })
+            ? await completeAppointment(mode.appointmentId, notes, followUp, { vaccination, treatments }, weight)
             : mode.kind === "walkin"
-                ? await createWalkIn({ petId: petId ?? "", date, type: visitType, services, notes, followUp, vaccination, treatment })
-                : await updateVisit({ visitId: mode.visitId, notes, date: mode.linked ? undefined : date, type: mode.linked ? undefined : visitType, services: mode.linked ? undefined : services });
+                ? await createWalkIn({ petId: petId ?? "", date, type: visitType, services, notes, followUp, vaccination, treatment, weight })
+                : await updateVisit({ visitId: mode.visitId, notes, date: mode.linked ? undefined : date, type: mode.linked ? undefined : visitType, services: mode.linked ? undefined : services, weight });
         setPending(false);
         if (!result.success) {
             if (result.error === "exists" && result.visitId && result.petId) {
@@ -127,20 +215,32 @@ export default function VisitForm({
 
     return (
         <form
-            className="mt-5 flex flex-col gap-4"
+            className={mode.kind === "complete" ? "mt-6 flex flex-col gap-8" : "mt-5 flex flex-col gap-4"}
             onSubmit={(event) => {
                 event.preventDefault();
                 void save();
             }}
         >
-            {mode.kind !== "walkin" && (
-                <p className="text-sm text-stone-600 dark:text-stone-300">{mode.kind === "complete" ? copy.visitCompleteLead : copy.visitNotes}</p>
+            {mode.kind === "edit" && (
+                <p className="text-sm text-stone-600 dark:text-stone-300">{copy.visitNotes}</p>
             )}
             {mode.kind === "complete" && (
-                <div>
-                    <p className="text-sm text-stone-500">{copy.columnPet}</p>
-                    <p className="mt-1 text-sm font-medium text-stone-900 dark:text-stone-50">{mode.petName}</p>
-                </div>
+                <dl className="grid gap-x-8 gap-y-3 rounded-2xl border border-stone-200 bg-white p-4 sm:grid-cols-3 dark:border-stone-800 dark:bg-stone-900">
+                    <div className="min-w-0">
+                        <dt className="text-xs font-medium text-stone-500">{copy.columnPet}</dt>
+                        <dd className="mt-1 text-sm font-semibold">
+                            <Link href={`/pets/${mode.petId}`} className="text-emerald-950 hover:underline dark:text-emerald-50">{mode.petName}</Link>
+                        </dd>
+                    </div>
+                    <div className="min-w-0">
+                        <dt className="text-xs font-medium text-stone-500">{copy.visitApptWhen}</dt>
+                        <dd className="mt-1 text-sm font-semibold text-emerald-950 dark:text-emerald-50">{mode.when}</dd>
+                    </div>
+                    <div className="min-w-0">
+                        <dt className="text-xs font-medium text-stone-500">{copy.columnService}</dt>
+                        <dd className="mt-1 text-sm font-semibold text-emerald-950 dark:text-emerald-50">{mode.detail}</dd>
+                    </div>
+                </dl>
             )}
             {mode.kind === "walkin" && mode.petId && mode.petName && (
                 <div>
@@ -168,18 +268,7 @@ export default function VisitForm({
                     }}
                 />
             )}
-            {mode.kind === "complete" ? (
-                <>
-                    <div>
-                        <p className="text-sm text-stone-500">{copy.columnTime}</p>
-                        <p className="mt-1 text-sm font-medium text-stone-900 dark:text-stone-50">{mode.when}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-stone-500">{copy.columnService}</p>
-                        <p className="mt-1 text-sm font-medium text-stone-900 dark:text-stone-50">{mode.detail}</p>
-                    </div>
-                </>
-            ) : locked ? null : (
+            {mode.kind === "complete" ? null : locked ? null : (
                 <>
                     <label className="text-sm text-stone-500">
                         {copy.visitDate}
@@ -210,10 +299,16 @@ export default function VisitForm({
             {mode.kind === "edit" && locked && (
                 <p className="text-sm text-stone-500">{copy.columnTime}: <span className="font-medium text-stone-900 dark:text-stone-50">{mode.date}</span></p>
             )}
-            <label className="text-sm text-stone-500">
-                {copy.visitNotes}
-                <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={5} maxLength={4000} placeholder={copy.visitNotesPh} className={field} />
-            </label>
+            <div className={mode.kind === "complete" ? "grid gap-4" : "contents"}>
+                <label className={mode.kind === "complete" ? completeLabel : "text-sm text-stone-500"}>
+                    {copy.weightKg}
+                    <input type="number" inputMode="decimal" min="0.001" max="999.999" step="0.001" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="4.25" className={field} />
+                </label>
+                <label className={mode.kind === "complete" ? completeLabel : "text-sm text-stone-500"}>
+                    {copy.visitNotes}
+                    <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={5} maxLength={4000} placeholder={copy.visitNotesPh} className={field} />
+                </label>
+            </div>
             {mode.kind !== "edit" && (
                 <VisitCareFields
                     copy={copy}
@@ -231,9 +326,38 @@ export default function VisitForm({
                     onVaccineDue={setVaccineDue}
                     onTreatmentType={setTreatmentType}
                     onTreatmentDue={setTreatmentDue}
+                    grouped={mode.kind === "complete"}
+                    stack={{
+                        rows: treatmentRows,
+                        onAdd: addTreatmentRow,
+                        onChange: changeTreatment,
+                        onSave: commitTreatment,
+                        onCancel: cancelTreatment,
+                        onEdit: openTreatment,
+                    }}
                 />
             )}
-            {mode.kind !== "edit" && (
+            {mode.kind === "complete" ? (
+                <section className="flex flex-col gap-3">
+                    <h2 className={sectionTitle}>{copy.visitFollowHeading}</h2>
+                    <label className="flex items-start gap-3 text-sm text-stone-800 dark:text-stone-100">
+                        <input type="checkbox" checked={remind} onChange={(event) => setRemind(event.target.checked)} className="mt-0.5 size-4 accent-emerald-800" />
+                        <span>{copy.visitFollowPrompt}</span>
+                    </label>
+                    {remind && (
+                        <div className="grid gap-4">
+                            <label className={completeLabel}>
+                                {copy.followUpDate}
+                                <input type="date" required min={todayInBeirut()} value={followDate} onChange={(event) => setFollowDate(event.target.value)} className={field} />
+                            </label>
+                            <label className={completeLabel}>
+                                {copy.followUpNotes}
+                                <textarea value={followNotes} onChange={(event) => setFollowNotes(event.target.value)} rows={3} maxLength={1000} placeholder={copy.followUpNotesPh} className={field} />
+                            </label>
+                        </div>
+                    )}
+                </section>
+            ) : mode.kind !== "edit" && (
                 <fieldset className="rounded-2xl border border-stone-200 p-4 dark:border-stone-700">
                     <label className="flex items-center gap-2 text-sm font-medium text-stone-800 dark:text-stone-100">
                         <input type="checkbox" checked={remind} onChange={(event) => setRemind(event.target.checked)} />
@@ -243,7 +367,7 @@ export default function VisitForm({
                         <div className="mt-3 flex flex-col gap-3">
                             <label className="text-sm text-stone-500">
                                 {copy.followUpDate}
-                                <input type="date" required value={followDate} onChange={(event) => setFollowDate(event.target.value)} className={field} />
+                                <input type="date" required min={todayInBeirut()} value={followDate} onChange={(event) => setFollowDate(event.target.value)} className={field} />
                             </label>
                             <label className="text-sm text-stone-500">
                                 {copy.followUpNotes}
@@ -255,9 +379,20 @@ export default function VisitForm({
             )}
             {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
             {saved && <p className="text-sm text-emerald-800 dark:text-emerald-200">{copy.visitSaved}</p>}
-            <button type="submit" disabled={pending} className="w-fit rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-950 disabled:opacity-60">
-                {pending ? copy.visitSaving : copy.visitSave}
-            </button>
+            {mode.kind === "complete" ? (
+                <div className="flex flex-col gap-3 border-t border-stone-200 pt-6 sm:flex-row sm:items-center dark:border-stone-800">
+                    <button type="submit" disabled={pending} className={primaryAction}>
+                        {pending ? copy.visitSaving : copy.visitSave}
+                    </button>
+                    <HistoryBack fallback={`/admin/appointments/${mode.appointmentId}`} className={secondaryAction}>
+                        {copy.visitCancel}
+                    </HistoryBack>
+                </div>
+            ) : (
+                <button type="submit" disabled={pending} className="w-fit rounded-full bg-emerald-900 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-950 disabled:opacity-60">
+                    {pending ? copy.visitSaving : copy.visitSave}
+                </button>
+            )}
         </form>
     );
 }
@@ -280,9 +415,12 @@ function saveError(copy: Copy, code: string | undefined) {
     if (code === "followUp") return copy.followUpDateError;
     if (code === "denied") return copy.outcomeError;
     if (code === "duplicate") return copy.errDoseDuplicate;
+    if (code === "annualDate") return copy.errDoseAnnualDate;
     if (code === "species") return copy.errDoseSpecies;
     if (code === "due") return copy.errDueDate;
     if (code === "doseDate") return copy.errDoseDate;
+    if (code === "weight") return copy.weightErr;
+    if (code === "treatment") return copy.visitTreatmentDuplicate;
     return copy.visitSaveError;
 }
 
@@ -318,6 +456,8 @@ function VisitCareFields({
     onVaccineDue,
     onTreatmentType,
     onTreatmentDue,
+    grouped = false,
+    stack,
 }: {
     copy: Copy;
     visitDay: string;
@@ -334,12 +474,106 @@ function VisitCareFields({
     onVaccineDue: (due: { key: string; value: string }) => void;
     onTreatmentType: (type: TreatmentKind) => void;
     onTreatmentDue: (due: string) => void;
+    grouped?: boolean;
+    stack?: {
+        rows: TreatmentRow[];
+        onAdd: () => void;
+        onChange: (key: string, patch: Partial<Pick<TreatmentRow, "type" | "nextDueAt">>) => void;
+        onSave: (key: string) => void;
+        onCancel: (key: string) => void;
+        onEdit: (key: string) => void;
+    };
 }) {
     const doses = care?.doses ?? [];
     const selected = doses.find((dose) => dose === vaccineType) ?? doses[0] ?? "ANNUAL";
     const track = `${selected}|${visitDay}`;
     const draft = vaccineDraft(true, care, visitDay, vaccineType, vaccineDue);
     const nextDue = draft?.nextDueAt ?? "";
+    const entryLabel = grouped ? completeLabel : "text-sm text-stone-500";
+    const entryGap = grouped ? "grid gap-4" : "mt-3 flex flex-col gap-3";
+
+    const vaccineFields = care && doses.length > 0 ? (
+        <div className={entryGap}>
+            <label className={entryLabel}>
+                {copy.colDose}
+                <select value={selected} onChange={(event) => onVaccineType(event.target.value as Dose)} className={field}>
+                    {doses.map((dose) => <option key={dose} value={dose}>{copy[doseLabels[dose]]}</option>)}
+                </select>
+            </label>
+            <label className={entryLabel}>
+                {copy.adminDate}
+                <input type="date" readOnly required value={visitDay} className={field} />
+            </label>
+            <label className={entryLabel}>
+                {copy.nextDue}
+                <input
+                    type="date"
+                    min={todayInBeirut()}
+                    value={nextDue}
+                    onChange={(event) => onVaccineDue({ key: track, value: event.target.value })}
+                    className={field}
+                />
+                <span className="mt-1 block text-xs font-normal text-stone-500">{copy.suggestNote}</span>
+            </label>
+        </div>
+    ) : (
+        <p className={grouped ? "text-sm text-stone-500" : "mt-3 text-sm text-stone-500"}>{care ? copy.errDoseSpecies : copy.visitChoosePet}</p>
+    );
+    const treatmentFields = care ? (
+        <div className={entryGap}>
+            <label className={entryLabel}>
+                {copy.colTreatment}
+                <select value={treatmentType} onChange={(event) => onTreatmentType(event.target.value as TreatmentKind)} className={field}>
+                    <option value="DEWORMING">{copy.doseDeworming}</option>
+                    <option value="FLEA_TICK">{copy.doseFlea}</option>
+                </select>
+            </label>
+            <label className={entryLabel}>
+                {copy.adminDate}
+                <input type="date" readOnly required value={visitDay} className={field} />
+            </label>
+            <label className={entryLabel}>
+                {copy.nextDue}
+                <input type="date" min={todayInBeirut()} value={treatmentDue} onChange={(event) => onTreatmentDue(event.target.value)} className={field} />
+            </label>
+        </div>
+    ) : (
+        <p className={grouped ? "text-sm text-stone-500" : "mt-3 text-sm text-stone-500"}>{copy.visitChoosePet}</p>
+    );
+
+    if (grouped) {
+        return (
+            <div className="flex flex-col gap-8">
+                <CareSection
+                    title={copy.visitLinkedVaccines}
+                    lead={copy.visitVaccinationsLead}
+                    action={copy.addVaccination}
+                    open={vaccineOpen}
+                    onToggle={() => onVaccineOpen(!vaccineOpen)}
+                >
+                    {vaccineFields}
+                </CareSection>
+                {stack && (
+                    <CareSection
+                        title={copy.visitLinkedTreatments}
+                        lead={copy.visitTreatmentsLead}
+                        action={copy.addTreatment}
+                        onToggle={stack.onAdd}
+                    >
+                        <TreatmentStack
+                            copy={copy}
+                            visitDay={visitDay}
+                            rows={stack.rows}
+                            onChange={stack.onChange}
+                            onSave={stack.onSave}
+                            onCancel={stack.onCancel}
+                            onEdit={stack.onEdit}
+                        />
+                    </CareSection>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-4">
@@ -347,64 +581,107 @@ function VisitCareFields({
                 <button type="button" aria-expanded={vaccineOpen} onClick={() => onVaccineOpen(!vaccineOpen)} className={vaccineOpen ? careOpen : careSolid}>
                     {copy.addVaccination}
                 </button>
-                {vaccineOpen && (
-                    care && doses.length > 0 ? (
-                        <div className="mt-3 flex flex-col gap-3">
-                            <label className="text-sm text-stone-500">
-                                {copy.colDose}
-                                <select value={selected} onChange={(event) => onVaccineType(event.target.value as Dose)} className={field}>
-                                    {doses.map((dose) => <option key={dose} value={dose}>{copy[doseLabels[dose]]}</option>)}
-                                </select>
-                            </label>
-                            <label className="text-sm text-stone-500">
-                                {copy.adminDate}
-                                <input type="date" readOnly required value={visitDay} className={field} />
-                            </label>
-                            <label className="text-sm text-stone-500">
-                                {copy.nextDue}
-                                <input
-                                    type="date"
-                                    value={nextDue}
-                                    onChange={(event) => onVaccineDue({ key: track, value: event.target.value })}
-                                    className={field}
-                                />
-                                <span className="mt-1 block text-xs font-normal text-stone-500">{copy.suggestNote}</span>
-                            </label>
-                        </div>
-                    ) : (
-                        <p className="mt-3 text-sm text-stone-500">{care ? copy.errDoseSpecies : copy.visitChoosePet}</p>
-                    )
-                )}
+                {vaccineOpen && vaccineFields}
             </section>
             <section className="rounded-2xl border border-stone-200 p-4 dark:border-stone-700">
                 <button type="button" aria-expanded={treatmentOpen} onClick={() => onTreatmentOpen(!treatmentOpen)} className={treatmentOpen ? careOpen : careQuiet}>
                     {copy.addTreatment}
                 </button>
-                {treatmentOpen && (
-                    care ? (
-                        <div className="mt-3 flex flex-col gap-3">
-                            <label className="text-sm text-stone-500">
-                                {copy.colTreatment}
-                                <select value={treatmentType} onChange={(event) => onTreatmentType(event.target.value as TreatmentKind)} className={field}>
-                                    <option value="DEWORMING">{copy.doseDeworming}</option>
-                                    <option value="FLEA_TICK">{copy.doseFlea}</option>
-                                </select>
-                            </label>
-                            <label className="text-sm text-stone-500">
-                                {copy.adminDate}
-                                <input type="date" readOnly required value={visitDay} className={field} />
-                            </label>
-                            <label className="text-sm text-stone-500">
-                                {copy.nextDue}
-                                <input type="date" value={treatmentDue} onChange={(event) => onTreatmentDue(event.target.value)} className={field} />
-                            </label>
-                        </div>
-                    ) : (
-                        <p className="mt-3 text-sm text-stone-500">{copy.visitChoosePet}</p>
-                    )
-                )}
+                {treatmentOpen && treatmentFields}
             </section>
         </div>
+    );
+}
+
+function treatmentLabel(copy: Copy, type: TreatmentKind) {
+    return type === "DEWORMING" ? copy.doseDeworming : copy.doseFlea;
+}
+
+function TreatmentStack({
+    copy,
+    visitDay,
+    rows,
+    onChange,
+    onSave,
+    onCancel,
+    onEdit,
+}: {
+    copy: Copy;
+    visitDay: string;
+    rows: TreatmentRow[];
+    onChange: (key: string, patch: Partial<Pick<TreatmentRow, "type" | "nextDueAt">>) => void;
+    onSave: (key: string) => void;
+    onCancel: (key: string) => void;
+    onEdit: (key: string) => void;
+}) {
+    if (rows.length === 0) return null;
+    return (
+        <div className="flex flex-col gap-3">
+            {rows.map((row) => row.kind === "saved" ? (
+                <button key={row.key} type="button" onClick={() => onEdit(row.key)} className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-start hover:border-emerald-800 dark:border-stone-700 dark:bg-stone-900">
+                    <span className="block text-sm font-medium text-emerald-950 dark:text-emerald-50">{treatmentLabel(copy, row.type)}</span>
+                    {row.nextDueAt && <span className="mt-1 block text-sm text-stone-500">{copy.nextDue} · <span dir="ltr">{row.nextDueAt}</span></span>}
+                </button>
+            ) : (
+                <div key={row.key} className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900">
+                    <label className={completeLabel}>
+                        {copy.colTreatment}
+                        <select value={row.type} onChange={(event) => onChange(row.key, { type: event.target.value as TreatmentKind })} className={field}>
+                            <option value="DEWORMING">{copy.doseDeworming}</option>
+                            <option value="FLEA_TICK">{copy.doseFlea}</option>
+                        </select>
+                    </label>
+                    <label className={completeLabel}>
+                        {copy.adminDate}
+                        <input type="date" readOnly required value={visitDay} className={field} />
+                    </label>
+                    <label className={completeLabel}>
+                        {copy.nextDue}
+                        <input type="date" min={todayInBeirut()} value={row.nextDueAt} onChange={(event) => onChange(row.key, { nextDueAt: event.target.value })} className={field} />
+                    </label>
+                    {row.error && <p className="text-sm text-red-700 dark:text-red-300">{row.error}</p>}
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => onSave(row.key)} className="h-9 rounded-full bg-emerald-900 px-4 text-sm font-medium text-white hover:bg-emerald-950">
+                            {copy.profileSave}
+                        </button>
+                        <button type="button" onClick={() => onCancel(row.key)} className="h-9 rounded-full border border-stone-300 px-4 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:border-stone-600 dark:text-stone-100 dark:hover:bg-stone-800">
+                            {copy.visitCancel}
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function CareSection({
+    title,
+    lead,
+    action,
+    open,
+    onToggle,
+    children,
+}: {
+    title: string;
+    lead: string;
+    action: string;
+    open?: boolean;
+    onToggle: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <section className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <h2 className={sectionTitle}>{title}</h2>
+                    <p className="mt-1 text-sm leading-6 text-stone-500">{lead}</p>
+                </div>
+                <button type="button" aria-expanded={open} onClick={onToggle} className={addAction}>
+                    {action}
+                </button>
+            </div>
+            {open === undefined || open ? children : null}
+        </section>
     );
 }
 
