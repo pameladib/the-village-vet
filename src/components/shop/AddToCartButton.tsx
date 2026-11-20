@@ -61,19 +61,11 @@ export default function AddToCartButton({
 
     return (
         <div className="mt-6 flex items-center gap-2">
-            <label className="sr-only" htmlFor={`qty-${productId}`}>{copy.shopStockField}</label>
-            <input
-                id={`qty-${productId}`}
-                type="number"
-                min={1}
-                max={max}
-                value={quantity}
-                onChange={(event) => {
-                    const next = Number(event.target.value);
-                    setQuantity(Number.isFinite(next) ? Math.min(max, Math.max(1, next)) : 1);
-                }}
-                className="w-20 rounded-full border border-stone-200 px-3 py-2.5 text-sm"
-            />
+            <div className="inline-flex items-center rounded-full bg-emerald-900 text-white" role="group" aria-label={copy.shopQty}>
+                <button type="button" aria-label={copy.shopRemove} disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} className="px-3.5 py-2.5 text-sm hover:bg-emerald-950 disabled:opacity-40">−</button>
+                <span className="min-w-6 text-center text-sm font-medium tabular-nums">{quantity}</span>
+                <button type="button" aria-label={copy.shopAdd} disabled={quantity >= max} onClick={() => setQuantity((value) => Math.min(max, value + 1))} className="px-3.5 py-2.5 text-sm hover:bg-emerald-950 disabled:opacity-40">+</button>
+            </div>
             <button type="button" onClick={() => setCartQuantity(line, quantity)} className="rounded-full bg-emerald-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-950">
                 {copy.shopAdd}
             </button>

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Noto_Sans_Arabic } from "next/font/google";
+import { headers } from "next/headers";
 import PwaProvider from "@/components/PwaProvider";
+import { auth } from "@/lib/auth/auth";
 import { getLocale, messages } from "@/lib/i18n";
 import "./globals.css";
 
@@ -47,6 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   const copy = messages(locale);
   const vapid = process.env.VAPID_PUBLIC_KEY ?? "";
+  const session = await auth.api.getSession({ headers: await headers() });
 
   return (
     <html
@@ -56,7 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className={`flex min-h-full flex-col ${locale === "ar" ? "font-[family-name:var(--font-arabic)]" : ""}`}>
         {vapid ? <meta name="village-vet-vapid" content={vapid} /> : null}
-        <PwaProvider copy={copy} />
+        <PwaProvider copy={copy} signedIn={Boolean(session)} />
         {children}
       </body>
     </html>
