@@ -74,7 +74,7 @@ function openingsFor(
     return getAvailableStarts(type, species, date, schedule.appointments, schedule.blocks);
 }
 
-export async function getOpenings(input: { petId: string; type: AppointmentType; date: string }) {
+export async function getOpenings(input: { petId: string; type: AppointmentType; date: string; exceptAppointmentId?: string }) {
     const session = await bookingSession();
     if (!session) return { success: false as const, formErrors: ["You need to sign in."], starts: [], duration: 0 };
 
