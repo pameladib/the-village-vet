@@ -10,6 +10,7 @@ import { parseShopQuery, shopHref, shopText } from "@/lib/shop/catalog";
 import { presentPrice } from "@/lib/shop/money";
 import { getDisplayCurrency, getPricing } from "@/lib/shop/pricing";
 import { productPhotoSrc } from "@/lib/storage/files";
+import { pageKey } from "@/lib/slug";
 
 function first(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] : value;
@@ -98,12 +99,12 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
                             const description = shopText(locale, product.description, product.descriptionAr);
                             return (
                             <li key={product.id} className="flex flex-col overflow-hidden rounded-[1.6rem] bg-white ring-1 ring-stone-200">
-                                <Link href={`/shop/${product.id}`} className="relative block aspect-square bg-[#efe8dc]">
+                                <Link href={`/shop/${pageKey(product)}`} className="relative block aspect-square bg-[#efe8dc]">
                                     <ProductPhoto src={productPhotoSrc(product.id, product.photoUrl)} alt={name} sizes="(min-width: 1024px) 22rem, 50vw" />
                                 </Link>
                                 <div className="flex flex-1 flex-col p-4">
                                     <p className="text-[0.7rem] font-medium tracking-wide text-emerald-800 uppercase">{shopText(locale, product.category.name, product.category.nameAr)}</p>
-                                    <Link href={`/shop/${product.id}`} className="mt-1 font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
+                                    <Link href={`/shop/${pageKey(product)}`} className="mt-1 font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
                                     {description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-stone-500">{description}</p>}
                                     <div className="mt-auto flex items-end justify-between gap-2 pt-4">
                                         <p className="text-sm font-medium text-emerald-950">{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</p>

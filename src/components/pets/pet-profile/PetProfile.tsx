@@ -14,6 +14,7 @@ import WeightHistory, { type WeightEntry } from "./tabs/WeightHistory";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 import type { Copy, Locale } from "@/lib/i18n";
 import { petPhotoSrc } from "@/lib/storage/files";
+import { pageKey } from "@/lib/slug";
 import type { PetDocument } from "@/components/pets/DocumentList";
 
 /* cannot use the Prisma generated Pet type because estimatedAgeValue is a Decimal while we are passing it as a normal JS number
@@ -124,7 +125,7 @@ export default function PetProfile({
                         {copy.profileBack}
                     </HistoryBack>
                     <Link
-                        href={`/pets/${pet.id}/edit`}
+                        href={`/pets/${pageKey(pet)}/edit`}
                         replace
                         className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
                     >

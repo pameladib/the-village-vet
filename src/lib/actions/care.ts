@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
 import { doseDates, applyReminderPlan } from "@/lib/clinic/visit-care";
 import { dateOnlyUtc, doseConflict, formatDateOnly, nextVaccineDue, planFollowUp } from "@/lib/clinic/vaccines";
+import { revalidatePet } from "@/lib/paths";
 import { prisma } from "@/lib/prisma";
 
 const vaccinationSchema = z.object({
@@ -33,11 +34,10 @@ async function veterinarian() {
     }
 }
 
-function refresh(petId: string, visitId?: string) {
-    revalidatePath(`/pets/${petId}`);
+async function refresh(petId: string, visitId?: string) {
+    await revalidatePet(petId, visitId);
     revalidatePath("/dashboard");
     revalidatePath("/admin/care");
-    if (visitId) revalidatePath(`/pets/${petId}/visits/${visitId}`);
 }
 
 async function visitOnPet(petId: string, medicalVisitId: string | undefined) {
@@ -135,7 +135,7 @@ export async function saveVaccination(input: unknown) {
         return { success: false as const, error: "save" as const };
     }
 
-    refresh(pet.id, visit.id);
+    await refresh(pet.id, visit.id);
     return { success: true as const };
 }
 
@@ -206,7 +206,7 @@ export async function saveTreatment(input: unknown) {
         return { success: false as const, error: "save" as const };
     }
 
-    refresh(pet.id, visit.id);
+    await refresh(pet.id, visit.id);
     return { success: true as const };
 }
 
@@ -232,7 +232,7 @@ export async function rescheduleCareReminder(input: unknown) {
         where: { id: parsed.data.id },
         select: { petId: true },
     });
-    if (reminder) refresh(reminder.petId);
+        if (reminder) await refresh(reminder.petId);
     else {
         revalidatePath("/admin/care");
         revalidatePath("/dashboard");

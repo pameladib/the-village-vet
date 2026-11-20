@@ -2,6 +2,7 @@ import type { PetGetPayload, PetSelect } from "../../../generated/prisma/models/
 
 export const petCardSelect = {
     id: true,
+    slug: true,
     name: true,
     species: true,
     breed: true,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { appointmentDetail, appointmentTypes, formatVisitServices, groomingServices } from "@/lib/appointments/labels";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
+import { pageKey } from "@/lib/slug";
 import type { PetProfileData, ProfileAppointment, ProfileVisit } from "../PetProfile";
 
 function startTime(value: Date | string) {
@@ -81,7 +82,7 @@ export default function AppointmentsTab({
                 <div className="mb-2 flex items-center justify-between gap-3">
                     <h3 className="text-sm font-medium text-emerald-900 dark:text-emerald-200">{copy.visitHistory}</h3>
                     {canRecord && (
-                        <Link href={`/pets/${pet.id}/visits/new`} className="rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">
+                        <Link href={`/pets/${pageKey(pet)}/visits/new`} className="rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">
                             {copy.addVisit}
                         </Link>
                     )}
@@ -91,7 +92,7 @@ export default function AppointmentsTab({
                 ) : (
                     <div className="flex flex-col gap-3">
                         {visits.map((visit) => (
-                            <Link key={visit.id} href={`/pets/${pet.id}/visits/${visit.id}`} className="rounded-2xl bg-stone-100 px-3.5 py-3.5 hover:bg-emerald-50 dark:bg-stone-900 dark:hover:bg-emerald-950/40">
+                            <Link key={visit.id} href={`/pets/${pageKey(pet)}/visits/${visit.id}`} className="rounded-2xl bg-stone-100 px-3.5 py-3.5 hover:bg-emerald-50 dark:bg-stone-900 dark:hover:bg-emerald-950/40">
                                 <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{appointmentDetail(visit.type, visit.services, null, copy)}</p>
                                 <p className="mt-1 text-sm text-stone-900 dark:text-stone-50">{formatWhen(visit.visitedAt, locale, visit.linked)}</p>
                                 <p className="mt-1 line-clamp-2 text-sm text-stone-600 dark:text-stone-300">{preview(visit.notes) || copy.noVisitNotes}</p>

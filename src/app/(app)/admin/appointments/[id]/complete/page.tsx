@@ -8,6 +8,7 @@ import { availableVaccineDoses } from "@/lib/clinic/vaccines";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
+import { pageKey } from "@/lib/slug";
 import { isClinicalAppointment } from "@/lib/visits/rules";
 
 export default async function CompleteVisitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,12 +22,12 @@ export default async function CompleteVisitPage({ params }: { params: Promise<{ 
     const appointment = await prisma.appointment.findUnique({
         where: { id },
         include: {
-            pet: { select: { id: true, name: true, species: true, vaccinations: { select: { type: true, administeredAt: true } } } },
+            pet: { select: { id: true, slug: true, name: true, species: true, vaccinations: { select: { type: true, administeredAt: true } } } },
             medicalVisit: { select: { id: true } },
         },
     });
     if (!appointment) notFound();
-    if (appointment.medicalVisit) redirect(`/pets/${appointment.pet.id}/visits/${appointment.medicalVisit.id}`);
+    if (appointment.medicalVisit) redirect(`/pets/${pageKey(appointment.pet)}/visits/${appointment.medicalVisit.id}`);
     if (!isClinicalAppointment(appointment.type) || appointment.status !== "BOOKED") redirect(`/admin/appointments/${appointment.id}`);
 
     const locale = await getLocale();
@@ -52,6 +53,7 @@ export default async function CompleteVisitPage({ params }: { params: Promise<{ 
                     kind: "complete",
                     appointmentId: appointment.id,
                     petId: appointment.pet.id,
+                    petSlug: pageKey(appointment.pet),
                     petName: appointment.pet.name,
                     when,
                     detail: appointmentDetail(appointment.type, appointment.services, appointment.groomingService, copy),

@@ -9,6 +9,7 @@ import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
 import { shopText, shortOrderId } from "@/lib/shop/catalog";
 import { openOrderStatuses, stockLevels, stockState } from "@/lib/shop/inventory";
+import { refWhere } from "@/lib/slug";
 
 function moveLabel(type: string, copy: Copy) {
     if (type === "RECEIVE") return copy.invMoveReceive;
@@ -42,9 +43,10 @@ export default async function InventoryProductPage({ params }: { params: Promise
     });
 
     const product = await prisma.product.findUnique({
-        where: { id },
+        where: refWhere(id),
         select: {
             id: true,
+            slug: true,
             name: true,
             nameAr: true,
             stock: true,
@@ -53,19 +55,20 @@ export default async function InventoryProductPage({ params }: { params: Promise
         },
     });
     if (!product) notFound();
+    if (product.slug && id !== product.slug) redirect(`/admin/inventory/${product.slug}`);
 
     const [reserved, movements, orderItems] = await Promise.all([
         prisma.orderItem.aggregate({
-            where: { productId: id, order: { status: { in: [...openOrderStatuses] } } },
+            where: { productId: product.id, order: { status: { in: [...openOrderStatuses] } } },
             _sum: { quantity: true },
         }),
         prisma.stockMovement.findMany({
-            where: { productId: id },
+            where: { productId: product.id },
             orderBy: { createdAt: "desc" },
             include: { staff: { select: { name: true } } },
         }),
         prisma.orderItem.findMany({
-            where: { productId: id },
+            where: { productId: product.id },
             select: { id: true, quantity: true, order: { select: { id: true, status: true, createdAt: true, updatedAt: true } } },
         }),
     ]);

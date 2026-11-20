@@ -1,11 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { calendarDateInBeirut } from "@/lib/appointments/availability";
 import { canRecordPetWeight } from "@/lib/auth/permissions";
 import { requireRole } from "@/lib/auth/session";
 import { parseWeightKg, weightInstant, weightNotes } from "@/lib/pets/weight";
+import { revalidatePet } from "@/lib/paths";
 import { prisma } from "@/lib/prisma";
 
 async function veterinarian() {
@@ -17,8 +17,8 @@ async function veterinarian() {
     }
 }
 
-function refresh(petId: string) {
-    revalidatePath(`/pets/${petId}`);
+async function refresh(petId: string) {
+    await revalidatePet(petId);
 }
 
 export async function createPetWeight(input: { petId: string; weight: string; date: string; notes: string }) {
@@ -42,7 +42,7 @@ export async function createPetWeight(input: { petId: string; weight: string; da
     await prisma.petWeight.create({
         data: { petId: pet.id, weight, recordedAt, notes },
     });
-    refresh(pet.id);
+    await refresh(pet.id);
     return { success: true as const };
 }
 
@@ -82,7 +82,7 @@ export async function updatePetWeight(input: { id: string; weight: string; date:
             data: { weight, notes, recordedAt },
         });
     }
-    refresh(current.petId);
+    await refresh(current.petId);
     return { success: true as const };
 }
 
@@ -93,6 +93,6 @@ export async function deletePetWeight(id: string) {
     const current = await prisma.petWeight.findUnique({ where: { id: parsed.data }, select: { id: true, petId: true } });
     if (!current) return { success: false as const, error: "missing" as const };
     await prisma.petWeight.delete({ where: { id: current.id } });
-    refresh(current.petId);
+    await refresh(current.petId);
     return { success: true as const };
 }

@@ -25,6 +25,7 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
         dueAt: reminder.dueAt.toISOString(),
         timing: careTiming(reminder.dueAt),
         petId: reminder.petId,
+        petSlug: reminder.petSlug,
         petName: reminder.petName,
         ownerId: reminder.ownerId,
         ownerName: reminder.ownerName,

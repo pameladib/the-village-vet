@@ -57,7 +57,7 @@ export default function VisitForm({
 }: {
     copy: Copy;
     mode:
-        | { kind: "complete"; appointmentId: string; petId: string; petName: string; when: string; detail: string; visitDay: string; care: PetCare }
+        | { kind: "complete"; appointmentId: string; petId: string; petSlug?: string; petName: string; when: string; detail: string; visitDay: string; care: PetCare }
         | { kind: "walkin"; petId?: string; petName?: string; pets?: WalkInPet[]; care?: PetCare }
         | { kind: "edit"; visitId: string; linked: boolean; date: string; visitType: VisitKind; services: VisitService[]; notes: string; weight: string };
 }) {
@@ -229,7 +229,7 @@ export default function VisitForm({
                     <div className="min-w-0">
                         <dt className="text-xs font-medium text-stone-500">{copy.columnPet}</dt>
                         <dd className="mt-1 text-sm font-semibold">
-                            <Link href={`/pets/${mode.petId}`} className="text-emerald-950 hover:underline dark:text-emerald-50">{mode.petName}</Link>
+                            <Link href={`/pets/${mode.petSlug || mode.petId}`} className="text-emerald-950 hover:underline dark:text-emerald-50">{mode.petName}</Link>
                         </dd>
                     </div>
                     <div className="min-w-0">

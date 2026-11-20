@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth/session";
 import { formatDateOnly } from "@/lib/clinic/vaccines";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { pageKey } from "@/lib/slug";
 
 function one(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] : value;
@@ -32,7 +33,7 @@ export default async function FollowUpsPage({ searchParams }: { searchParams: Pr
             id: true,
             dueOn: true,
             notes: true,
-            pet: { select: { id: true, name: true, sex: true, owner: { select: { id: true, name: true, phoneNumber: true } } } },
+            pet: { select: { id: true, slug: true, name: true, sex: true, owner: { select: { id: true, name: true, phoneNumber: true } } } },
         },
     });
     const rows: FollowUpItem[] = reminders.map((row) => ({
@@ -41,6 +42,7 @@ export default async function FollowUpsPage({ searchParams }: { searchParams: Pr
         notes: row.notes,
         timing: careTiming(row.dueOn),
         petId: row.pet.id,
+        petSlug: pageKey(row.pet),
         petName: row.pet.name,
         ownerId: row.pet.owner.id,
         ownerName: row.pet.owner.name,

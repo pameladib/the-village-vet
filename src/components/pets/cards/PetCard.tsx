@@ -3,6 +3,7 @@ import Link from "next/link";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 import type { Copy } from "@/lib/i18n";
 import { petPhotoSrc } from "@/lib/storage/files";
+import { pageKey } from "@/lib/slug";
 import type { PetCardData } from "@/lib/types/pets";
 
 export default function PetCard({ pet, copy }: { pet: PetCardData; copy: Copy }) {
@@ -12,7 +13,7 @@ export default function PetCard({ pet, copy }: { pet: PetCardData; copy: Copy })
 
     return (
         <Link
-            href={`/pets/${pet.id}`}
+            href={`/pets/${pageKey(pet)}`}
             className="group flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm transition duration-200 hover:border-emerald-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 dark:border-stone-700 dark:bg-stone-950 dark:hover:border-emerald-400"
         >
             <div className="size-20 shrink-0 overflow-hidden rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
+import { refWhere } from "@/lib/slug";
 
 export default async function PetProfilePage({
   params,
@@ -30,7 +31,7 @@ export default async function PetProfilePage({
   let pet;
 
   pet = await prisma.pet.findFirst({
-    where: session.user.role === "ADMIN" ? { id } : { id, ownerId: session.user.id },
+    where: session.user.role === "ADMIN" ? refWhere(id) : { ...refWhere(id), ownerId: session.user.id },
     include: {
       weightRecords: { // current weight is the latest weight record, not a column on the pet
         orderBy: { recordedAt: "desc" },
@@ -65,6 +66,7 @@ export default async function PetProfilePage({
   });
 
   if (!pet) notFound(); // if query succeeds but no pet is found, query returns null. notFound() displays our custom not-found.tsx page
+  if (pet.slug && id !== pet.slug) redirect(`/pets/${pet.slug}`);
 
   /* 
   The estimatedAgeValue field in the Pet model is of type Decimal

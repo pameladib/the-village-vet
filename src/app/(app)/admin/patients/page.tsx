@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
+import { pageKey } from "@/lib/slug";
 
 function first(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] : value;
@@ -46,7 +47,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
                 <ul className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-2">
                     {pets.map((pet) => {
                         const breed = pet.breed?.trim();
-                        const profileHref = clinical ? `/pets/${pet.id}` : `/admin/patients/${pet.id}`;
+                        const profileHref = clinical ? `/pets/${pageKey(pet)}` : `/admin/patients/${pageKey(pet)}`;
                         return (
                             <PatientCard
                                 key={pet.id}

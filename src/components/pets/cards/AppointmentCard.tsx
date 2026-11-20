@@ -9,6 +9,7 @@ import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { shownMessage } from "@/lib/shown-message";
 import { petPhotoSrc } from "@/lib/storage/files";
+import { pageKey } from "@/lib/slug";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 
 function when(startAt: Date | string, locale: Locale) {
@@ -73,7 +74,7 @@ export default function AppointmentCard({ appointment, copy, locale }: { appoint
                     )}
                 </div>
                 <div className="min-w-0">
-                    <Link href={`/pets/${pet.id}`} className="truncate text-sm font-semibold text-emerald-950 hover:underline dark:text-emerald-50">{pet.name}</Link>
+                    <Link href={`/pets/${pageKey(pet)}`} className="truncate text-sm font-semibold text-emerald-950 hover:underline dark:text-emerald-50">{pet.name}</Link>
                     <p className="mt-0.5 text-sm text-stone-700 dark:text-stone-200">{detail(appointment, copy)}</p>
                     <p className="mt-0.5 text-sm text-stone-500">{when(appointment.startAt, locale)}</p>
                     {error && <p className="mt-1 text-xs text-red-700 dark:text-red-300">{error}</p>}

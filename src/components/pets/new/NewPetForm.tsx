@@ -58,7 +58,7 @@ the isFirstPet and ownerName props are needed only for adding a pet
 defaultValues, photoUrl and id are for updating a pet (id is to identify the pet and send it to the updatePet action)
 for this reason we made all 5 props optional so we can pass them as needed or leave them out when not needed
 */ 
-export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photoUrl, id, allowClinical = false, copy }: { isFirstPet?: boolean; ownerName?: string; defaultValues?: PetForm; photoUrl?: string | null; id?: string; allowClinical?: boolean; copy: Copy }) {
+export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photoUrl, id, profileSlug, allowClinical = false, copy }: { isFirstPet?: boolean; ownerName?: string; defaultValues?: PetForm; photoUrl?: string | null; id?: string; profileSlug?: string | null; allowClinical?: boolean; copy: Copy }) {
   const [step, setStep] = useState(1); // 1 basic, 2 medical, 3 vaccinations and treatments
   const [formError, setFormError] = useState<string | null>(null);
   const [petId, setPetId] = useState(id);
@@ -123,8 +123,9 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
     }
 
     setFormError(null);
-    if (petId) router.replace(`/pets/${savedId}`);
-    else router.push(`/pets/${savedId}`);
+    const destination = result.slug || profileSlug || savedId;
+    // Replace the form so Back from the new profile returns to the dashboard.
+    router.replace(`/pets/${destination}`);
   }
 
   return (
@@ -134,7 +135,7 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
           {defaultValues && id && (
             <button
               type="button"
-              onClick={() => router.replace(`/pets/${id}`)}
+              onClick={() => router.replace(`/pets/${profileSlug || id}`)}
               className="mb-6 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition duration-200 hover:scale-[1.03] hover:border-emerald-700 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
             >
               <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />

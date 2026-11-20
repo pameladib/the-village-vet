@@ -8,6 +8,7 @@ import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
 import { shopText } from "@/lib/shop/catalog";
 import { openOrderStatuses, stockLevels, stockState, type StockState } from "@/lib/shop/inventory";
+import { pageKey } from "@/lib/slug";
 
 function first(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] : value;
@@ -41,6 +42,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         prisma.product.findMany({
             select: {
                 id: true,
+                slug: true,
                 name: true,
                 nameAr: true,
                 stock: true,
@@ -128,7 +130,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                                     <div className="min-w-0"><dt className="text-xs text-stone-500">{copy.invReserved}</dt><dd className="font-medium text-stone-900 dark:text-stone-50">{count.format(product.reserved)}</dd></div>
                                     <div className="min-w-0"><dt className="text-xs text-stone-500">{copy.invAvailable}</dt><dd className="font-medium text-stone-900 dark:text-stone-50">{count.format(product.available)}</dd></div>
                                 </dl>
-                                <Link href={`/admin/inventory/${product.id}`} className="mt-3 inline-flex rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.invManage}</Link>
+                                <Link href={`/admin/inventory/${pageKey(product)}`} className="mt-3 inline-flex rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.invManage}</Link>
                             </li>
                         ))}
                     </ul>
@@ -155,7 +157,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                                             <td className="px-3 py-2.5 text-stone-800 dark:text-stone-100">{count.format(product.reserved)}</td>
                                             <td className="px-3 py-2.5 text-stone-800 dark:text-stone-100">{count.format(product.available)}</td>
                                             <td className="px-3 py-2.5"><StockBadge state={product.state} label={stateLabel(product.state, copy)} /></td>
-                                            <td className="px-3 py-2.5"><Link href={`/admin/inventory/${product.id}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{copy.invManage}</Link></td>
+                                            <td className="px-3 py-2.5"><Link href={`/admin/inventory/${pageKey(product)}`} className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{copy.invManage}</Link></td>
                                         </tr>
                                     ))}
                                 </tbody>

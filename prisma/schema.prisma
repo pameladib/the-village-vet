@@ -91,6 +91,7 @@ model Verification {
 
 model Pet {
   id String @id @default(uuid())
+  slug String? @unique
 
   // basic information
   name              String
@@ -504,6 +505,7 @@ model ProductCategory {
 
 model Product {
   id            String          @id @default(uuid())
+  slug          String?         @unique
   name          String
   nameAr        String
   description   String?

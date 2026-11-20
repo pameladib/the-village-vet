@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { getPricing } from "@/lib/shop/pricing";
+import { refWhere } from "@/lib/slug";
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
     try {
@@ -15,11 +16,12 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
     const { id } = await params;
     const [product, categories, pricing] = await Promise.all([
-        prisma.product.findUnique({ where: { id } }),
+        prisma.product.findUnique({ where: refWhere(id) }),
         prisma.productCategory.findMany({ orderBy: { position: "asc" } }),
         getPricing(),
     ]);
     if (!product) notFound();
+    if (product.slug && id !== product.slug) redirect(`/admin/shop/${product.slug}`);
 
     const locale = await getLocale();
     const copy = messages(locale);

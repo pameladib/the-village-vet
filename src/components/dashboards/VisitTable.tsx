@@ -71,7 +71,7 @@ export default function VisitTable({
                                 {showDate && <p className="text-xs text-stone-500">{day.format(visit.startAt)}</p>}
                             </div>
                             <p className="truncate text-sm font-medium text-stone-900 sm:min-w-0 sm:px-2 sm:text-center dark:text-stone-50">
-                                {clinical ? <Link href={`/pets/${visit.petId}`} className="hover:underline">{visit.petName}</Link> : visit.petName}
+                                {clinical ? <Link href={`/pets/${visit.petSlug}`} className="hover:underline">{visit.petName}</Link> : visit.petName}
                             </p>
                             <p className="truncate text-sm text-stone-600 sm:min-w-0 sm:px-2 sm:text-center dark:text-stone-300">
                                 <Link href={`/admin/owners/${visit.ownerId}`} className="hover:underline">{visit.ownerName}</Link>

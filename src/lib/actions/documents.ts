@@ -1,7 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { revalidatePet } from "@/lib/paths";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/session";
 import { canUploadMedicalDocument } from "@/lib/auth/permissions";
@@ -99,6 +99,6 @@ export async function confirmMedicalDocument(petId: string, input: { title: stri
         return { success: false as const, formErrors: ["Could not save the document."] };
     }
 
-    revalidatePath(`/pets/${allowed.petId}`);
+    await revalidatePet(allowed.petId);
     return { success: true as const };
 }

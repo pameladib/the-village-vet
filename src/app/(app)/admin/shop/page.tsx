@@ -9,6 +9,7 @@ import { adminShopHref, formatLbp, parseShopQuery, shopText } from "@/lib/shop/c
 import { presentPrice } from "@/lib/shop/money";
 import { getDisplayCurrency, getPricing } from "@/lib/shop/pricing";
 import { productPhotoSrc } from "@/lib/storage/files";
+import { pageKey } from "@/lib/slug";
 
 function first(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] : value;
@@ -79,19 +80,19 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
                         const name = shopText(locale, product.name, product.nameAr);
                         return (
                             <li key={product.id} className="overflow-hidden rounded-3xl border border-stone-200 bg-white">
-                                <Link href={`/admin/shop/${product.id}`} className="relative block aspect-square bg-[#efe8dc]">
+                                <Link href={`/admin/shop/${pageKey(product)}`} className="relative block aspect-square bg-[#efe8dc]">
                                     <ProductPhoto src={productPhotoSrc(product.id, product.photoUrl)} alt={name} sizes="(min-width: 1024px) 20rem, 50vw" />
                                 </Link>
                                 <div className="p-4">
                                     <p className="text-xs font-medium tracking-wide text-emerald-800 uppercase">{shopText(locale, product.category.name, product.category.nameAr)}</p>
-                                    <Link href={`/admin/shop/${product.id}`} className="mt-1 block font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
+                                    <Link href={`/admin/shop/${pageKey(product)}`} className="mt-1 block font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
                                     <p className="text-sm text-stone-500">{locale === "ar" ? product.name : product.nameAr}</p>
                                     <div className="mt-3 flex items-center justify-between gap-2 text-sm">
                                         <span>{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</span>
                                         <span className="text-stone-500">{product.stock > 0 ? formatLbp(product.stock, locale) : copy.shopOut}</span>
                                     </div>
                                     {!product.available && <p className="mt-2 text-xs font-medium text-stone-500">{copy.shopHidden}</p>}
-                                    <Link href={`/admin/shop/${product.id}`} className="mt-3 inline-flex text-sm font-medium text-emerald-800">{copy.shopEdit}</Link>
+                                    <Link href={`/admin/shop/${pageKey(product)}`} className="mt-3 inline-flex text-sm font-medium text-emerald-800">{copy.shopEdit}</Link>
                                 </div>
                             </li>
                         );

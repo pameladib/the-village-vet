@@ -9,6 +9,7 @@ import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
+import { pageKey } from "@/lib/slug";
 
 export default async function StaffAppointmentPage({ params }: { params: Promise<{ id: string }> }) {
     let session;
@@ -22,7 +23,7 @@ export default async function StaffAppointmentPage({ params }: { params: Promise
     const appointment = await prisma.appointment.findUnique({
         where: { id },
         include: {
-            pet: { select: { id: true, name: true } },
+            pet: { select: { id: true, slug: true, name: true } },
             owner: { select: { id: true, name: true, phoneNumber: true } },
             medicalVisit: { select: { id: true } },
         },
@@ -69,7 +70,7 @@ export default async function StaffAppointmentPage({ params }: { params: Promise
                         <div>
                             <dt className="text-xs text-stone-500">{copy.columnPet}</dt>
                             <dd className="mt-1 text-base font-medium text-stone-900 dark:text-stone-50">
-                                {clinical ? <Link href={`/pets/${appointment.pet.id}`} className="text-emerald-900 hover:underline dark:text-emerald-200">{appointment.pet.name}</Link> : appointment.pet.name}
+                                {clinical ? <Link href={`/pets/${pageKey(appointment.pet)}`} className="text-emerald-900 hover:underline dark:text-emerald-200">{appointment.pet.name}</Link> : appointment.pet.name}
                             </dd>
                         </div>
                         <div>
@@ -93,7 +94,7 @@ export default async function StaffAppointmentPage({ params }: { params: Promise
                 </div>
             )}
             {appointment.medicalVisit && clinical && (
-                <Link href={`/pets/${appointment.pet.id}/visits/${appointment.medicalVisit.id}`} className="mt-4 inline-flex text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">
+                <Link href={`/pets/${pageKey(appointment.pet)}/visits/${appointment.medicalVisit.id}`} className="mt-4 inline-flex text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">
                     {copy.openVisit}
                 </Link>
             )}

@@ -17,6 +17,7 @@ export type FollowUpItem = {
     notes: string | null;
     timing: "overdue" | "due" | "upcoming";
     petId: string;
+    petSlug: string;
     petName: string;
     ownerId: string;
     ownerName: string;
@@ -172,7 +173,7 @@ function FollowUpRow({ copy, locale, row, highlight }: { copy: Copy; locale: Loc
         <li id={`follow-up-${row.id}`} className={`rounded-xl px-3 py-3 transition-colors duration-700 ${highlight ? "bg-emerald-50 ring-2 ring-emerald-600/35 dark:bg-emerald-950/40" : ""}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <Link href={`/pets/${row.petId}`} className="text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">{row.petName}</Link>
+                    <Link href={`/pets/${row.petSlug}`} className="text-sm font-medium text-emerald-900 hover:underline dark:text-emerald-200">{row.petName}</Link>
                     <p className={`text-sm ${metaTone}`}>
                         <Link href={`/admin/owners/${row.ownerId}`} className="hover:underline">{row.ownerName}</Link>
                         {ownerWhatsapp ? <>{" · "}<a href={ownerWhatsapp} target="_blank" rel="noopener noreferrer" className="hover:underline">{row.phone}</a></> : null}

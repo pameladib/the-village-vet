@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/session";
 import { openOrderStatuses } from "@/lib/shop/inventory";
+import { revalidateProduct } from "@/lib/paths";
 
 const quantitySchema = z.number().int().min(1).max(10000);
 const noteSchema = z.string().trim().min(1).max(300);
@@ -17,13 +18,9 @@ async function staff() {
     }
 }
 
-function refresh(productId: string) {
-    revalidatePath("/admin/inventory");
-    revalidatePath(`/admin/inventory/${productId}`);
+async function refresh(productId: string) {
     revalidatePath("/dashboard");
-    revalidatePath("/admin/shop");
-    revalidatePath("/shop");
-    revalidatePath(`/shop/${productId}`);
+    await revalidateProduct(productId);
 }
 
 export async function receiveStock(productId: string, quantity: number, note: string) {
@@ -47,7 +44,7 @@ export async function receiveStock(productId: string, quantity: number, note: st
             },
         }),
     ]);
-    refresh(productId);
+    await refresh(productId);
     return { success: true as const };
 }
 
@@ -73,7 +70,7 @@ export async function writeOffStock(productId: string, quantity: number, note: s
         if (error instanceof Error && error.message === "not-enough") return { success: false as const, error: "not-enough" as const };
         return { success: false as const, error: "missing" as const };
     }
-    refresh(productId);
+    await refresh(productId);
     return { success: true as const };
 }
 
@@ -109,7 +106,7 @@ export async function correctStock(productId: string, counted: number, note: str
         if (code === "count-low" || code === "missing") return { success: false as const, error: code };
         return { success: false as const, error: "invalid" as const };
     }
-    refresh(productId);
+    await refresh(productId);
     return { success: true as const };
 }
 
@@ -121,6 +118,6 @@ export async function setLowStockThreshold(productId: string, threshold: number)
     }
     const updated = await prisma.product.updateMany({ where: { id: productId }, data: { lowStockAt: threshold } });
     if (updated.count !== 1) return { success: false as const, error: "missing" as const };
-    refresh(productId);
+    await refresh(productId);
     return { success: true as const };
 }

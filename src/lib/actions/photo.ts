@@ -1,7 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { revalidatePet } from "@/lib/paths";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/session";
 import { canChangePetPhoto } from "@/lib/auth/permissions";
@@ -104,6 +104,6 @@ export async function confirmPetPhoto(petId: string, input: { key: string; conte
         return { success: false as const, formErrors: ["Could not store the photo."] };
     }
 
-    revalidatePath(`/pets/${allowed.petId}`);
+    await revalidatePet(allowed.petId);
     return { success: true as const };
 }

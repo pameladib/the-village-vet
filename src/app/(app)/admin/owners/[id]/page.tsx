@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId } from "@/lib/shop/catalog";
 import { formatStored, orderCharge } from "@/lib/shop/money";
 import { petPhotoSrc } from "@/lib/storage/files";
+import { pageKey } from "@/lib/slug";
 
 export default async function OwnerProfilePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -33,7 +34,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
             username: true,
             createdAt: true,
             pets: {
-                select: { id: true, name: true, species: true, breed: true, photoUrl: true },
+                select: { id: true, slug: true, name: true, species: true, breed: true, photoUrl: true },
                 orderBy: { name: "asc" },
             },
             sessions: {
@@ -115,7 +116,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                             const photo = petPhotoSrc(pet.id, pet.photoUrl);
                             return (
                                 <li key={pet.id}>
-                                    <Link href={clinical ? `/pets/${pet.id}` : `/admin/patients/${pet.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
+                                    <Link href={clinical ? `/pets/${pageKey(pet)}` : `/admin/patients/${pageKey(pet)}`} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
                                         <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
                                             {photo ? <img src={photo} alt="" className="size-full object-cover" /> : <SpeciesMark species={pet.species} className="size-4" />}
                                         </span>

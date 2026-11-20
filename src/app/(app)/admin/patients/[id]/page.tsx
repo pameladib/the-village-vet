@@ -10,6 +10,7 @@ import { getLocale, messages, type Copy, type Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { ownerChat } from "@/lib/clinic/phone";
 import { prisma } from "@/lib/prisma";
+import { pageKey, refWhere } from "@/lib/slug";
 
 function ageText(
     pet: {
@@ -53,12 +54,11 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
     } catch {
         redirect("/dashboard");
     }
-    if (canSeeClinicalRecords(session.user.role)) redirect(`/pets/${id}`);
-
     const pet = await prisma.pet.findUnique({
-        where: { id },
+        where: refWhere(id),
         select: {
             id: true,
+            slug: true,
             name: true,
             species: true,
             breed: true,
@@ -77,6 +77,8 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
         },
     });
     if (!pet) notFound();
+    if (canSeeClinicalRecords(session.user.role)) redirect(`/pets/${pageKey(pet)}`);
+    if (pet.slug && id !== pet.slug) redirect(`/admin/patients/${pet.slug}`);
 
     const locale = await getLocale();
     const copy = messages(locale);

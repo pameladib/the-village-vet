@@ -11,6 +11,8 @@ import { notify, notifyStaff } from "@/lib/notifications";
 import { adminMoves, customerCanCancel, staffCanCancel, stageStamp, stockEffect, type OrderStatus } from "@/lib/shop/lifecycle";
 import { convertMinor, validDeliveryFee } from "@/lib/shop/money";
 import { getDisplayCurrency, pricingFrom } from "@/lib/shop/pricing";
+import { revalidateProduct } from "@/lib/paths";
+import { uniqueSlug } from "@/lib/record-slug";
 import { planReservation } from "@/lib/shop/reservation";
 import { acceptPhoto, isSafeObjectKey, objectKey, PHOTO_TYPES, preparePhoto, PRODUCT_PHOTOS_BUCKET } from "@/lib/storage/files";
 import { createUploadUrl, ensurePrivateBucket, readStoredPrefix, removeStoredObject, StorageNotConfiguredError } from "@/lib/storage/supabase";
@@ -63,10 +65,12 @@ function storedPhoto(value: string) {
     return null;
 }
 
-function refreshShop(productId?: string) {
-    revalidatePath("/admin/shop");
-    revalidatePath("/shop");
-    if (productId) revalidatePath(`/shop/${productId}`);
+async function refreshShop(productId?: string) {
+    if (productId) await revalidateProduct(productId);
+    else {
+        revalidatePath("/admin/shop");
+        revalidatePath("/shop");
+    }
 }
 
 async function owner() {
@@ -386,6 +390,7 @@ export async function saveProduct(input: unknown) {
     }
     const data = {
         name: parsed.data.name,
+        slug: await uniqueSlug("product", parsed.data.name, parsed.data.id),
         nameAr: parsed.data.nameAr,
         description: parsed.data.description || null,
         descriptionAr: parsed.data.descriptionAr || null,
@@ -413,7 +418,7 @@ export async function saveProduct(input: unknown) {
             }
         });
     }
-    refreshShop(parsed.data.id);
+    await refreshShop(parsed.data.id);
     return { success: true as const };
 }
 
@@ -431,7 +436,7 @@ export async function deleteProduct(productId: string) {
     if (existing.photoUrl && isSafeObjectKey(existing.photoUrl)) {
         await removeStoredObject(PRODUCT_PHOTOS_BUCKET, existing.photoUrl).catch(() => undefined);
     }
-    refreshShop(productId);
+    await refreshShop(productId);
     return { success: true as const };
 }
 
@@ -660,7 +665,7 @@ export async function saveCategory(input: unknown) {
             data: { name: parsed.data.name, nameAr: parsed.data.nameAr, position: (last._max.position ?? 0) + 1 },
         });
     }
-    refreshShop();
+    await refreshShop();
     return { success: true as const };
 }
 
@@ -672,6 +677,6 @@ export async function deleteCategory(categoryId: string) {
     if (count > 0) return { success: false as const, formErrors: ["This category still has products, so it cannot be deleted."] };
     const deleted = await prisma.productCategory.deleteMany({ where: { id: categoryId } });
     if (deleted.count !== 1) return { success: false as const, formErrors: ["That category was not found."] };
-    refreshShop();
+    await refreshShop();
     return { success: true as const };
 }

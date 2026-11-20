@@ -9,6 +9,7 @@ import { doseCopyKey } from "@/lib/clinic/vaccines";
 import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
+import { pageKey, refWhere } from "@/lib/slug";
 
 export default async function VisitPage({ params }: { params: Promise<{ id: string; visitId: string }> }) {
     let session;
@@ -19,10 +20,16 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
     }
 
     const { id, visitId } = await params;
+    const petRef = await prisma.pet.findFirst({
+        where: session.user.role === "ADMIN" ? refWhere(id) : { ...refWhere(id), ownerId: session.user.id },
+        select: { id: true, slug: true },
+    });
+    if (!petRef) notFound();
+    if (petRef.slug && id !== petRef.slug) redirect(`/pets/${petRef.slug}/visits/${visitId}`);
     const visit = await prisma.medicalVisit.findFirst({
-        where: { id: visitId, petId: id },
+        where: { id: visitId, petId: petRef.id },
         include: {
-            pet: { select: { id: true, name: true, ownerId: true } },
+            pet: { select: { id: true, slug: true, name: true, ownerId: true } },
             vaccinations: { select: { id: true, type: true, administeredAt: true }, orderBy: { administeredAt: "desc" } },
             treatments: { select: { id: true, type: true, administeredAt: true }, orderBy: { administeredAt: "desc" } },
             weight: { select: { weight: true } },
@@ -46,7 +53,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
 
     return (
         <main className="mx-auto w-full max-w-xl px-4 py-6 sm:px-6">
-            <HistoryBack fallback={`/pets/${visit.pet.id}`} className="cursor-pointer text-sm font-medium text-emerald-800">{visit.pet.name}</HistoryBack>
+            <HistoryBack fallback={`/pets/${pageKey(visit.pet)}`} className="cursor-pointer text-sm font-medium text-emerald-800">{visit.pet.name}</HistoryBack>
             <h1 className="mt-3 text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">
                 {appointmentDetail(visit.type, visit.services, null, copy)}
             </h1>
@@ -98,7 +105,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
             </section>
 
             {canWrite && visit.vaccinations.length === 0 && visit.treatments.length === 0 && (
-                <DeleteVisit visitId={visit.id} petId={visit.pet.id} copy={copy} />
+                <DeleteVisit visitId={visit.id} petId={pageKey(visit.pet)} copy={copy} />
             )}
             {canWrite && (visit.vaccinations.length > 0 || visit.treatments.length > 0) && (
                 <p className="mt-6 text-sm text-stone-500">{copy.visitDeleteBlocked}</p>

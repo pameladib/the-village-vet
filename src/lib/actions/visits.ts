@@ -6,6 +6,7 @@ import { beirutInstant, todayInBeirut } from "@/lib/appointments/availability";
 import { orderedVisitServices } from "@/lib/appointments/labels";
 import { requireRole } from "@/lib/auth/session";
 import { addVisitTreatment, addVisitVaccination } from "@/lib/clinic/visit-care";
+import { revalidatePet } from "@/lib/paths";
 import { prisma } from "@/lib/prisma";
 import { writeVisitWeight } from "@/lib/pets/save-weight";
 import { followUpCreateTab, followUpDueOn } from "@/lib/visits/follow-up";
@@ -31,13 +32,11 @@ async function staff() {
     }
 }
 
-function refresh(petId: string, visitId?: string) {
+async function refresh(petId: string, visitId?: string) {
     revalidatePath("/dashboard");
     revalidatePath("/admin/appointments");
     revalidatePath("/admin/care");
-    revalidatePath(`/pets/${petId}`);
-    revalidatePath(`/admin/patients/${petId}`);
-    if (visitId) revalidatePath(`/pets/${petId}/visits/${visitId}`);
+    await revalidatePet(petId, visitId);
 }
 
 function walkInInstant(date: string) {
@@ -155,7 +154,7 @@ export async function completeAppointment(appointmentId: string, notes: string, 
                 petId: "petId" in saved ? saved.petId : undefined,
             };
         }
-        refresh(saved.petId, saved.visitId);
+        await refresh(saved.petId, saved.visitId);
         revalidatePath(`/admin/appointments/${parsedId.data}`);
         return { success: true as const, visitId: saved.visitId, petId: saved.petId };
     } catch (error) {
@@ -212,7 +211,7 @@ export async function createWalkIn(input: { petId: string; date: string; type: "
             await writeVisitWeight(tx, { petId: pet.id, visitId: created.id, visitedAt, raw: parsed.data.weight ?? "" });
             return created;
         });
-        refresh(pet.id, visit.id);
+        await refresh(pet.id, visit.id);
         return { success: true as const, visitId: visit.id, petId: pet.id };
     } catch (error) {
         if (error instanceof Error && error.message === "weight") return { success: false as const, error: "weight" as const };
@@ -265,7 +264,7 @@ export async function updateVisit(input: { visitId: string; notes: string; date?
         if (error instanceof Error && error.message === "weight") return { success: false as const, error: "weight" as const };
         return { success: false as const, error: "closed" as const };
     }
-    refresh(visit.petId, visit.id);
+    await refresh(visit.petId, visit.id);
     return { success: true as const, visitId: visit.id, petId: visit.petId };
 }
 
@@ -297,7 +296,7 @@ export async function deleteVisit(visitId: string) {
             return { petId: visit.petId };
         });
         if ("error" in removed) return { success: false as const, error: removed.error };
-        refresh(removed.petId);
+        await refresh(removed.petId);
         return { success: true as const, petId: removed.petId };
     } catch {
         return { success: false as const, error: "closed" as const };
@@ -327,7 +326,7 @@ export async function setAppointmentOutcome(appointmentId: string, outcome: "COM
         data: { status: outcome },
     });
     if (updated.count !== 1) return { success: false as const, error: "closed" as const };
-    refresh(appointment.petId);
+    await refresh(appointment.petId);
     revalidatePath(`/admin/appointments/${appointment.id}`);
     return { success: true as const };
 }

@@ -1,5 +1,5 @@
 import HistoryBack from "@/components/HistoryBack";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import AddToCartButton from "@/components/shop/AddToCartButton";
 import ProductPhoto from "@/components/shop/ProductPhoto";
 import { getLocale, messages } from "@/lib/i18n";
@@ -8,14 +8,16 @@ import { shopText } from "@/lib/shop/catalog";
 import { presentPrice } from "@/lib/shop/money";
 import { getDisplayCurrency, getPricing } from "@/lib/shop/pricing";
 import { productPhotoSrc } from "@/lib/storage/files";
+import { refWhere } from "@/lib/slug";
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const product = await prisma.product.findFirst({
-        where: { id, available: true },
+        where: { ...refWhere(id), available: true },
         include: { category: { select: { name: true, nameAr: true } } },
     });
     if (!product) notFound();
+    if (product.slug && id !== product.slug) redirect(`/shop/${product.slug}`);
 
     const [locale, pricing, display] = await Promise.all([getLocale(), getPricing(), getDisplayCurrency()]);
     const copy = messages(locale);

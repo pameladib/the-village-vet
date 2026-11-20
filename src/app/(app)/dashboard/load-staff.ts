@@ -5,11 +5,13 @@ import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { stockState } from "@/lib/shop/inventory";
 import { followUpBuckets } from "@/lib/visits/follow-up";
+import { pageKey } from "@/lib/slug";
 import type { AppointmentType, GroomingService, VisitService } from "../../../../generated/prisma/client";
 
 export type StaffVisit = {
     id: string;
     petId: string;
+    petSlug: string;
     type: AppointmentType;
     services: VisitService[];
     groomingService: GroomingService | null;
@@ -27,6 +29,7 @@ export type StaffReminder = {
     dose: string | null;
     dueAt: Date;
     petId: string;
+    petSlug: string;
     petName: string;
     ownerId: string;
     ownerName: string;
@@ -41,7 +44,7 @@ export type FollowUpCounts = {
 };
 
 const visitInclude = {
-    pet: { select: { id: true, name: true } },
+    pet: { select: { id: true, slug: true, name: true } },
     owner: { select: { id: true, name: true, phoneNumber: true } },
 } as const;
 
@@ -51,12 +54,13 @@ function toVisit(visit: {
     services: VisitService[];
     groomingService: GroomingService | null;
     startAt: Date;
-    pet: { id: string; name: string };
+    pet: { id: string; slug: string | null; name: string };
     owner: { id: string; name: string; phoneNumber: string };
 }): StaffVisit {
     return {
         id: visit.id,
         petId: visit.pet.id,
+        petSlug: pageKey(visit.pet),
         type: visit.type,
         services: visit.services,
         groomingService: visit.groomingService,
@@ -185,6 +189,7 @@ export async function loadPatients(rawQuery: string, rawPage: string | undefined
         where,
         select: {
             id: true,
+            slug: true,
             name: true,
             species: true,
             breed: true,
@@ -205,6 +210,7 @@ export async function loadCareReminders() {
             pet: {
                 select: {
                     id: true,
+                    slug: true,
                     name: true,
                     species: true,
                     owner: { select: { id: true, name: true, phoneNumber: true } },
@@ -219,6 +225,7 @@ export async function loadCareReminders() {
         dose: reminder.dose,
         dueAt: reminder.dueAt,
         petId: reminder.pet.id,
+        petSlug: pageKey(reminder.pet),
         petName: reminder.pet.name,
         ownerId: reminder.pet.owner.id,
         ownerName: reminder.pet.owner.name,

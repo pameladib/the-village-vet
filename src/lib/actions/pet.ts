@@ -7,6 +7,7 @@ import { z } from "zod";
 import { applyRecordedFollowUps, syncVaccineReminder } from "@/lib/clinic/reminders";
 import { canChangePetPhoto } from "@/lib/auth/permissions";
 import { petWeightFromGrams } from "@/lib/pets/weight";
+import { uniqueSlug } from "@/lib/record-slug";
 import { PET_PHOTOS_BUCKET, isSafeObjectKey } from "@/lib/storage/files";
 import { removeStoredObject } from "@/lib/storage/supabase";
 
@@ -133,6 +134,7 @@ export async function createPet(data: PetForm) {
         const created = await prisma.pet.create({
             data: {
                 name: result.data.name,
+                slug: await uniqueSlug("pet", result.data.name),
                 species: result.data.species,
                 sex: result.data.sex,
                 color: result.data.color || null,
@@ -179,7 +181,7 @@ export async function createPet(data: PetForm) {
         });
         await syncVaccineReminder(prisma, created.id, result.data.species);
 
-        return { success: true, id: created.id };
+        return { success: true, id: created.id, slug: created.slug };
     } catch {
         return { success: false, formErrors: [saveError()] };
     }
@@ -238,6 +240,8 @@ export async function updatePet(id: string, data: PetForm) {
         where: isAdmin ? { id } : { id, ownerId: session.user.id },
         select: {
             photoUrl: true,
+            name: true,
+            slug: true,
             species: true,
             estimatedAgeValue: true,
             estimatedAgeUnit: true,
@@ -277,12 +281,15 @@ export async function updatePet(id: string, data: PetForm) {
         return { success: false, formErrors: ["You cannot change this photo."] };
     }
 
+    const slug = await uniqueSlug("pet", form.name, id);
+
     async function savePet(photoUrl: string | null | undefined) {
         await prisma.$transaction(async (tx) => {
             const updated = await tx.pet.updateMany({
                 where: isAdmin ? { id } : { id, ownerId: session.user.id },
                 data: {
                     name: form.name,
+                    slug,
                     species: form.species,
                     sex: form.sex,
                     color: form.color || null,
@@ -379,7 +386,7 @@ export async function updatePet(id: string, data: PetForm) {
         }).catch(() => undefined);
         await syncVaccineReminder(prisma, id, form.species).catch(() => undefined);
 
-        return { success: true, id };
+        return { success: true, id, slug };
     } catch {
         return { success: false, formErrors: [saveError()] };
     }

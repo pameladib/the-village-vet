@@ -20,6 +20,7 @@ export type CareRow = {
     dueAt: string;
     timing: "overdue" | "due" | "upcoming";
     petId: string;
+    petSlug: string;
     petName: string;
     ownerId: string;
     ownerName: string;
@@ -208,7 +209,7 @@ function CareItem({ row, copy, locale }: { row: CareRow; copy: Copy; locale: Loc
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                     <p className="truncate font-medium text-stone-900 dark:text-stone-50">
-                        <Link href={`/pets/${row.petId}`} className="hover:underline">{row.petName}</Link>
+                        <Link href={`/pets/${row.petSlug}`} className="hover:underline">{row.petName}</Link>
                     </p>
                     <p className="truncate text-sm text-stone-500">
                         <Link href={`/admin/owners/${row.ownerId}`} className="hover:underline">{row.ownerName}</Link>

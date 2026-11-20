@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import type { PetForm } from "@/lib/validations/pet";
 import { notFound, redirect } from "next/navigation";
+import { refWhere } from "@/lib/slug";
 
 function toDateInput(date: Date | null) {
     if (!date) return "";
@@ -50,7 +51,7 @@ export default async function EditPetPage({
     }
 
     const pet = await prisma.pet.findFirst({
-        where: session.user.role === "ADMIN" ? { id } : { id, ownerId: session.user.id },
+        where: session.user.role === "ADMIN" ? refWhere(id) : { ...refWhere(id), ownerId: session.user.id },
         include: {
             weightRecords: { // current weight is the latest weight record, not a column on the pet
                 orderBy: { recordedAt: "desc" },
@@ -67,6 +68,7 @@ export default async function EditPetPage({
     });
 
     if (!pet) notFound();
+    if (pet.slug && id !== pet.slug) redirect(`/pets/${pet.slug}/edit`);
 
     // we must convert the pet's existing data that we got from the database into the format the form expects so we can have the values filled in in the edit form
 
@@ -104,5 +106,5 @@ export default async function EditPetPage({
         previousHistory: textValue(petFields.previousHistory),
     };
 
-    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id} allowClinical copy={messages(await getLocale())} />;
+    return <NewPetForm defaultValues={defaultValues} photoUrl={photoUrl} id={petFields.id} profileSlug={pet.slug} allowClinical copy={messages(await getLocale())} />;
 }
