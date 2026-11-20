@@ -22,6 +22,7 @@ const visitorLinks = [
 
 const customerLinks = [
     { href: "/", key: "clinic" },
+    { href: "/find-us", key: "navFindUs" },
     { href: "/emergency", key: "emergency" },
     { href: "/shop", key: "shop" },
     { href: "/dashboard", key: "dashboard" },

@@ -64,6 +64,7 @@ export const openingsSchema = z.object({
     petId: z.uuid({ message: "Choose a pet." }),
     type: z.enum(appointmentTypes, { message: "Choose an appointment type." }),
     date: z.iso.date({ message: "Choose a valid date." }),
+    exceptAppointmentId: z.uuid().optional(),
 });
 
 export type BookingForm = z.infer<typeof bookingSchema>;

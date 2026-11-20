@@ -96,7 +96,19 @@ export async function getOpenings(input: { petId: string; type: AppointmentType;
     if (!pet) return { success: false as const, formErrors: ["We couldn't find this pet."], starts: [], duration: 0 };
 
     const schedule = await loadSchedule(prisma, parsed.data.date);
-    const starts = openingsFor(parsed.data.type, pet.species, parsed.data.date, schedule);
+    const exceptId = parsed.data.exceptAppointmentId;
+    const except = exceptId
+        ? await prisma.appointment.findFirst({
+            where: session.user.role === "OWNER"
+                ? { id: exceptId, ownerId: session.user.id, status: "BOOKED" }
+                : { id: exceptId, status: "BOOKED" },
+            select: { id: true },
+        })
+        : null;
+    const openings = except
+        ? { ...schedule, appointments: schedule.appointments.filter((appointment) => appointment.id !== except.id) }
+        : schedule;
+    const starts = openingsFor(parsed.data.type, pet.species, parsed.data.date, openings);
     return {
         success: true as const,
         starts: starts.map((start) => start.toISOString()),

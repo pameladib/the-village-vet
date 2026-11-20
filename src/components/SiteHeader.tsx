@@ -31,6 +31,7 @@ export default function SiteHeader({
     const headerRef = useRef<HTMLElement>(null);
     const links = [
         { href: "/", label: copy.clinic },
+        { href: "/find-us", label: copy.navFindUs },
         ...(showEmergency ? [{ href: "/emergency", label: copy.emergency }] : []),
         { href: "/shop", label: copy.shop },
         { href: "/dashboard", label: copy.dashboard },

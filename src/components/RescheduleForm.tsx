@@ -36,7 +36,7 @@ export default function RescheduleForm({
     useEffect(() => {
         if (!date) return;
         let cancelled = false;
-        getOpenings({ petId, type, date }).then((result) => {
+        getOpenings({ petId, type, date, exceptAppointmentId: appointmentId }).then((result) => {
             if (cancelled) return;
             if (!result.success) {
                 setError(shownMessage(copy, result.formErrors[0]) ?? copy.loadTimesFail);
@@ -50,7 +50,7 @@ export default function RescheduleForm({
         return () => {
             cancelled = true;
         };
-    }, [date, petId, type]);
+    }, [appointmentId, date, petId, type]);
 
     const time = new Intl.DateTimeFormat(intlLocale(locale), {
         timeZone: "Asia/Beirut",
