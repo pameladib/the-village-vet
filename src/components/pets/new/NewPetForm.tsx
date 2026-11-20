@@ -10,7 +10,6 @@ import { createPet, updatePet } from "@/lib/actions/pet";
 import { confirmPetPhoto, preparePetPhotoUpload } from "@/lib/actions/photo";
 import { uploadToSignedUrl } from "@/lib/storage/direct-upload";
 import { ChevronLeft } from "lucide-react";
-import HistoryBack from "@/components/HistoryBack";
 import { useRouter } from "next/navigation";
 import { petPhotoSrc } from "@/lib/storage/files";
 import type { Copy } from "@/lib/i18n";
@@ -124,7 +123,8 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
     }
 
     setFormError(null);
-    router.push(`/pets/${savedId}`);
+    if (petId) router.replace(`/pets/${savedId}`);
+    else router.push(`/pets/${savedId}`);
   }
 
   return (
@@ -132,13 +132,14 @@ export default function NewPetForm({ isFirstPet, ownerName, defaultValues, photo
       <div className="flex flex-1 items-start justify-center bg-stone-100 px-4 py-10 font-sans dark:bg-stone-950 sm:px-6">
         <div className="w-full max-w-md">
           {defaultValues && id && (
-            <HistoryBack
-              fallback={`/pets/${id}`}
+            <button
+              type="button"
+              onClick={() => router.replace(`/pets/${id}`)}
               className="mb-6 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition duration-200 hover:scale-[1.03] hover:border-emerald-700 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 active:scale-[0.98] dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
             >
               <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
               {copy.petBackProfile}
-            </HistoryBack>
+            </button>
           )}
           {defaultValues ? (
             <h1 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">

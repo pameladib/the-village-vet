@@ -125,6 +125,7 @@ export default function PetProfile({
                     </HistoryBack>
                     <Link
                         href={`/pets/${pet.id}/edit`}
+                        replace
                         className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
                     >
                         <SquarePen className="size-4" strokeWidth={1.5} />
