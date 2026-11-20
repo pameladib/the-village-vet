@@ -2,23 +2,25 @@ import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
 import { redirect } from "next/navigation";
 import AppointmentTabs, { type AppointmentTab } from "@/components/admin/AppointmentTabs";
+import FocusHighlight from "@/components/FocusHighlight";
 import UpcomingFilter from "@/components/admin/UpcomingFilter";
 import VisitTable from "@/components/dashboards/VisitTable";
-import { ownerChat } from "@/lib/clinic/public";
 import AppointmentOutcomes from "@/components/visits/AppointmentOutcomes";
-import { loadAppointmentsBetween, loadStaffAppointments } from "@/app/(app)/dashboard/load-staff";
+import { findStaffVisit, loadAppointmentsBetween, loadCancelledAppointments, loadStaffAppointments } from "@/app/(app)/dashboard/load-staff";
 import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
-import { appointmentDetail } from "@/lib/appointments/labels";
+import { clinicDayRange, todayInBeirut } from "@/lib/appointments/availability";
 import { spanBounds, tomorrowInBeirut, upcomingSpan, type UpcomingWhen } from "@/lib/appointments/upcoming-filter";
 import { getLocale, messages } from "@/lib/i18n";
-import { intlLocale } from "@/lib/intl-locale";
+import { prisma } from "@/lib/prisma";
 
 function one(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function StaffAppointmentsPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[]; when?: string | string[]; on?: string | string[] }> }) {
+const focusPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function StaffAppointmentsPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[]; when?: string | string[]; on?: string | string[]; focus?: string | string[] }> }) {
     let session;
     try {
         session = await requireRole(["ADMIN", "SECONDARY_ADMIN"]);
@@ -31,25 +33,32 @@ export default async function StaffAppointmentsPage({ searchParams }: { searchPa
     const clinical = canSeeClinicalRecords(session.user.role);
     const params = await searchParams;
     const tabName = one(params.tab);
-    const tab: AppointmentTab = tabName === "awaiting" || tabName === "upcoming" ? tabName : "today";
+    const focusName = one(params.focus) ?? "";
+    const focusId = focusPattern.test(focusName) ? focusName : "";
+    if (focusId && tabName !== "today" && tabName !== "awaiting" && tabName !== "upcoming" && tabName !== "cancelled") {
+        const target = await prisma.appointment.findUnique({ where: { id: focusId }, select: { status: true, startAt: true } });
+        const range = clinicDayRange(todayInBeirut());
+        let next: AppointmentTab = "today";
+        if (target?.status === "CANCELLED") next = "cancelled";
+        else if (target && range && target.startAt >= range.open && target.startAt < range.close) next = "today";
+        else if (target && target.startAt.getTime() >= Date.now()) next = "upcoming";
+        else if (target?.status === "BOOKED") next = "awaiting";
+        redirect(`/admin/appointments?tab=${next}&focus=${focusId}`);
+    }
+    const tab: AppointmentTab = tabName === "awaiting" || tabName === "upcoming" || tabName === "cancelled" ? tabName : "today";
     const whenName = one(params.when);
     const upcomingWhen: UpcomingWhen = whenName === "tomorrow" || whenName === "week" || whenName === "date" ? whenName : "all";
     const chosenDate = one(params.on) ?? "";
-    const { today, upcoming, awaiting } = await loadStaffAppointments();
+    const [{ today, upcoming, awaiting }, cancelled] = await Promise.all([loadStaffAppointments(), loadCancelledAppointments()]);
     const todayIds = new Set(today.map((visit) => visit.id));
     const later = upcoming.filter((visit) => !todayIds.has(visit.id));
+    if (focusId && tab === "upcoming" && !later.some((visit) => visit.id === focusId)) {
+        const extra = await findStaffVisit(focusId);
+        if (extra && extra.startAt.getTime() >= Date.now()) later.push(extra);
+    }
     const span = upcomingSpan(upcomingWhen, chosenDate);
     const bounds = typeof span === "object" ? spanBounds(span) : null;
     const shown = span === "all" ? later : bounds ? await loadAppointmentsBetween(bounds.start, bounds.end) : [];
-    const when = new Intl.DateTimeFormat(intlLocale(locale), {
-        timeZone: "Asia/Beirut",
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    });
 
     return (
         <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -61,39 +70,32 @@ export default async function StaffAppointmentsPage({ searchParams }: { searchPa
                 </Link>
             </div>
 
+            {focusId && <FocusHighlight id={`visit-${focusId}`} active clearHref={tab === "today" ? "/admin/appointments" : `/admin/appointments?tab=${tab}`} />}
             <AppointmentTabs
                 tab={tab}
                 label={copy.appointments}
-                labels={{ today: copy.apptTabToday, awaiting: copy.awaitingRecord, upcoming: copy.apptUpcoming }}
-                counts={{ today: today.length, awaiting: awaiting.length, upcoming: later.length }}
+                labels={{ today: copy.apptTabToday, awaiting: copy.awaitingRecord, upcoming: copy.apptUpcoming, cancelled: copy.apptTabCancelled }}
+                counts={{ today: today.length, awaiting: awaiting.length, upcoming: later.length, cancelled: cancelled.length }}
                 panels={{
-                    today: today.length === 0 ? <p className="text-sm text-stone-500">{copy.noVisitsToday}</p> : <VisitTable visits={today} copy={copy} locale={locale} clinical={clinical} />,
+                    today: today.length === 0 ? <p className="text-sm text-stone-500">{copy.noVisitsToday}</p> : <VisitTable visits={today} copy={copy} locale={locale} clinical={clinical} highlightId={focusId} />,
                     awaiting: (
                         <>
                             <p className="text-sm text-stone-500">{copy.awaitingLead}</p>
                             {awaiting.length === 0 ? (
                                 <p className="mt-3 text-sm text-stone-500">{copy.awaitingEmpty}</p>
                             ) : (
-                                <ul className="mt-3 flex flex-col gap-2">
-                                    {awaiting.map((visit) => {
-                                        const chat = ownerChat(visit.phone);
-                                        return (
-                                            <li key={visit.id} className="flex flex-col gap-3 rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 sm:flex-row sm:items-center sm:justify-between">
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-sm font-medium text-stone-900 dark:text-stone-50">
-                                                        {clinical ? <Link href={`/pets/${visit.petId}`} className="hover:underline">{visit.petName}</Link> : visit.petName}
-                                                        {" · "}
-                                                        <Link href={`/admin/owners/${visit.ownerId}`} className="hover:underline">{visit.ownerName}</Link>
-                                                        {chat ? <>{" · "}<a href={chat} target="_blank" rel="noopener noreferrer" className="hover:underline">{visit.phone}</a></> : null}
-                                                    </p>
-                                                    <p className="truncate text-sm text-stone-500">{appointmentDetail(visit.type, visit.services, visit.groomingService, copy)}</p>
-                                                    <p className="text-sm text-stone-500">{when.format(visit.startAt)}</p>
-                                                </div>
-                                                <AppointmentOutcomes id={visit.id} type={visit.type} passed canWrite={clinical} copy={copy} />
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
+                                <VisitTable
+                                    visits={awaiting}
+                                    copy={copy}
+                                    locale={locale}
+                                    clinical={clinical}
+                                    showDate
+                                    highlightId={focusId}
+                                    trailingLabel={copy.columnActions}
+                                    trailing={(visit) => (
+                                        <AppointmentOutcomes id={visit.id} type={visit.type} passed canWrite={clinical} copy={copy} />
+                                    )}
+                                />
                             )}
                         </>
                     ),
@@ -114,10 +116,13 @@ export default async function StaffAppointmentsPage({ searchParams }: { searchPa
                             ) : shown.length === 0 ? (
                                 <p className="mt-3 text-sm text-stone-500">{upcomingWhen === "all" ? copy.noVisits : copy.apptFilterEmpty}</p>
                             ) : (
-                                <VisitTable visits={shown} copy={copy} locale={locale} clinical={clinical} showDate />
+                                <VisitTable visits={shown} copy={copy} locale={locale} clinical={clinical} showDate highlightId={focusId} />
                             )}
                         </div>
                     ),
+                    cancelled: cancelled.length === 0
+                        ? <p className="text-sm text-stone-500">{copy.apptCancelledEmpty}</p>
+                        : <VisitTable visits={cancelled} copy={copy} locale={locale} clinical={clinical} showDate highlightId={focusId} cancelled />,
                 }}
             />
         </main>

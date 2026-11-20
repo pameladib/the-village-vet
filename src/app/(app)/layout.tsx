@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth/auth";
 import { enforcePasswordChange } from "@/lib/auth/password-change";
 import { getLocale, messages } from "@/lib/i18n";
 import { rememberLocale } from "@/lib/locale-preference";
+import { noticeHref } from "@/lib/notifications/href";
 import { prisma } from "@/lib/prisma";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -15,12 +16,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     await rememberLocale(session?.user.id, locale);
     const staff = session && (session.user.role === "ADMIN" || session.user.role === "SECONDARY_ADMIN") ? session : null;
     const notices = staff
-        ? await prisma.notification.findMany({
+        ? (await prisma.notification.findMany({
             where: { userId: staff.user.id, readAt: null },
             orderBy: { createdAt: "desc" },
             take: 20,
             select: { id: true, title: true, body: true, readAt: true, createdAt: true, dedupeKey: true },
-        })
+        })).map((notice) => ({ ...notice, href: noticeHref(notice.dedupeKey, "staff") }))
         : undefined;
 
     return (

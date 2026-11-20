@@ -119,11 +119,13 @@ export default function LogInForm({ nextPath = "/dashboard", copy, locale }: { n
                     <div className="absolute bottom-0 -left-16 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
                 </div>
 
-                <div className="relative flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
+                <div className="relative">
+                    <div dir="ltr" className="flex">
+                        <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-700 px-2.5 py-1 text-xs text-emerald-50 hover:bg-emerald-900" />
+                    </div>
+                    <p className="mt-4 text-sm font-medium tracking-[0.22em] text-emerald-200 uppercase">
                         {copy.clinicName}
                     </p>
-                    <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-700 px-2.5 py-1 text-xs text-emerald-50 hover:bg-emerald-900" />
                 </div>
 
                 <div className="relative mt-4 w-full min-w-0 lg:mt-0 lg:max-w-md">

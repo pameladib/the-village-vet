@@ -18,6 +18,7 @@ export type StaffVisit = {
     ownerId: string;
     ownerName: string;
     phone: string;
+    cancelledAt?: Date;
 };
 
 export type StaffReminder = {
@@ -136,6 +137,22 @@ export async function loadStaffAppointments() {
         upcoming: upcoming.map(toVisit),
         awaiting: awaiting.map(toVisit),
     };
+}
+
+export async function loadCancelledAppointments() {
+    const range = clinicDayRange(todayInBeirut());
+    if (!range) return [];
+    const visits = await prisma.appointment.findMany({
+        where: { status: "CANCELLED", startAt: { gte: range.open } },
+        orderBy: { updatedAt: "desc" },
+        include: visitInclude,
+    });
+    return visits.map((visit) => ({ ...toVisit(visit), cancelledAt: visit.updatedAt }));
+}
+
+export async function findStaffVisit(id: string) {
+    const visit = await prisma.appointment.findUnique({ where: { id }, include: visitInclude });
+    return visit ? toVisit(visit) : null;
 }
 
 export async function loadAppointmentsBetween(start: Date, end: Date) {

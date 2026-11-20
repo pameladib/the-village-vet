@@ -2,8 +2,8 @@
 // owner registration links and the install QR code.
 //
 // Set APP_URL to the public site origin with no path.
-// Production on Vercel: https://the-village-vet.vercel.app
-// After the clinic domain is connected, change it to that https address.
+// Production site: https://thevillagevetlb.com
+// Set APP_URL to that https address. It must be the origin only, with no path.
 // Do not use a Vercel preview URL. This is separate from BETTER_AUTH_URL.
 //
 // Local development uses http://localhost:3000 when APP_URL is unset.
@@ -20,6 +20,8 @@ export function canonicalAppUrl(raw: string | undefined, production: boolean) {
 export function publicAppUrl() {
     return canonicalAppUrl(process.env.APP_URL, process.env.NODE_ENV === "production");
 }
+
+export const clinicWebsite = "https://thevillagevetlb.com";
 
 function originOnly(value: string) {
     let url: URL;

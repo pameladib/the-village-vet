@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/session";
 import type { Locale } from "@/lib/i18n";
 import { messages } from "@/lib/i18n";
-import { notify, notifyOwnerAndStaff } from "@/lib/notifications";
+import { notify, notifyStaff } from "@/lib/notifications";
 import { adminMoves, customerCanCancel, staffCanCancel, stageStamp, stockEffect, type OrderStatus } from "@/lib/shop/lifecycle";
 import { convertMinor, validDeliveryFee } from "@/lib/shop/money";
 import { getDisplayCurrency, pricingFrom } from "@/lib/shop/pricing";
@@ -167,12 +167,19 @@ export async function placeOrder(input: unknown) {
             });
         });
 
-        await notifyOwnerAndStaff(
+        const customer = order.customerName.trim() || "A customer";
+        await notify(
             session.user.id,
             (locale) => messages(locale).noticeOrderNew,
             (locale) => messages(locale).noticeOrderNewBody,
+            `order:${order.id}:${session.user.id}`,
+            `/shop/orders/${order.id}`,
+        );
+        await notifyStaff(
+            "New shop order",
+            `${customer} placed a shop order.`,
             `order:${order.id}`,
-            { owner: `/shop/orders/${order.id}`, staff: `/admin/orders/${order.id}` },
+            `/admin/orders?focus=${order.id}`,
         );
         revalidatePath("/shop/orders");
         return { success: true as const, id: order.id };
@@ -509,7 +516,7 @@ export async function cancelOrder(orderId: string) {
     if (!z.uuid().safeParse(orderId).success) return { success: false as const, formErrors: ["That order was not found."] };
     const order = await prisma.shopOrder.findFirst({
         where: { id: orderId, ownerId: session.user.id },
-        select: { status: true },
+        select: { status: true, customerName: true },
     });
     if (!order) return { success: false as const, formErrors: ["That order was not found."] };
     if (!customerCanCancel(order.status)) return { success: false as const, formErrors: ["That order can no longer be changed."] };
@@ -517,19 +524,13 @@ export async function cancelOrder(orderId: string) {
     if (!saved) return { success: false as const, formErrors: ["This order changed."] };
     try {
         await tellCustomer(saved);
-        const staff = await prisma.user.findMany({
-            where: { role: { in: ["ADMIN", "SECONDARY_ADMIN"] } },
-            select: { id: true },
-        });
-        for (const person of staff) {
-            await notify(
-                person.id,
-                (locale) => messages(locale).noticeOrderCancelledTitle,
-                (locale) => messages(locale).noticeOrderCancelledStaff,
-                `order:${saved.id}:cancelled:${person.id}`,
-                `/admin/orders/${saved.id}`,
-            );
-        }
+        const customer = order.customerName.trim() || "A customer";
+        await notifyStaff(
+            "Order cancelled",
+            `${customer} cancelled a shop order.`,
+            `order:${saved.id}:cancelled`,
+            `/admin/orders?status=cancelled&focus=${saved.id}`,
+        );
     } catch {
         // The cancellation is already saved.
     }

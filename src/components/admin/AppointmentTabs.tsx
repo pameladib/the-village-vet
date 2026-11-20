@@ -3,9 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-export type AppointmentTab = "today" | "awaiting" | "upcoming";
+export type AppointmentTab = "today" | "awaiting" | "upcoming" | "cancelled";
 
-const tabs: AppointmentTab[] = ["today", "awaiting", "upcoming"];
+const tabs: AppointmentTab[] = ["today", "awaiting", "upcoming", "cancelled"];
 
 export default function AppointmentTabs({
     tab,
@@ -29,7 +29,7 @@ export default function AppointmentTabs({
 
     useEffect(() => {
         const hash = window.location.hash.replace("#", "");
-        if (hash === "awaiting" || hash === "upcoming") {
+        if (hash === "awaiting" || hash === "upcoming" || hash === "cancelled") {
             router.replace(`/admin/appointments?tab=${hash}`, { scroll: false });
         }
     }, [router]);

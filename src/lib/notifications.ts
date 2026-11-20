@@ -1,5 +1,6 @@
-import type { Locale } from "@/lib/i18n";
+import { messages, type Locale } from "@/lib/i18n";
 import { savedLocale } from "@/lib/locale-preference";
+import { presentNotice } from "@/lib/notifications/present";
 import { prisma } from "@/lib/prisma";
 import { deliverPush } from "@/lib/notifications/push";
 
@@ -24,9 +25,21 @@ export async function notify(userId: string, title: NoticeText, body: NoticeText
         throw error;
     }
     try {
-        await deliverPush(userId, text.title, text.body, href);
+        const locale = await savedLocale(userId);
+        const shown = presentNotice(text, messages(locale), locale);
+        await deliverPush(userId, shown.title, shown.body, href);
     } catch {
         // The in-app notice is already saved. A failed browser push must not undo it.
+    }
+}
+
+export async function notifyStaff(title: NoticeText, body: NoticeText, key: string, href = "/dashboard") {
+    const staff = await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "SECONDARY_ADMIN"] } },
+        select: { id: true },
+    });
+    for (const person of staff) {
+        await notify(person.id, title, body, `${key}:${person.id}`, href);
     }
 }
 

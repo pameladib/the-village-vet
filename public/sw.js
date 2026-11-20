@@ -95,12 +95,20 @@ self.addEventListener("push", (event) => {
     const data = event.data ? event.data.json() : {};
     const title = typeof data.title === "string" && data.title ? data.title : "The Village Vet";
     const body = typeof data.body === "string" ? data.body : "";
-    event.waitUntil(self.registration.showNotification(title, {
-        body,
-        icon: "/icon-192.png",
-        badge: "/icon-192.png",
-        data: { href: safePath(data.href) },
-    }));
+    event.waitUntil((async () => {
+        const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        const visible = windows.filter((client) => client.visibilityState === "visible");
+        if (visible.length > 0) {
+            for (const client of visible) client.postMessage({ type: "village-vet-notice" });
+            return;
+        }
+        await self.registration.showNotification(title, {
+            body,
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+            data: { href: safePath(data.href) },
+        });
+    })());
 });
 
 self.addEventListener("notificationclick", (event) => {

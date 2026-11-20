@@ -20,3 +20,18 @@ export async function markNotificationRead(id: string) {
     revalidatePath("/", "layout");
     return { success: true as const };
 }
+
+export async function markAllNotificationsRead() {
+    let session;
+    try {
+        session = await requireAuth();
+    } catch {
+        return { success: false as const };
+    }
+    await prisma.notification.updateMany({
+        where: { userId: session.user.id, readAt: null },
+        data: { readAt: new Date() },
+    });
+    revalidatePath("/", "layout");
+    return { success: true as const };
+}

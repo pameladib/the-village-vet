@@ -12,7 +12,8 @@ import {
 } from "@/lib/appointments/availability";
 import type { AppointmentType, Species, UserRole } from "../../../generated/prisma/client";
 import { orderedVisitServices } from "@/lib/appointments/labels";
-import { notifyOwnerAndStaff } from "@/lib/notifications";
+import { notify, notifyStaff } from "@/lib/notifications";
+import { appointmentNoticeBody } from "@/lib/notifications/appointment-notice";
 
 const BOOKING_ROLES = ["OWNER", "ADMIN", "SECONDARY_ADMIN"] as const satisfies readonly UserRole[];
 
@@ -124,7 +125,7 @@ export async function bookAppointment(data: unknown) {
 
             const pet = await tx.pet.findFirst({
                 where: petWhere(session.user.id, session.user.role, parsed.data.petId),
-                select: { id: true, species: true, ownerId: true },
+                select: { id: true, species: true, name: true, ownerId: true, owner: { select: { name: true } } },
             });
             if (!pet) return { error: "We couldn't find this pet." } as const;
 
@@ -144,18 +145,27 @@ export async function bookAppointment(data: unknown) {
                     petId: pet.id,
                 },
             });
-            return { appointment } as const;
+            return { appointment, ownerName: pet.owner.name, petName: pet.name } as const;
         });
 
         if ("error" in created) return { success: false as const, formErrors: [created.error] };
 
         try {
-            await notifyOwnerAndStaff(
+            const detail = appointmentNoticeBody({
+                owner: created.ownerName,
+                pet: created.petName,
+                type: created.appointment.type,
+                services: created.appointment.services,
+                grooming: created.appointment.groomingService,
+                startAt: created.appointment.startAt,
+            });
+            await notify(
                 created.appointment.ownerId,
                 "Appointment booked",
                 "A visit was booked. Open the dashboard to see the time.",
-                `booked:${created.appointment.id}`,
+                `booked:${created.appointment.id}:${created.appointment.ownerId}`,
             );
+            await notifyStaff("Appointment booked", detail, `booked:${created.appointment.id}`, `/admin/appointments?focus=${created.appointment.id}`);
         } catch {
             // The visit is already saved. A failed notice must not look like a failed booking.
         }
@@ -179,7 +189,16 @@ export async function cancelAppointment(appointmentId: string) {
         where: session.user.role === "OWNER"
             ? { id: parsed.data, ownerId: session.user.id, status: "BOOKED" }
             : { id: parsed.data, status: "BOOKED" },
-        select: { id: true, ownerId: true, startAt: true },
+        select: {
+            id: true,
+            ownerId: true,
+            startAt: true,
+            type: true,
+            services: true,
+            groomingService: true,
+            pet: { select: { name: true } },
+            owner: { select: { name: true } },
+        },
     });
     if (!existing || existing.startAt <= new Date()) {
         return { success: false as const, formErrors: ["This appointment can no longer be cancelled."] };
@@ -191,11 +210,24 @@ export async function cancelAppointment(appointmentId: string) {
     });
 
     try {
-        await notifyOwnerAndStaff(
+        await notify(
             existing.ownerId,
             "Appointment cancelled",
             "A visit was cancelled.",
+            `cancelled:${existing.id}:${existing.ownerId}`,
+        );
+        await notifyStaff(
+            "Appointment cancelled",
+            appointmentNoticeBody({
+                owner: existing.owner.name,
+                pet: existing.pet.name,
+                type: existing.type,
+                services: existing.services,
+                grooming: existing.groomingService,
+                startAt: existing.startAt,
+            }),
             `cancelled:${existing.id}`,
+            `/admin/appointments?tab=cancelled&focus=${existing.id}`,
         );
     } catch {
         // The cancellation is saved even if the notice fails.
@@ -226,7 +258,7 @@ export async function rescheduleAppointment(input: { appointmentId: string; date
                 where: session.user.role === "OWNER"
                     ? { id: parsed.data.appointmentId, ownerId: session.user.id, status: "BOOKED" }
                     : { id: parsed.data.appointmentId, status: "BOOKED" },
-                include: { pet: { select: { species: true } } },
+                include: { pet: { select: { species: true, name: true } }, owner: { select: { name: true } } },
             });
             if (!current || current.startAt <= new Date()) return { error: "This appointment can no longer be changed." } as const;
 
@@ -247,15 +279,36 @@ export async function rescheduleAppointment(input: { appointmentId: string; date
                     duration: appointmentDuration(current.type, current.pet.species),
                 },
             });
-            return { appointment } as const;
+            return {
+                appointment,
+                ownerName: current.owner.name,
+                petName: current.pet.name,
+                type: current.type,
+                services: current.services,
+                grooming: current.groomingService,
+            } as const;
         });
         if ("error" in moved) return { success: false as const, formErrors: [moved.error] };
         try {
-            await notifyOwnerAndStaff(
+            const detail = appointmentNoticeBody({
+                owner: moved.ownerName,
+                pet: moved.petName,
+                type: moved.type,
+                services: moved.services,
+                grooming: moved.grooming,
+                startAt: moved.appointment.startAt,
+            });
+            await notify(
                 moved.appointment.ownerId,
                 "Appointment rescheduled",
                 "A visit was moved to a new time.",
+                `rescheduled:${moved.appointment.id}:${moved.appointment.startAt.toISOString()}:${moved.appointment.ownerId}`,
+            );
+            await notifyStaff(
+                "Appointment rescheduled",
+                detail,
                 `rescheduled:${moved.appointment.id}:${moved.appointment.startAt.toISOString()}`,
+                `/admin/appointments?focus=${moved.appointment.id}`,
             );
         } catch {
             // The new time is saved even if the notice fails.

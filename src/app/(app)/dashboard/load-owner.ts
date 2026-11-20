@@ -1,4 +1,5 @@
 import { careTiming } from "@/lib/appointments/availability";
+import { noticeHref } from "@/lib/notifications/href";
 import { prisma } from "@/lib/prisma";
 import { appointmentWithPetInclude } from "@/lib/types/appointments";
 import { petCardSelect } from "@/lib/types/pets";
@@ -45,6 +46,7 @@ export async function loadOwnerDashboard(userId: string, name: string) {
             title: notice.title,
             body: notice.body,
             dedupeKey: notice.dedupeKey,
+            href: noticeHref(notice.dedupeKey, "owner"),
             createdAt: notice.createdAt.toISOString(),
             readAt: notice.readAt?.toISOString() ?? null,
         })),

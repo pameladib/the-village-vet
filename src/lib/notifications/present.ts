@@ -1,4 +1,5 @@
-import type { Copy } from "@/lib/i18n";
+import type { Copy, Locale } from "@/lib/i18n";
+import { presentAppointmentNotice } from "@/lib/notifications/appointment-notice";
 
 const titles: Record<string, keyof Copy> = {
     "New shop order": "noticeOrderNew",
@@ -15,6 +16,7 @@ const titles: Record<string, keyof Copy> = {
     "Care is due today": "noticeCareDue",
     "Care is still due": "noticeCareStill",
     "New client account": "noticeNewClient",
+    "QR code scanned": "noticeQr",
 };
 
 const bodies: Record<string, keyof Copy> = {
@@ -33,14 +35,20 @@ const bodies: Record<string, keyof Copy> = {
     "A visit was moved to a new time.": "noticeApptMovedBody",
     "You have a visit today.": "noticeApptTodayBody",
     "You have a visit tomorrow.": "noticeApptTomorrowBody",
+    "Someone scanned the clinic QR code and opened the website.": "noticeQrBody",
 };
 
-export function presentNotice(item: { title: string; body: string }, copy: Copy) {
+export function presentNotice(item: { title: string; body: string }, copy: Copy, locale: Locale = "en") {
     const titleKey = titles[item.title];
     const bodyKey = bodies[item.body];
-    let body = bodyKey ? copy[bodyKey] : item.body;
+    const appointment = presentAppointmentNotice(item.body, copy, locale);
+    let body = appointment ?? (bodyKey ? copy[bodyKey] : item.body);
     const client = item.body.match(/^(.*) created an account\.$/);
     if (client?.[1]) body = copy.noticeNewClientBody.replace("{name}", client[1]);
+    const placed = item.body.match(/^(.*) placed a shop order\.$/);
+    if (placed?.[1]) body = copy.noticeOrderStaffPlaced.replace("{name}", placed[1]);
+    const cancelledOrder = item.body.match(/^(.*) cancelled a shop order\.$/);
+    if (cancelledOrder?.[1]) body = copy.noticeOrderStaffCancelled.replace("{name}", cancelledOrder[1]);
     const care = item.body.match(/^(.*) has a vaccination or treatment to book\.$/);
     if (care?.[1]) body = copy.noticeCareBody.replace("{name}", care[1]);
     return {

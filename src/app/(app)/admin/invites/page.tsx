@@ -3,7 +3,7 @@ import InviteForm from "@/components/admin/InviteForm";
 import OwnerInstallCard from "@/components/admin/OwnerInstallCard";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
-import { publicAppUrl } from "@/lib/public-url";
+import { clinicWebsite, publicAppUrl } from "@/lib/public-url";
 
 export default async function InvitesPage() {
     try {
@@ -21,7 +21,7 @@ export default async function InvitesPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.inviteTitle}</h1>
             <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-300">{copy.inviteLead}</p>
             <InviteForm copy={copy} locale={locale} appUrl={appUrl} />
-            <OwnerInstallCard url={appUrl} copy={copy} />
+            <OwnerInstallCard url={clinicWebsite} copy={copy} />
         </main>
     );
 }

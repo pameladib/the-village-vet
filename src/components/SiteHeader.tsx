@@ -8,6 +8,7 @@ import LogOutButton from "@/components/auth/LogOutButton";
 import ClinicLogo from "@/components/ClinicLogo";
 import LocaleSwitch from "@/components/LocaleSwitch";
 import NotificationBell from "@/components/NotificationBell";
+import StaffLive from "@/components/StaffLive";
 import type { Copy, Locale } from "@/lib/i18n";
 
 const menuItem = "flex min-h-11 w-full items-center rounded-md px-3 text-start text-base";
@@ -23,7 +24,7 @@ export default function SiteHeader({
     locale: Locale;
     showProfile?: boolean;
     showEmergency?: boolean;
-    notices?: { id: string; title: string; body: string; readAt: Date | null; createdAt?: Date | null; dedupeKey?: string | null }[];
+    notices?: { id: string; title: string; body: string; readAt: Date | null; createdAt?: Date | null; dedupeKey?: string | null; href?: string | null }[];
 }) {
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
@@ -63,6 +64,10 @@ export default function SiteHeader({
 
     return (
         <header ref={headerRef} className="border-b border-emerald-100 bg-white dark:border-emerald-950 dark:bg-stone-950">
+            {notices !== undefined && <StaffLive />}
+            <div dir="ltr" className="flex px-4 pt-2">
+                <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-200 px-2.5 py-1 text-xs text-emerald-900 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-100 dark:hover:bg-emerald-950" />
+            </div>
             <div className="hidden flex-wrap items-center justify-between gap-3 px-4 py-3 lg:flex">
                 <Link href="/" className="text-sm font-semibold tracking-wide text-emerald-900 dark:text-emerald-100">
                     {copy.clinicName}
@@ -73,7 +78,6 @@ export default function SiteHeader({
                     ))}
                     {notices !== undefined && <NotificationBell copy={copy} locale={locale} items={notices} />}
                     <LogOutButton label={copy.logOut} className="hover:text-emerald-700 disabled:opacity-60 dark:hover:text-emerald-300" />
-                    <LocaleSwitch locale={locale} label={copy.language} />
                 </nav>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 lg:hidden">
@@ -112,9 +116,6 @@ export default function SiteHeader({
                     })}
                     <div onClick={close}>
                         <LogOutButton label={copy.logOut} className={`${menuItem} font-semibold text-emerald-950 hover:bg-emerald-50 disabled:opacity-60 dark:text-emerald-50 dark:hover:bg-emerald-950`} />
-                    </div>
-                    <div className="mt-1 border-t border-emerald-100 px-3 py-3 dark:border-emerald-950">
-                        <LocaleSwitch locale={locale} label={copy.language} className="inline-flex min-h-11 items-center rounded-full border border-emerald-200 px-4 text-sm font-medium text-emerald-950 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-50 dark:hover:bg-emerald-950" />
                     </div>
                 </nav>
             )}

@@ -29,6 +29,7 @@ type Notice = {
     title: string;
     body: string;
     dedupeKey: string | null;
+    href: string | null;
     createdAt: string;
     readAt: string | null;
 };
@@ -157,13 +158,16 @@ export default function OwnerDashboard({
                 </div>
 
                 <section className="mt-5 rounded-2xl border border-[#E5E7EB] bg-white px-4 py-4 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:px-5">
-                    <h2 className="text-base font-semibold text-emerald-950 dark:text-emerald-50">{copy.notices}</h2>
-                    <EnablePush copy={copy} />
                     <NotificationList
                         empty={copy.noNotices}
                         markRead={copy.markRead}
+                        markAllRead={copy.markAllRead}
                         locale={locale}
                         copy={copy}
+                        heading={copy.notices}
+                        headingAs="h2"
+                        headingClassName="text-base font-semibold text-emerald-950 dark:text-emerald-50"
+                        extra={<EnablePush copy={copy} />}
                         items={notices.map((notice) => ({ ...notice, readAt: notice.readAt ? new Date(notice.readAt) : null }))}
                     />
                 </section>

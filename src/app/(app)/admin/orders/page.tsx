@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import FocusHighlight from "@/components/FocusHighlight";
+import { focusClass } from "@/components/focus-class";
 import OrderSort from "@/components/shop/OrderSort";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
@@ -22,6 +24,16 @@ const statusFilters = {
 
 const activeStatuses = ["PENDING", "APPROVED", "PREPARING", "OUT_FOR_DELIVERY", "READY_FOR_PICKUP"] as const;
 
+function filterForStatus(status: string): FilterKey {
+    if (status === "PENDING") return "pending";
+    if (status === "APPROVED" || status === "PREPARING") return "approved";
+    if (status === "READY_FOR_PICKUP") return "ready";
+    if (status === "OUT_FOR_DELIVERY") return "out";
+    if (status === "FULFILLED") return "completed";
+    if (status === "REJECTED") return "rejected";
+    return "cancelled";
+}
+
 type FilterKey = keyof typeof statusFilters;
 
 function first(value: string | string[] | undefined) {
@@ -38,7 +50,9 @@ function ordersHref(status: string, query: string, sort: string, owner: string) 
     return search ? `/admin/orders?${search}` : "/admin/orders";
 }
 
-export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ status?: string | string[]; q?: string | string[]; sort?: string | string[]; owner?: string | string[] }> }) {
+const focusPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ status?: string | string[]; q?: string | string[]; sort?: string | string[]; owner?: string | string[]; focus?: string | string[] }> }) {
     try {
         await requireRole(["ADMIN", "SECONDARY_ADMIN"]);
     } catch {
@@ -47,6 +61,12 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
 
     const raw = await searchParams;
     const statusKey = first(raw.status);
+    const focusName = first(raw.focus) ?? "";
+    const focusId = focusPattern.test(focusName) ? focusName : "";
+    if (focusId && !(statusKey && statusKey in statusFilters)) {
+        const focused = await prisma.shopOrder.findUnique({ where: { id: focusId }, select: { status: true } });
+        if (focused) redirect(`/admin/orders?status=${filterForStatus(focused.status)}&focus=${focusId}`);
+    }
     const filter = statusKey && statusKey in statusFilters ? statusKey as FilterKey : "";
     const status = filter ? statusFilters[filter] : undefined;
     const query = (first(raw.q) ?? "").trim().slice(0, 80);
@@ -132,6 +152,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                 <OrderSort label={copy.sortBy} oldest={copy.sortOldest} newest={copy.sortNewest} status={showAll ? "all" : filter} query={query} sort={sort} owner={ownerId} />
                 <button className="rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.search}</button>
             </form>
+            {focusId && <FocusHighlight id={`order-${focusId}`} active clearHref={ordersHref(showAll ? "all" : filter, query, sort, ownerId)} />}
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
                 {tabs.map((tab) => {
                     const current = showAll ? tab.key === "all" : tab.key === filter;
@@ -166,7 +187,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                             const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : null;
                             const chat = contact.phone ? ownerChat(contact.phone) : null;
                             return (
-                                <li key={order.id} className={`relative rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 ${order.status === "PENDING" ? "ring-1 ring-amber-300" : ""}`}>
+                                <li key={order.id} data-focus={`order-${order.id}`} className={`relative rounded-2xl bg-white px-4 py-3 dark:bg-stone-900 ${order.id === focusId ? focusClass(true) : order.status === "PENDING" ? "ring-1 ring-amber-300" : ""}`}>
                                     <Link href={`/admin/orders/${order.id}`} aria-label={shortOrderId(order.id)} className="absolute inset-0 rounded-2xl" />
                                     <div className="pointer-events-none relative">
                                         <div className="flex items-center justify-between gap-3">
@@ -225,7 +246,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                                     const originLabel = origin === "counter" ? copy.shopOriginCounter : origin === "staff" ? copy.shopOriginStaff : null;
                                     const chat = contact.phone ? ownerChat(contact.phone) : null;
                                     return (
-                                        <tr key={order.id} className={order.status === "PENDING" ? "bg-amber-50/80 dark:bg-amber-950/20" : "bg-white dark:bg-stone-900"}>
+                                        <tr key={order.id} data-focus={`order-${order.id}`} className={order.id === focusId ? focusClass(true) : order.status === "PENDING" ? "bg-amber-50/80 dark:bg-amber-950/20" : "bg-white dark:bg-stone-900"}>
                                             <td className="rounded-s-xl px-3 py-3 font-medium text-emerald-950 dark:text-emerald-50">{shortOrderId(order.id)}</td>
                                             <td className="px-3 py-3">
                                                 <p className="text-stone-900 dark:text-stone-50">

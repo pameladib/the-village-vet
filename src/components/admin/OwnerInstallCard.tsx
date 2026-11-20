@@ -10,7 +10,7 @@ export default function OwnerInstallCard({ url, copy }: { url: string | null; co
                 <>
                     <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-300">{copy.inviteInstallScan}</p>
                     <div className="mt-4">
-                        <AppQr url={url} size={240} label={copy.inviteInstallScan} />
+                        <AppQr url={`${url.replace(/\/$/, "")}/q`} size={240} label={copy.inviteInstallScan} />
                     </div>
                     <p dir="ltr" className="mt-3 break-all text-left text-sm text-stone-600 dark:text-stone-300">{url}</p>
                     <div className="mt-3">
