@@ -24,13 +24,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
     return (
         <main className="bg-[#f6f1e8]">
-            <div className="mx-auto grid w-full max-w-5xl gap-8 px-5 py-8 lg:grid-cols-2 lg:py-12">
+            <div className="mx-auto w-full max-w-5xl px-5 pt-8 lg:pt-12">
+                <HistoryBack fallback="/shop" className="cursor-pointer text-sm font-medium text-emerald-800">{copy.shopBackStore}</HistoryBack>
+            </div>
+            <div className="mx-auto grid w-full max-w-5xl gap-8 px-5 pt-6 pb-8 lg:grid-cols-2 lg:pt-8 lg:pb-12">
                 <div className="relative aspect-square overflow-hidden rounded-[2rem] bg-[#efe8dc]">
                     <ProductPhoto src={productPhotoSrc(product.id, product.photoUrl)} alt={name} sizes="(min-width: 1024px) 36rem, 100vw" />
                 </div>
                 <div className="flex flex-col justify-center">
-                    <HistoryBack fallback="/shop" className="cursor-pointer text-sm font-medium text-emerald-800">{copy.shopBackStore}</HistoryBack>
-                    <p className="mt-6 text-xs font-medium tracking-[0.16em] text-emerald-800 uppercase">{shopText(locale, product.category.name, product.category.nameAr)}</p>
+                    <p className="text-xs font-medium tracking-[0.16em] text-emerald-800 uppercase">{shopText(locale, product.category.name, product.category.nameAr)}</p>
                     <h1 className="mt-2 text-4xl text-emerald-950">{name}</h1>
                     {description && <p className="mt-4 max-w-md text-base leading-7 text-stone-600">{description}</p>}
                     <p className="mt-6 text-2xl text-emerald-950">{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</p>

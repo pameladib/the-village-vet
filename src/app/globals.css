@@ -54,3 +54,24 @@ body {
 .public-serif :is(h1, h2, h3) {
   font-family: var(--font-serif), Georgia, "Times New Roman", serif;
 }
+
+/* Safari zooms a focused field whose text is under 16px and leaves the page zoomed. Desktop type stays as written. */
+@media (max-width: 1023px) {
+  :is(
+    textarea,
+    select,
+    input:not(
+      [type="button"],
+      [type="checkbox"],
+      [type="color"],
+      [type="hidden"],
+      [type="image"],
+      [type="radio"],
+      [type="range"],
+      [type="reset"],
+      [type="submit"]
+    )
+  ) {
+    font-size: 16px;
+  }
+}

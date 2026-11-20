@@ -77,7 +77,7 @@ export default function PublicHeader({
     }, [open]);
 
     return (
-        <header ref={headerRef} className="sticky top-0 z-20 border-b border-stone-200/80 bg-white">
+        <header ref={headerRef} className="sticky top-0 z-20 bg-white">
             <div className="mx-auto flex min-h-16 w-full max-w-6xl items-center gap-4 px-5 py-2 sm:gap-6">
                 <Link href="/" className="shrink-0 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40">
                     <ClinicLogo locale={locale} name={copy.clinicName} className={locale === "ar" ? "h-10 w-auto sm:h-11" : "h-12 w-auto max-w-[9.5rem] sm:h-14 sm:max-w-none"} />
@@ -98,14 +98,6 @@ export default function PublicHeader({
                     })}
                 </nav>
                 <div className="ms-auto flex items-center gap-3 lg:ms-2">
-                    {showCurrency && (
-                        <div className="hidden lg:block">
-                            <CurrencySwitch currency={currency} label={copy.currency} />
-                        </div>
-                    )}
-                    <div className="hidden lg:block">
-                        <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50" />
-                    </div>
                     {showProfile && (
                         <Link href="/profile" className="hidden text-sm font-semibold text-emerald-950 hover:text-emerald-800 lg:inline">
                             {copy.profile}
@@ -129,13 +121,12 @@ export default function PublicHeader({
                     </button>
                 </div>
             </div>
+            <div className="mx-auto flex w-full max-w-6xl flex-nowrap items-center justify-between gap-3 border-t border-stone-200/80 px-5 py-2">
+                <LocaleSwitch locale={locale} label={copy.language} className="shrink-0 rounded-full border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50" />
+                {showCurrency && <CurrencySwitch currency={currency} label={copy.currency} />}
+            </div>
             {open && (
                 <nav id="public-menu" aria-label={copy.menu} className="flex flex-col overflow-x-clip border-t border-stone-200 px-3 py-2 lg:hidden">
-                    {showCurrency && (
-                        <div className="flex min-h-11 items-center px-3">
-                            <CurrencySwitch currency={currency} label={copy.currency} />
-                        </div>
-                    )}
                     {mobileLinks.map((link) => {
                         const active = current(link.href);
                         return (
@@ -165,9 +156,6 @@ export default function PublicHeader({
                             <LogOutButton label={copy.logOut} className={`${menuItem} w-full text-start font-semibold text-emerald-950 hover:bg-emerald-50 disabled:opacity-60`} />
                         </div>
                     )}
-                    <div className="mt-1 border-t border-stone-200 px-3 py-3">
-                        <LocaleSwitch locale={locale} label={copy.language} className="inline-flex min-h-11 items-center rounded-full border border-stone-200 px-4 text-sm font-medium text-emerald-950 hover:bg-emerald-50" />
-                    </div>
                 </nav>
             )}
         </header>
