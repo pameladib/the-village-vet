@@ -8,6 +8,7 @@ import ClinicLogo from "@/components/ClinicLogo";
 import LogOutButton from "@/components/auth/LogOutButton";
 import CurrencySwitch from "@/components/CurrencySwitch";
 import LocaleSwitch from "@/components/LocaleSwitch";
+import CartLink from "@/components/shop/CartLink";
 import type { Copy, Locale } from "@/lib/i18n";
 import type { Currency } from "@/lib/shop/money";
 
@@ -98,6 +99,7 @@ export default function PublicHeader({
                     })}
                 </nav>
                 <div className="ms-auto flex items-center gap-3 lg:ms-2">
+                    {showCurrency && <CartLink label={copy.shopCart} locale={locale} compact />}
                     {showProfile && (
                         <Link href="/profile" className="hidden text-sm font-semibold text-emerald-950 hover:text-emerald-800 lg:inline">
                             {copy.profile}

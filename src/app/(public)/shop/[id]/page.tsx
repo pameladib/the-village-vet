@@ -37,7 +37,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     {description && <p className="mt-4 max-w-md text-base leading-7 text-stone-600">{description}</p>}
                     <p className="mt-6 text-2xl text-emerald-950">{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</p>
                     <p className="mt-2 text-sm text-stone-500">{product.stock > 0 ? copy.shopStockIn : copy.shopOut}</p>
-                    <AddToCartButton productId={product.id} name={name} price={product.price} stock={product.stock} image={productPhotoSrc(product.id, product.photoUrl)} copy={copy} />
+                    <AddToCartButton productId={product.id} name={name} price={product.price} stock={product.stock} image={productPhotoSrc(product.id, product.photoUrl)} copy={copy} locale={locale} />
                 </div>
             </div>
         </main>

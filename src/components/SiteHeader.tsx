@@ -65,9 +65,6 @@ export default function SiteHeader({
     return (
         <header ref={headerRef} className="border-b border-emerald-100 bg-white dark:border-emerald-950 dark:bg-stone-950">
             {notices !== undefined && <StaffLive />}
-            <div dir="ltr" className="flex px-4 pt-2">
-                <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-200 px-2.5 py-1 text-xs text-emerald-900 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-100 dark:hover:bg-emerald-950" />
-            </div>
             <div className="hidden flex-wrap items-center justify-between gap-3 px-4 py-3 lg:flex">
                 <Link href="/" className="text-sm font-semibold tracking-wide text-emerald-900 dark:text-emerald-100">
                     {copy.clinicName}
@@ -97,6 +94,9 @@ export default function SiteHeader({
                         {open ? <X className="size-6" strokeWidth={1.75} /> : <Menu className="size-6" strokeWidth={1.75} />}
                     </button>
                 </div>
+            </div>
+            <div dir="ltr" className="flex px-4 pb-2">
+                <LocaleSwitch locale={locale} label={copy.language} className="rounded-full border border-emerald-200 px-2.5 py-1 text-xs text-emerald-900 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-100 dark:hover:bg-emerald-950" />
             </div>
             {open && (
                 <nav id="app-menu" aria-label={copy.menu} className="flex flex-col overflow-x-clip border-t border-emerald-100 px-3 py-2 lg:hidden dark:border-emerald-950">

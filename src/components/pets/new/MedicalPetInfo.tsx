@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useFormContext, useWatch, useFieldArray } from "react-hook-form";
 import { formatTodayDate } from "@/lib/helpers/dates";
 import { dateOnlyUtc, formatDateOnly, nextVaccineDue } from "@/lib/clinic/vaccines";
@@ -57,23 +57,27 @@ function latestDose<T extends { type?: string; administeredAt?: string }>(rows: 
 }
 
 function NextVaccineDue({ species, copy }: { species: "CAT" | "DOG" | undefined; copy: Copy }) {
-  const { register, setValue, getValues } = useFormContext<PetForm>();
+  const { setValue, getValues } = useFormContext<PetForm>();
   const vaccinations = useWatch<PetForm, "vaccinations">({ name: "vaccinations" });
   const latest = latestDose(vaccinations);
   const annualsBefore = (vaccinations ?? []).filter((row) => row !== latest && row.type === "ANNUAL" && row.administeredAt).length;
-  const key = latest?.administeredAt ? `${species ?? ""}|${latest.type ?? ""}|${latest.administeredAt}|${annualsBefore}` : "";
-  const seen = useRef(key);
+  const given = latest?.administeredAt && latest.type ? dateOnlyUtc(latest.administeredAt) : null;
+  const next = species && latest?.type && given
+    ? nextVaccineDue(species, latest.type, given, latest.type === "ANNUAL" ? annualsBefore : 0)
+    : null;
+  const key = given && latest?.type ? `${species ?? ""}|${latest.type}|${latest.administeredAt}|${annualsBefore}` : "";
+  const suggested = next ? formatDateOnly(next.dueAt) : "";
+  const [tracked, setTracked] = useState(key);
+  const [override, setOverride] = useState<string | null>(() => getValues("vaccineNextDueAt") || null);
+  if (tracked !== key) {
+    setTracked(key);
+    setOverride(null);
+  }
+  const shown = override ?? suggested;
 
   useEffect(() => {
-    if (!key || !latest?.administeredAt || !species || !latest.type || seen.current === key) return;
-    const previous = seen.current;
-    seen.current = key;
-    if (!previous && getValues("vaccineNextDueAt")) return;
-    const given = dateOnlyUtc(latest.administeredAt);
-    if (!given) return;
-    const next = nextVaccineDue(species, latest.type, given, latest.type === "ANNUAL" ? annualsBefore : 0);
-    setValue("vaccineNextDueAt", next ? formatDateOnly(next.dueAt) : "");
-  }, [annualsBefore, getValues, key, latest, setValue, species]);
+    setValue("vaccineNextDueAt", shown);
+  }, [setValue, shown]);
 
   const threeWeeks = latest?.type === "FIRST" || (species === "DOG" && latest?.type === "SECOND");
 
@@ -81,14 +85,19 @@ function NextVaccineDue({ species, copy }: { species: "CAT" | "DOG" | undefined;
     <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
       <label className="block">
         <span className={labelClassName}>{copy.petNextVaccine}</span>
-        <input type="date" className={fieldClassName} {...register("vaccineNextDueAt")} />
+        <input
+          type="date"
+          className={fieldClassName}
+          value={shown}
+          onChange={(event) => setOverride(event.target.value)}
+        />
       </label>
       <p className="mt-1 text-xs text-stone-500">
         {latest?.administeredAt
           ? (threeWeeks ? copy.petSuggestWeeks : copy.petSuggestMonths)
           : copy.petDueUnknown}
       </p>
-      <button type="button" onClick={() => setValue("vaccineNextDueAt", "")} className="mt-1 text-xs font-medium text-stone-500 hover:text-stone-800 dark:hover:text-stone-200">{copy.clearDate}</button>
+      <button type="button" onClick={() => setOverride("")} className="mt-1 text-xs font-medium text-stone-500 hover:text-stone-800 dark:hover:text-stone-200">{copy.clearDate}</button>
     </div>
   );
 }
