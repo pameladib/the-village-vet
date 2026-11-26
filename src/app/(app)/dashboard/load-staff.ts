@@ -86,7 +86,7 @@ export async function loadStaffDashboard(role: string) {
             })
             : [],
         prisma.shopOrder.count({ where: { status: "PENDING" } }),
-        prisma.product.findMany({ select: { stock: true, lowStockAt: true } }),
+        prisma.productVariant.findMany({ select: { stock: true, lowStockAt: true } }),
         clinical
             ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { lt: todayStart } } })
             : 0,
@@ -103,7 +103,7 @@ export async function loadStaffDashboard(role: string) {
         clinical,
         today: todayVisits.map(toVisit),
         pendingOrders,
-        lowStock: lowStock.filter((product) => stockState(product.stock, product.lowStockAt) === "low").length,
+        lowStock: lowStock.filter((variant) => stockState(variant.stock, variant.lowStockAt) === "low").length,
         overdueCare,
         awaitingCount,
         followUps: (() => {
@@ -236,9 +236,16 @@ export async function loadCareReminders() {
 }
 
 export async function loadLowStock() {
-    const products = await prisma.product.findMany({
-        select: { id: true, name: true, nameAr: true, stock: true, lowStockAt: true },
+    const variants = await prisma.productVariant.findMany({
+        select: {
+            id: true,
+            label: true,
+            labelAr: true,
+            stock: true,
+            lowStockAt: true,
+            product: { select: { id: true, name: true, nameAr: true, slug: true } },
+        },
         orderBy: { stock: "asc" },
     });
-    return products.filter((product) => stockState(product.stock, product.lowStockAt) === "low").slice(0, 20);
+    return variants.filter((variant) => stockState(variant.stock, variant.lowStockAt) === "low").slice(0, 20);
 }

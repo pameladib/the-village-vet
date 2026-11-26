@@ -96,13 +96,13 @@ export async function savePricing(input: unknown) {
         }));
         let changedPrices = false;
         if (current.currency !== parsed.data.currency) {
-            const products = await tx.product.findMany({ select: { id: true, price: true } });
-            for (const product of products) {
-                const price = convertMinor(product.price, current.currency, parsed.data.currency, parsed.data.rate);
+            const variants = await tx.productVariant.findMany({ select: { id: true, price: true } });
+            for (const variant of variants) {
+                const price = convertMinor(variant.price, current.currency, parsed.data.currency, parsed.data.rate);
                 if (price == null) throw new Error("rate");
-                await tx.product.update({ where: { id: product.id }, data: { price } });
+                await tx.productVariant.update({ where: { id: variant.id }, data: { price } });
             }
-            changedPrices = products.length > 0;
+            changedPrices = variants.length > 0;
         }
         await tx.clinicSetting.upsert({
             where: { id: "clinic" },

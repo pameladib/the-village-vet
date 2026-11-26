@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/session";
 import { getClinicSettings } from "@/lib/clinic/public";
 import { getLocale, messages } from "@/lib/i18n";
 import { shopText } from "@/lib/shop/catalog";
+import { sellableName } from "@/lib/shop/variants";
 import { orderContact } from "@/lib/shop/lifecycle";
 import { loadOrder } from "@/lib/shop/load-order";
 
@@ -54,7 +55,7 @@ export default async function CustomerOrderPage({ params }: { params: Promise<{ 
                         ownerPhone: contact.phone,
                         items: order.items.map((item) => ({
                             id: item.id,
-                            name: shopText(locale, item.product.name, item.product.nameAr),
+                            name: sellableName(shopText(locale, item.product.name, item.product.nameAr), shopText(locale, item.variantLabel, item.variantLabelAr)),
                             quantity: item.quantity,
                             unitPrice: item.unitPrice,
                         })),

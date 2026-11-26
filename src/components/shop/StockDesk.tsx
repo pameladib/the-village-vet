@@ -14,7 +14,7 @@ function failureText(error: string, copy: Copy) {
     return copy.invFailed;
 }
 
-export default function StockDesk({ productId, threshold, copy }: { productId: string; threshold: number; copy: Copy }) {
+export default function StockDesk({ variantId, threshold, copy }: { variantId: string; threshold: number; copy: Copy }) {
     const router = useRouter();
     const dialog = useRef<HTMLDialogElement>(null);
     const [mode, setMode] = useState<Mode | null>(null);
@@ -54,10 +54,10 @@ export default function StockDesk({ productId, threshold, copy }: { productId: s
         if (!mode) return;
         setPending(true);
         const result = mode === "receive"
-            ? await receiveStock(productId, quantity, note)
+            ? await receiveStock(variantId, quantity, note)
             : mode === "damage"
-                ? await writeOffStock(productId, quantity, note)
-                : await correctStock(productId, quantity, note);
+                ? await writeOffStock(variantId, quantity, note)
+                : await correctStock(variantId, quantity, note);
         setPending(false);
         if (!result.success) {
             setError(failureText(result.error, copy));
@@ -91,7 +91,7 @@ export default function StockDesk({ productId, threshold, copy }: { productId: s
                         }
                         setPending(true);
                         setError(null);
-                        const result = await setLowStockThreshold(productId, value);
+                        const result = await setLowStockThreshold(variantId, value);
                         setPending(false);
                         if (!result.success) {
                             setError(failureText(result.error, copy));

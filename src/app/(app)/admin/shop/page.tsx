@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { adminShopHref, formatLbp, parseShopQuery, shopText } from "@/lib/shop/catalog";
 import { presentPrice } from "@/lib/shop/money";
 import { getDisplayCurrency, getPricing } from "@/lib/shop/pricing";
+import { offerSummary } from "@/lib/shop/variants";
 import { productPhotoSrc } from "@/lib/storage/files";
 import { pageKey } from "@/lib/slug";
 
@@ -37,10 +38,15 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
                     { nameAr: { contains: filters.q, mode: "insensitive" } },
                     { description: { contains: filters.q, mode: "insensitive" } },
                     { descriptionAr: { contains: filters.q, mode: "insensitive" } },
+                    { variants: { some: { label: { contains: filters.q, mode: "insensitive" } } } },
+                    { variants: { some: { labelAr: { contains: filters.q, mode: "insensitive" } } } },
                 ],
             } : {}),
         },
-        include: { category: { select: { name: true, nameAr: true } } },
+        include: {
+            category: { select: { name: true, nameAr: true } },
+            variants: { select: { price: true, stock: true } },
+        },
         orderBy: locale === "ar" ? { nameAr: "asc" } : { name: "asc" },
     });
     const pill = "shrink-0 rounded-full border px-4 py-2 text-sm whitespace-nowrap";
@@ -78,6 +84,8 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
                 <ul className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
                     {products.map((product) => {
                         const name = shopText(locale, product.name, product.nameAr);
+                        const offer = offerSummary(product.variants);
+                        const price = product.variants.length > 0 ? presentPrice(offer.min, pricing.currency, display, pricing.rate, locale) : copy.shopOut;
                         return (
                             <li key={product.id} className="overflow-hidden rounded-3xl border border-stone-200 bg-white">
                                 <Link href={`/admin/shop/${pageKey(product)}`} className="relative block aspect-square bg-[#efe8dc]">
@@ -88,8 +96,8 @@ export default async function AdminShopPage({ searchParams }: { searchParams: Pr
                                     <Link href={`/admin/shop/${pageKey(product)}`} className="mt-1 block font-medium text-emerald-950 hover:text-emerald-800">{name}</Link>
                                     <p className="text-sm text-stone-500">{locale === "ar" ? product.name : product.nameAr}</p>
                                     <div className="mt-3 flex items-center justify-between gap-2 text-sm">
-                                        <span>{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</span>
-                                        <span className="text-stone-500">{product.stock > 0 ? formatLbp(product.stock, locale) : copy.shopOut}</span>
+                                        <span>{product.variants.length > 0 && offer.from ? `${copy.shopFrom} ${price}` : price}</span>
+                                        <span className="text-stone-500">{offer.stock > 0 ? formatLbp(offer.stock, locale) : copy.shopOut}</span>
                                     </div>
                                     {!product.available && <p className="mt-2 text-xs font-medium text-stone-500">{copy.shopHidden}</p>}
                                     <Link href={`/admin/shop/${pageKey(product)}`} className="mt-3 inline-flex text-sm font-medium text-emerald-800">{copy.shopEdit}</Link>

@@ -14,12 +14,13 @@ import { getDisplayCurrency, pricingFrom } from "@/lib/shop/pricing";
 import { revalidateProduct } from "@/lib/paths";
 import { uniqueSlug } from "@/lib/record-slug";
 import { planReservation } from "@/lib/shop/reservation";
+import { sellableName } from "@/lib/shop/variants";
 import { acceptPhoto, isSafeObjectKey, objectKey, PHOTO_TYPES, preparePhoto, PRODUCT_PHOTOS_BUCKET } from "@/lib/storage/files";
 import { createUploadUrl, ensurePrivateBucket, readStoredPrefix, removeStoredObject, StorageNotConfiguredError } from "@/lib/storage/supabase";
 
 const orderSchema = z.object({
     items: z.array(z.object({
-        productId: z.uuid(),
+        variantId: z.uuid(),
         quantity: z.number().int().min(1).max(20),
     })).min(1),
     fulfillment: z.enum(["PICKUP", "DELIVERY"]),
@@ -29,15 +30,22 @@ const orderSchema = z.object({
     deliveryNote: z.string().trim().max(300).optional(),
 });
 
+const variantInput = z.object({
+    id: z.uuid().optional(),
+    label: z.string().trim().max(80),
+    labelAr: z.string().trim().max(80),
+    price: z.number().int().min(0),
+    stock: z.number().int().min(0).optional(),
+});
+
 const productSchema = z.object({
     id: z.uuid().optional(),
     name: z.string().trim().min(1).max(120),
     nameAr: z.string().trim().min(1).max(120),
     description: z.string().trim().optional(),
     descriptionAr: z.string().trim().optional(),
-    price: z.number().int().min(0),
     priceCurrency: z.enum(["USD", "LBP"]),
-    stock: z.number().int().min(0).optional(),
+    variants: z.array(variantInput).min(1).max(12),
     categoryId: z.uuid(),
     available: z.boolean().optional(),
     photoUrl: z.string().trim().min(1).max(300),
@@ -54,6 +62,11 @@ function productFieldErrors(error: z.ZodError): Partial<Record<ProductField, Pro
     for (const issue of error.issues) {
         const key = issue.path[0];
         if (typeof key !== "string" || key in fields) continue;
+        if (key === "variants") {
+            const nested = issue.path[2];
+            fields.variants = nested === "stock" ? "stock" : nested === "label" || nested === "labelAr" ? (issue.code === "too_big" ? "long" : "label") : issue.code === "too_small" ? "required" : "price";
+            continue;
+        }
         const code = productIssueCode(key, issue.code);
         if (code) fields[key as ProductField] = code;
     }
@@ -89,21 +102,33 @@ async function shopStaff() {
     }
 }
 
-type StockTx = Pick<typeof prisma, "product" | "orderItem">;
+type StockTx = Pick<typeof prisma, "productVariant" | "orderItem">;
 
-async function reserveStock(tx: StockTx, items: { productId: string; quantity: number }[], allowHidden: boolean) {
-    const products = await tx.product.findMany({
-        where: { id: { in: items.map((item) => item.productId) } },
-        select: { id: true, stock: true, available: true, price: true },
+async function reserveStock(tx: StockTx, items: { variantId: string; quantity: number }[], allowHidden: boolean) {
+    const variants = await tx.productVariant.findMany({
+        where: { id: { in: items.map((item) => item.variantId) } },
+        select: {
+            id: true,
+            productId: true,
+            stock: true,
+            price: true,
+            label: true,
+            labelAr: true,
+            product: { select: { available: true } },
+        },
     });
-    const plan = planReservation(products, items, { allowHidden });
+    const plan = planReservation(
+        variants.map((variant) => ({ ...variant, available: variant.product.available })),
+        items,
+        { allowHidden },
+    );
     if (!plan.ok) return null;
     for (const item of plan.lines) {
-        const reserved = await tx.product.updateMany({
+        const reserved = await tx.productVariant.updateMany({
             where: {
-                id: item.productId,
+                id: item.variantId,
                 stock: { gte: item.quantity },
-                ...(allowHidden ? {} : { available: true }),
+                ...(allowHidden ? {} : { product: { available: true } }),
             },
             data: { stock: { decrement: item.quantity } },
         });
@@ -113,10 +138,10 @@ async function reserveStock(tx: StockTx, items: { productId: string; quantity: n
 }
 
 async function releaseStock(tx: StockTx, orderId: string) {
-    const items = await tx.orderItem.findMany({ where: { orderId }, select: { productId: true, quantity: true } });
+    const items = await tx.orderItem.findMany({ where: { orderId }, select: { variantId: true, quantity: true } });
     for (const item of items) {
-        await tx.product.update({
-            where: { id: item.productId },
+        await tx.productVariant.update({
+            where: { id: item.variantId },
             data: { stock: { increment: item.quantity } },
         });
     }
@@ -198,7 +223,7 @@ const staffOrderSchema = z.object({
     customerName: z.string().trim().max(120).optional(),
     customerPhone: z.string().trim().max(30).optional(),
     items: z.array(z.object({
-        productId: z.uuid(),
+        variantId: z.uuid(),
         quantity: z.number().int().min(1).max(99),
     })).min(1).max(30),
     fulfillment: z.enum(["PICKUP", "DELIVERY"]).optional(),
@@ -344,26 +369,43 @@ export async function searchOrderProducts(query: string) {
     if (!session) return [];
     const q = query.trim().slice(0, 80);
     if (q.length < 1) return [];
-    return prisma.product.findMany({
+    const rows = await prisma.productVariant.findMany({
         where: {
             stock: { gt: 0 },
             OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { nameAr: { contains: q, mode: "insensitive" } },
+                { product: { name: { contains: q, mode: "insensitive" } } },
+                { product: { nameAr: { contains: q, mode: "insensitive" } } },
+                { label: { contains: q, mode: "insensitive" } },
+                { labelAr: { contains: q, mode: "insensitive" } },
             ],
         },
-        select: { id: true, name: true, nameAr: true, price: true, stock: true, available: true },
-        orderBy: { name: "asc" },
+        select: {
+            id: true,
+            label: true,
+            labelAr: true,
+            price: true,
+            stock: true,
+            product: { select: { name: true, nameAr: true, available: true } },
+        },
+        orderBy: [{ product: { name: "asc" } }, { position: "asc" }],
         take: 8,
     });
+    return rows.map((row) => ({
+        id: row.id,
+        name: sellableName(row.product.name, row.label),
+        nameAr: sellableName(row.product.nameAr, row.labelAr),
+        price: row.price,
+        stock: row.stock,
+        available: row.product.available,
+    }));
 }
 
 export async function quoteCart(ids: string[]) {
     const unique = [...new Set(ids)].filter((id) => z.uuid().safeParse(id).success).slice(0, 30);
     if (unique.length === 0) return { ...pricingFrom(null), products: [] as { id: string; price: number }[] };
     const [products, pricing] = await Promise.all([
-        prisma.product.findMany({
-            where: { id: { in: unique }, available: true },
+        prisma.productVariant.findMany({
+            where: { id: { in: unique }, product: { available: true } },
             select: { id: true, price: true },
         }),
         prisma.clinicSetting.findUnique({ where: { id: "clinic" }, select: { priceCurrency: true, usdRate: true } }),
@@ -386,7 +428,14 @@ export async function saveProduct(input: unknown) {
         select: { priceCurrency: true, usdRate: true },
     }));
     if (parsed.data.priceCurrency !== pricing.currency) {
-        return { success: false as const, formErrors: [] as string[], fieldErrors: { price: "currency" as const } };
+        return { success: false as const, formErrors: [] as string[], fieldErrors: { variants: "currency" as const } };
+    }
+    const versions = parsed.data.variants;
+    if (versions.length > 1 && versions.some((variant) => !variant.label || !variant.labelAr)) {
+        return { success: false as const, formErrors: [] as string[], fieldErrors: { variants: "label" as const } };
+    }
+    if (versions.some((variant) => !variant.id && variant.stock == null)) {
+        return { success: false as const, formErrors: [] as string[], fieldErrors: { variants: "stock" as const } };
     }
     const data = {
         name: parsed.data.name,
@@ -394,32 +443,88 @@ export async function saveProduct(input: unknown) {
         nameAr: parsed.data.nameAr,
         description: parsed.data.description || null,
         descriptionAr: parsed.data.descriptionAr || null,
-        price: parsed.data.price,
         categoryId: parsed.data.categoryId,
         available: parsed.data.available ?? true,
         photoUrl,
     };
-    if (parsed.data.id) {
-        const existing = await prisma.product.findUnique({ where: { id: parsed.data.id }, select: { photoUrl: true } });
-        if (!existing) return { success: false as const, formErrors: ["That product was not found."] };
-        await prisma.product.update({ where: { id: parsed.data.id }, data });
-        if (existing.photoUrl && existing.photoUrl !== photoUrl && isSafeObjectKey(existing.photoUrl)) {
-            await removeStoredObject(PRODUCT_PHOTOS_BUCKET, existing.photoUrl).catch(() => undefined);
-        }
-    } else {
-        if (parsed.data.stock == null) return { success: false as const, formErrors: [] as string[], fieldErrors: { stock: "stock" as const } };
-        const stock = parsed.data.stock;
-        await prisma.$transaction(async (tx) => {
-            const created = await tx.product.create({ data: { ...data, stock } });
-            if (stock > 0) {
-                await tx.stockMovement.create({
-                    data: { productId: created.id, type: "RECEIVE", delta: stock, staffId: session.user.id },
-                });
+    try {
+        const saved = await prisma.$transaction(async (tx) => {
+            if (!parsed.data.id) {
+                const created = await tx.product.create({ data });
+                for (const [position, variant] of versions.entries()) {
+                    const stock = variant.stock ?? 0;
+                    const row = await tx.productVariant.create({
+                        data: {
+                            productId: created.id,
+                            label: variant.label,
+                            labelAr: variant.labelAr,
+                            price: variant.price,
+                            stock,
+                            position,
+                        },
+                    });
+                    if (stock > 0) {
+                        await tx.stockMovement.create({
+                            data: { variantId: row.id, type: "RECEIVE", delta: stock, staffId: session.user.id },
+                        });
+                    }
+                }
+                return { id: created.id, previousPhoto: null as string | null };
             }
+
+            const existing = await tx.product.findUnique({
+                where: { id: parsed.data.id },
+                select: { photoUrl: true, variants: { select: { id: true } } },
+            });
+            if (!existing) throw new Error("missing");
+            await tx.product.update({ where: { id: parsed.data.id }, data });
+            const kept = new Set(versions.flatMap((variant) => variant.id ? [variant.id] : []));
+            const removed = existing.variants.filter((variant) => !kept.has(variant.id));
+            if (removed.length > 0) {
+                const ordered = await tx.orderItem.count({ where: { variantId: { in: removed.map((variant) => variant.id) } } });
+                if (ordered > 0) throw new Error("ordered");
+                await tx.productVariant.deleteMany({ where: { id: { in: removed.map((variant) => variant.id) } } });
+            }
+            const known = new Set(existing.variants.map((variant) => variant.id));
+            for (const [position, variant] of versions.entries()) {
+                if (variant.id) {
+                    if (!known.has(variant.id)) throw new Error("missing");
+                    await tx.productVariant.update({
+                        where: { id: variant.id },
+                        data: { label: variant.label, labelAr: variant.labelAr, price: variant.price, position },
+                    });
+                    continue;
+                }
+                const stock = variant.stock ?? 0;
+                const row = await tx.productVariant.create({
+                    data: {
+                        productId: parsed.data.id,
+                        label: variant.label,
+                        labelAr: variant.labelAr,
+                        price: variant.price,
+                        stock,
+                        position,
+                    },
+                });
+                if (stock > 0) {
+                    await tx.stockMovement.create({
+                        data: { variantId: row.id, type: "RECEIVE", delta: stock, staffId: session.user.id },
+                    });
+                }
+            }
+            return { id: parsed.data.id, previousPhoto: existing.photoUrl };
         });
+        if (saved.previousPhoto && saved.previousPhoto !== photoUrl && isSafeObjectKey(saved.previousPhoto)) {
+            await removeStoredObject(PRODUCT_PHOTOS_BUCKET, saved.previousPhoto).catch(() => undefined);
+        }
+        await refreshShop(saved.id);
+        return { success: true as const };
+    } catch (error) {
+        if (error instanceof Error && error.message === "ordered") {
+            return { success: false as const, formErrors: ["A version that is already on an order stays on the product."] };
+        }
+        return { success: false as const, formErrors: ["That product was not found."] };
     }
-    await refreshShop(parsed.data.id);
-    return { success: true as const };
 }
 
 export async function deleteProduct(productId: string) {

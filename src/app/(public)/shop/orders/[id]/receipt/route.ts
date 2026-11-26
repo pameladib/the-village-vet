@@ -4,6 +4,7 @@ import { messages } from "@/lib/i18n";
 import { canSeeOrder, orderContact } from "@/lib/shop/lifecycle";
 import { loadOrder } from "@/lib/shop/load-order";
 import { buildReceipt, receiptHtml, receiptPdf } from "@/lib/shop/receipt";
+import { sellableName } from "@/lib/shop/variants";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
     const { id } = await context.params;
@@ -38,7 +39,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         ownerName: contact.name,
         ownerPhone: contact.phone,
         items: order.items.map((item) => ({
-            name: item.product.name,
+            name: sellableName(item.product.name, item.variantLabel),
             quantity: item.quantity,
             unitPrice: item.unitPrice,
         })),

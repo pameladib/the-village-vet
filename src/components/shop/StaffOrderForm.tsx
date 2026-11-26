@@ -201,7 +201,7 @@ export default function StaffOrderForm({
             ownerId: walkIn ? undefined : customer?.id,
             customerName: walkIn ? name : undefined,
             customerPhone: walkIn ? phone : undefined,
-            items: lines.map((line) => ({ productId: line.id, quantity: line.quantity })),
+            items: lines.map((line) => ({ variantId: line.id, quantity: line.quantity })),
             fulfillment,
             payment,
             paid,

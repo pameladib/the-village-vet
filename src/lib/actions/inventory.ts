@@ -23,20 +23,24 @@ async function refresh(productId: string) {
     await revalidateProduct(productId);
 }
 
-export async function receiveStock(productId: string, quantity: number, note: string) {
+async function variantProduct(variantId: string) {
+    return prisma.productVariant.findUnique({ where: { id: variantId }, select: { id: true, productId: true } });
+}
+
+export async function receiveStock(variantId: string, quantity: number, note: string) {
     const session = await staff();
     if (!session) return { success: false as const, error: "forbidden" as const };
-    if (!z.uuid().safeParse(productId).success || !quantitySchema.safeParse(quantity).success) {
+    if (!z.uuid().safeParse(variantId).success || !quantitySchema.safeParse(quantity).success) {
         return { success: false as const, error: "invalid" as const };
     }
     const reason = noteSchema.safeParse(note);
-    const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
-    if (!product) return { success: false as const, error: "missing" as const };
+    const variant = await variantProduct(variantId);
+    if (!variant) return { success: false as const, error: "missing" as const };
     await prisma.$transaction([
-        prisma.product.update({ where: { id: productId }, data: { stock: { increment: quantity } } }),
+        prisma.productVariant.update({ where: { id: variantId }, data: { stock: { increment: quantity } } }),
         prisma.stockMovement.create({
             data: {
-                productId,
+                variantId,
                 type: "RECEIVE",
                 delta: quantity,
                 note: reason.success ? reason.data : null,
@@ -44,50 +48,54 @@ export async function receiveStock(productId: string, quantity: number, note: st
             },
         }),
     ]);
-    await refresh(productId);
+    await refresh(variant.productId);
     return { success: true as const };
 }
 
-export async function writeOffStock(productId: string, quantity: number, note: string) {
+export async function writeOffStock(variantId: string, quantity: number, note: string) {
     const session = await staff();
     if (!session) return { success: false as const, error: "forbidden" as const };
-    if (!z.uuid().safeParse(productId).success || !quantitySchema.safeParse(quantity).success || !noteSchema.safeParse(note).success) {
+    if (!z.uuid().safeParse(variantId).success || !quantitySchema.safeParse(quantity).success || !noteSchema.safeParse(note).success) {
         return { success: false as const, error: "invalid" as const };
     }
     const reason = note.trim();
+    const variant = await variantProduct(variantId);
+    if (!variant) return { success: false as const, error: "missing" as const };
     try {
         await prisma.$transaction(async (tx) => {
-            const updated = await tx.product.updateMany({
-                where: { id: productId, stock: { gte: quantity } },
+            const updated = await tx.productVariant.updateMany({
+                where: { id: variantId, stock: { gte: quantity } },
                 data: { stock: { decrement: quantity } },
             });
             if (updated.count !== 1) throw new Error("not-enough");
             await tx.stockMovement.create({
-                data: { productId, type: "DAMAGE", delta: -quantity, note: reason, staffId: session.user.id },
+                data: { variantId, type: "DAMAGE", delta: -quantity, note: reason, staffId: session.user.id },
             });
         });
     } catch (error) {
         if (error instanceof Error && error.message === "not-enough") return { success: false as const, error: "not-enough" as const };
         return { success: false as const, error: "missing" as const };
     }
-    await refresh(productId);
+    await refresh(variant.productId);
     return { success: true as const };
 }
 
-export async function correctStock(productId: string, counted: number, note: string) {
+export async function correctStock(variantId: string, counted: number, note: string) {
     const session = await staff();
     if (!session) return { success: false as const, error: "forbidden" as const };
-    if (!z.uuid().safeParse(productId).success || !z.number().int().min(0).max(100000).safeParse(counted).success || !noteSchema.safeParse(note).success) {
+    if (!z.uuid().safeParse(variantId).success || !z.number().int().min(0).max(100000).safeParse(counted).success || !noteSchema.safeParse(note).success) {
         return { success: false as const, error: "invalid" as const };
     }
     const reason = note.trim();
+    const variant = await variantProduct(variantId);
+    if (!variant) return { success: false as const, error: "missing" as const };
     try {
         await prisma.$transaction(async (tx) => {
-            const locked = await tx.$queryRaw<Array<{ stock: number }>>`SELECT "stock" FROM "product" WHERE "id" = ${productId} FOR UPDATE`;
+            const locked = await tx.$queryRaw<Array<{ stock: number }>>`SELECT "stock" FROM "product_variant" WHERE "id" = ${variantId} FOR UPDATE`;
             const current = locked[0];
             if (!current) throw new Error("missing");
             const reserved = await tx.orderItem.aggregate({
-                where: { productId, order: { status: { in: [...openOrderStatuses] } } },
+                where: { variantId, order: { status: { in: [...openOrderStatuses] } } },
                 _sum: { quantity: true },
             });
             const held = reserved._sum.quantity ?? 0;
@@ -95,9 +103,9 @@ export async function correctStock(productId: string, counted: number, note: str
             const next = counted - held;
             const delta = next - current.stock;
             if (delta !== 0) {
-                await tx.product.update({ where: { id: productId }, data: { stock: next } });
+                await tx.productVariant.update({ where: { id: variantId }, data: { stock: next } });
                 await tx.stockMovement.create({
-                    data: { productId, type: "CORRECT", delta, note: reason, staffId: session.user.id },
+                    data: { variantId, type: "CORRECT", delta, note: reason, staffId: session.user.id },
                 });
             }
         });
@@ -106,18 +114,20 @@ export async function correctStock(productId: string, counted: number, note: str
         if (code === "count-low" || code === "missing") return { success: false as const, error: code };
         return { success: false as const, error: "invalid" as const };
     }
-    await refresh(productId);
+    await refresh(variant.productId);
     return { success: true as const };
 }
 
-export async function setLowStockThreshold(productId: string, threshold: number) {
+export async function setLowStockThreshold(variantId: string, threshold: number) {
     const session = await staff();
     if (!session) return { success: false as const, error: "forbidden" as const };
-    if (!z.uuid().safeParse(productId).success || !z.number().int().min(0).max(1000).safeParse(threshold).success) {
+    if (!z.uuid().safeParse(variantId).success || !z.number().int().min(0).max(1000).safeParse(threshold).success) {
         return { success: false as const, error: "invalid" as const };
     }
-    const updated = await prisma.product.updateMany({ where: { id: productId }, data: { lowStockAt: threshold } });
+    const variant = await variantProduct(variantId);
+    if (!variant) return { success: false as const, error: "missing" as const };
+    const updated = await prisma.productVariant.updateMany({ where: { id: variantId }, data: { lowStockAt: threshold } });
     if (updated.count !== 1) return { success: false as const, error: "missing" as const };
-    await refresh(productId);
+    await refresh(variant.productId);
     return { success: true as const };
 }

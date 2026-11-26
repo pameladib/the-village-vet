@@ -8,6 +8,7 @@ import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
 import { shopText } from "@/lib/shop/catalog";
 import { openOrderStatuses, stockLevels, stockState, type StockState } from "@/lib/shop/inventory";
+import { sellableName } from "@/lib/shop/variants";
 import { pageKey } from "@/lib/slug";
 
 function first(value: string | string[] | undefined) {
@@ -38,35 +39,49 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     const copy = messages(locale);
     const count = new Intl.NumberFormat(intlLocale(locale));
 
-    const [products, reservedRows, categories] = await Promise.all([
-        prisma.product.findMany({
+    const [variants, reservedRows, categories] = await Promise.all([
+        prisma.productVariant.findMany({
             select: {
                 id: true,
-                slug: true,
-                name: true,
-                nameAr: true,
+                label: true,
+                labelAr: true,
                 stock: true,
                 lowStockAt: true,
-                categoryId: true,
-                category: { select: { name: true, nameAr: true } },
+                product: {
+                    select: {
+                        id: true,
+                        slug: true,
+                        name: true,
+                        nameAr: true,
+                        categoryId: true,
+                        category: { select: { name: true, nameAr: true } },
+                    },
+                },
             },
         }),
         prisma.orderItem.groupBy({
-            by: ["productId"],
+            by: ["variantId"],
             where: { order: { status: { in: [...openOrderStatuses] } } },
             _sum: { quantity: true },
         }),
         prisma.productCategory.findMany({ orderBy: { position: "asc" }, select: { id: true, name: true, nameAr: true } }),
     ]);
-    const reserved = new Map(reservedRows.map((row) => [row.productId, row._sum.quantity ?? 0]));
-    const rows = products.map((product) => {
-        const levels = stockLevels(product.stock, reserved.get(product.id) ?? 0);
+    const reserved = new Map(reservedRows.map((row) => [row.variantId, row._sum.quantity ?? 0]));
+    const rows = variants.map((variant) => {
+        const levels = stockLevels(variant.stock, reserved.get(variant.id) ?? 0);
         return {
-            ...product,
+            id: variant.product.id,
+            slug: variant.product.slug,
+            variantId: variant.id,
+            name: variant.product.name,
+            nameAr: variant.product.nameAr,
+            labelText: variant.label,
+            labelTextAr: variant.labelAr,
+            categoryId: variant.product.categoryId,
             ...levels,
-            state: stockState(levels.available, product.lowStockAt),
-            label: shopText(locale, product.name, product.nameAr),
-            category: shopText(locale, product.category.name, product.category.nameAr),
+            state: stockState(levels.available, variant.lowStockAt),
+            label: sellableName(shopText(locale, variant.product.name, variant.product.nameAr), shopText(locale, variant.label, variant.labelAr)),
+            category: shopText(locale, variant.product.category.name, variant.product.category.nameAr),
         };
     });
     const summary = {
@@ -82,7 +97,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         if (activeCategory && row.categoryId !== activeCategory) return false;
         if (stateFilter && row.state !== stateFilter) return false;
         if (!needle) return true;
-        return row.name.toLocaleLowerCase().includes(needle) || row.nameAr.toLocaleLowerCase().includes(needle);
+        return row.name.toLocaleLowerCase().includes(needle)
+            || row.nameAr.toLocaleLowerCase().includes(needle)
+            || row.labelText.toLocaleLowerCase().includes(needle)
+            || row.labelTextAr.toLocaleLowerCase().includes(needle);
     });
     visible.sort((a, b) => {
         if (sort === "low" || sort === "high") {
@@ -117,7 +135,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                 <>
                     <ul className="mt-4 flex flex-col gap-2 md:hidden">
                         {visible.map((product) => (
-                            <li key={product.id} className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-3 dark:border-stone-800 dark:bg-stone-900">
+                            <li key={product.variantId} className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-3 dark:border-stone-800 dark:bg-stone-900">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <p className="truncate font-medium text-emerald-950 dark:text-emerald-50">{product.label}</p>
@@ -150,7 +168,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                                 </thead>
                                 <tbody>
                                     {visible.map((product) => (
-                                        <tr key={product.id} className="border-t border-[#E5E7EB] hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-800/70">
+                                        <tr key={product.variantId} className="border-t border-[#E5E7EB] hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-800/70">
                                             <td className="px-3 py-2.5 font-medium text-emerald-950 dark:text-emerald-50">{product.label}</td>
                                             <td className="px-3 py-2.5 text-stone-600 dark:text-stone-300">{product.category}</td>
                                             <td className="px-3 py-2.5 text-stone-800 dark:text-stone-100">{count.format(product.physical)}</td>

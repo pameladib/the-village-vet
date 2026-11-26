@@ -1,11 +1,10 @@
 import HistoryBack from "@/components/HistoryBack";
 import { notFound, redirect } from "next/navigation";
-import AddToCartButton from "@/components/shop/AddToCartButton";
 import ProductPhoto from "@/components/shop/ProductPhoto";
+import VariantPurchase from "@/components/shop/VariantPurchase";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { shopText } from "@/lib/shop/catalog";
-import { presentPrice } from "@/lib/shop/money";
 import { getDisplayCurrency, getPricing } from "@/lib/shop/pricing";
 import { productPhotoSrc } from "@/lib/storage/files";
 import { refWhere } from "@/lib/slug";
@@ -14,9 +13,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     const { id } = await params;
     const product = await prisma.product.findFirst({
         where: { ...refWhere(id), available: true },
-        include: { category: { select: { name: true, nameAr: true } } },
+        include: {
+            category: { select: { name: true, nameAr: true } },
+            variants: { orderBy: { position: "asc" } },
+        },
     });
-    if (!product) notFound();
+    if (!product || product.variants.length === 0) notFound();
     if (product.slug && id !== product.slug) redirect(`/shop/${product.slug}`);
 
     const [locale, pricing, display] = await Promise.all([getLocale(), getPricing(), getDisplayCurrency()]);
@@ -37,9 +39,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <p className="text-xs font-medium tracking-[0.16em] text-emerald-800 uppercase">{shopText(locale, product.category.name, product.category.nameAr)}</p>
                     <h1 className="mt-2 text-4xl text-emerald-950">{name}</h1>
                     {description && <p className="mt-4 max-w-md text-base leading-7 text-stone-600">{description}</p>}
-                    <p className="mt-6 text-2xl text-emerald-950">{presentPrice(product.price, pricing.currency, display, pricing.rate, locale)}</p>
-                    <p className="mt-2 text-sm text-stone-500">{product.stock > 0 ? copy.shopStockIn : copy.shopOut}</p>
-                    <AddToCartButton productId={product.id} name={name} price={product.price} stock={product.stock} image={productPhotoSrc(product.id, product.photoUrl)} copy={copy} locale={locale} />
+                    <VariantPurchase
+                        productName={name}
+                        image={productPhotoSrc(product.id, product.photoUrl)}
+                        variants={product.variants.map((variant) => ({
+                            id: variant.id,
+                            label: shopText(locale, variant.label, variant.labelAr),
+                            price: variant.price,
+                            stock: variant.stock,
+                        }))}
+                        copy={copy}
+                        locale={locale}
+                        currency={pricing.currency}
+                        display={display}
+                        rate={pricing.rate}
+                    />
                 </div>
             </div>
         </main>

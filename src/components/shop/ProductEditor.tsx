@@ -12,17 +12,25 @@ import ProductPhoto from "./ProductPhoto";
 import { mapShopError } from "./ShopAdmin";
 
 type Category = { id: string; name: string; nameAr: string };
+type Version = { id: string; label: string; labelAr: string; price: number; stock: number };
 type Product = {
     id: string;
     name: string;
     nameAr: string;
     description: string | null;
     descriptionAr: string | null;
-    price: number;
-    stock: number;
     available: boolean;
     categoryId: string;
     photoUrl: string | null;
+    variants: Version[];
+};
+type Draft = {
+    key: string;
+    id?: string;
+    label: string;
+    labelAr: string;
+    price: string;
+    stock: string;
 };
 
 function controlClass(invalid: boolean) {
@@ -32,8 +40,14 @@ function controlClass(invalid: boolean) {
 function explain(copy: Copy, field: ProductField, code: ProductFieldCode) {
     if (field === "name") return code === "long" ? copy.shopErrNameLong : copy.shopErrNameRequired;
     if (field === "nameAr") return code === "long" ? copy.shopErrNameArLong : copy.shopErrNameArRequired;
-    if (field === "price") return code === "currency" ? copy.pricingErrCurrency : copy.shopErrPrice;
-    if (field === "stock") return copy.shopErrStock;
+    if (field === "variants") {
+        if (code === "currency") return copy.pricingErrCurrency;
+        if (code === "label") return copy.shopErrVersionLabel;
+        if (code === "long") return copy.shopErrVersionLong;
+        if (code === "price") return copy.shopErrVersionPrice;
+        if (code === "stock") return copy.shopErrVersionStock;
+        return copy.shopErrVersions;
+    }
     if (field === "categoryId") return copy.shopErrCategory;
     if (field === "photoUrl") return code === "photoLink" ? copy.shopErrPhoto : copy.shopPhotoRequired;
     return copy.shopErrDetails;
@@ -55,6 +69,10 @@ function showBeside(form: HTMLFormElement, fields: Partial<Record<ProductField, 
     form.querySelector<HTMLElement>(`[name="${name}"]`)?.scrollIntoView({ block: "center" });
 }
 
+function blankVersion(): Draft {
+    return { key: crypto.randomUUID(), label: "", labelAr: "", price: "", stock: "" };
+}
+
 export default function ProductEditor({
     copy,
     locale,
@@ -73,6 +91,16 @@ export default function ProductEditor({
     const [fields, setFields] = useState<Partial<Record<ProductField, string>>>({});
     const [saving, setSaving] = useState(false);
     const [preview, setPreview] = useState<string | null>(null);
+    const [versions, setVersions] = useState<Draft[]>(() => product?.variants.length
+        ? product.variants.map((variant) => ({
+            key: variant.id,
+            id: variant.id,
+            label: variant.label,
+            labelAr: variant.labelAr,
+            price: inputFromMinor(variant.price, currency),
+            stock: String(variant.stock),
+        }))
+        : [{ ...blankVersion(), key: "draft" }]);
     const currentPhoto = preview ?? (product ? productPhoto(product.id, product.photoUrl) : null);
 
     function productPhoto(id: string, photoUrl: string | null) {
@@ -81,12 +109,16 @@ export default function ProductEditor({
         return `/shop/media/${id}`;
     }
 
+    function changeVersion(key: string, patch: Partial<Draft>) {
+        setVersions((current) => current.map((version) => version.key === key ? { ...version, ...patch } : version));
+    }
+
     return (
         <form
             className="mt-6 flex flex-col gap-4 rounded-3xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900"
             onInput={(event) => {
                 const name = (event.target as HTMLInputElement).name;
-                const field = (name === "photo" ? "photoUrl" : name) as ProductField;
+                const field = (name === "photo" ? "photoUrl" : name.startsWith("variant") ? "variants" : name) as ProductField;
                 setFields((current) => {
                     if (!current[field]) return current;
                     const next = { ...current };
@@ -104,9 +136,13 @@ export default function ProductEditor({
                     nameAr: String(form.get("nameAr") ?? ""),
                     description: String(form.get("description") ?? ""),
                     descriptionAr: String(form.get("descriptionAr") ?? ""),
-                    price: String(form.get("price") ?? ""),
-                    stock: product ? undefined : String(form.get("stock") ?? ""),
                     categoryId: String(form.get("categoryId") ?? ""),
+                    variants: versions.map((version) => ({
+                        label: version.label,
+                        labelAr: version.labelAr,
+                        price: version.price,
+                        ...(version.id ? {} : { stock: version.stock }),
+                    })),
                 };
                 setSaving(true);
                 setError(null);
@@ -150,9 +186,17 @@ export default function ProductEditor({
                     setSaving(false);
                     return;
                 }
-                const price = minorFromInput(values.price, currency);
-                if (price == null) {
-                    const messages = { price: copy.shopErrPrice };
+                const priced = versions.map((version) => {
+                    const price = minorFromInput(version.price, currency);
+                    return price == null ? null : {
+                        ...(version.id ? { id: version.id } : { stock: Number(version.stock) }),
+                        label: version.label.trim(),
+                        labelAr: version.labelAr.trim(),
+                        price,
+                    };
+                });
+                if (priced.some((version) => version == null)) {
+                    const messages = { variants: copy.shopErrVersionPrice };
                     setFields(messages);
                     showBeside(formElement, messages);
                     setSaving(false);
@@ -164,9 +208,8 @@ export default function ProductEditor({
                     nameAr: values.nameAr,
                     description: values.description,
                     descriptionAr: values.descriptionAr,
-                    price,
                     priceCurrency: currency,
-                    ...(product ? {} : { stock: Number(values.stock) }),
+                    variants: priced,
                     categoryId: values.categoryId,
                     available: form.get("available") === "on",
                     photoUrl,
@@ -225,18 +268,54 @@ export default function ProductEditor({
                 <textarea name="descriptionAr" defaultValue={product?.descriptionAr ?? ""} rows={3} dir="rtl" aria-invalid={Boolean(fields.descriptionAr)} className={controlClass(Boolean(fields.descriptionAr))} />
                 <FieldNote message={fields.descriptionAr} />
             </label>
-            <label className="text-sm font-medium">
-                {currency === "USD" ? copy.shopPriceUsd : copy.shopPriceLbp}
-                <input name="price" inputMode="decimal" defaultValue={product ? inputFromMinor(product.price, currency) : ""} required aria-invalid={Boolean(fields.price)} className={controlClass(Boolean(fields.price))} />
-                <FieldNote message={fields.price} />
-            </label>
-            {!product && (
-                <label className="text-sm font-medium">
-                    {copy.shopStockField}
-                    <input name="stock" type="number" min={0} required aria-invalid={Boolean(fields.stock)} className={controlClass(Boolean(fields.stock))} />
-                    <FieldNote message={fields.stock} />
-                </label>
-            )}
+            <fieldset name="variants" className="flex flex-col gap-3 rounded-2xl border border-stone-200 p-3 dark:border-stone-700">
+                <legend className="px-1 text-sm font-medium">{copy.shopVersions}</legend>
+                <p className="text-xs font-normal text-stone-500">{copy.shopVersionHint}</p>
+                {versions.map((version, index) => (
+                    <div key={version.key} className="grid gap-3 rounded-2xl bg-stone-50 p-3 dark:bg-stone-950">
+                        {versions.length > 1 && (
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium">{index + 1}</p>
+                                <button
+                                    type="button"
+                                    onClick={() => setVersions((current) => current.filter((item) => item.key !== version.key))}
+                                    className="text-sm text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-emerald-900"
+                                >
+                                    {copy.shopRemove}
+                                </button>
+                            </div>
+                        )}
+                        <label className="text-sm font-medium">
+                            {copy.shopVersionLabel}
+                            <input name="variant-label" value={version.label} onChange={(event) => changeVersion(version.key, { label: event.target.value })} className={controlClass(Boolean(fields.variants))} />
+                        </label>
+                        <label className="text-sm font-medium">
+                            {copy.shopVersionLabelAr}
+                            <input name="variant-label-ar" value={version.labelAr} dir="rtl" onChange={(event) => changeVersion(version.key, { labelAr: event.target.value })} className={controlClass(Boolean(fields.variants))} />
+                        </label>
+                        <label className="text-sm font-medium">
+                            {currency === "USD" ? copy.shopPriceUsd : copy.shopPriceLbp}
+                            <input name="variant-price" inputMode="decimal" value={version.price} onChange={(event) => changeVersion(version.key, { price: event.target.value })} required aria-invalid={Boolean(fields.variants)} className={controlClass(Boolean(fields.variants))} />
+                        </label>
+                        {version.id ? (
+                            <p className="text-sm text-stone-500">{copy.shopStockField}: {version.stock}</p>
+                        ) : (
+                            <label className="text-sm font-medium">
+                                {copy.shopStockField}
+                                <input name="variant-stock" type="number" min={0} value={version.stock} onChange={(event) => changeVersion(version.key, { stock: event.target.value })} required aria-invalid={Boolean(fields.variants)} className={controlClass(Boolean(fields.variants))} />
+                            </label>
+                        )}
+                    </div>
+                ))}
+                <FieldNote message={fields.variants} />
+                <button
+                    type="button"
+                    onClick={() => setVersions((current) => [...current, blankVersion()])}
+                    className="self-start rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:text-stone-100 dark:hover:bg-stone-800"
+                >
+                    {copy.shopAddVersion}
+                </button>
+            </fieldset>
             <label className="text-sm font-medium">
                 {copy.shopManageCategories}
                 <select name="categoryId" defaultValue={product?.categoryId ?? categories[0]?.id} required aria-invalid={Boolean(fields.categoryId)} className={controlClass(Boolean(fields.categoryId))}>

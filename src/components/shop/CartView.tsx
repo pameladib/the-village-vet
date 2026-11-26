@@ -9,7 +9,7 @@ import { convertMinor, formatMoney, type Currency } from "@/lib/shop/money";
 import ProductPhoto from "./ProductPhoto";
 
 export type CartLine = {
-    productId: string;
+    variantId: string;
     name: string;
     quantity: number;
     price: number;
@@ -23,7 +23,7 @@ export function readCart(): CartLine[] {
     if (typeof window === "undefined") return [];
     try {
         const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as CartLine[];
-        return Array.isArray(parsed) ? parsed.filter((line) => line && typeof line.productId === "string") : [];
+        return Array.isArray(parsed) ? parsed.filter((line) => line && typeof line.variantId === "string") : [];
     } catch {
         return [];
     }
@@ -40,19 +40,19 @@ export function clearCart() {
 }
 
 export function setCartQuantity(line: Omit<CartLine, "quantity">, quantity: number) {
-    const cart = readCart().filter((item) => item.productId !== line.productId);
+    const cart = readCart().filter((item) => item.variantId !== line.variantId);
     const next = quantity < 1 ? cart : [...cart, { ...line, quantity: Math.min(20, quantity) }];
     writeCart(next);
 }
 
 export function addToCart(line: CartLine) {
-    const current = readCart().find((item) => item.productId === line.productId)?.quantity ?? 0;
+    const current = readCart().find((item) => item.variantId === line.variantId)?.quantity ?? 0;
     setCartQuantity(line, Math.min(20, current + line.quantity));
 }
 
 export function useQuotedLines(lines: CartLine[], display: Currency) {
     const [prices, setPrices] = useState<Record<string, number> | null>(null);
-    const ids = lines.map((line) => line.productId).join(",");
+    const ids = lines.map((line) => line.variantId).join(",");
 
     useEffect(() => {
         let cancelled = false;
@@ -76,7 +76,7 @@ export function useQuotedLines(lines: CartLine[], display: Currency) {
 export default function CartView({ copy, locale, currency }: { copy: Copy; locale: Locale; currency: Currency }) {
     const [lines, setLines] = useState<CartLine[]>(() => readCart());
     const prices = useQuotedLines(lines, currency);
-    const total = lines.reduce((sum, line) => sum + (prices?.[line.productId] ?? 0) * line.quantity, 0);
+    const total = lines.reduce((sum, line) => sum + (prices?.[line.variantId] ?? 0) * line.quantity, 0);
 
     function update(next: CartLine[]) {
         setLines(next);
@@ -92,13 +92,13 @@ export default function CartView({ copy, locale, currency }: { copy: Copy; local
                 </div>
             )}
             {lines.map((line) => (
-                <div key={line.productId} className="flex gap-4 rounded-3xl bg-white p-3 ring-1 ring-stone-200">
+                <div key={line.variantId} className="flex gap-4 rounded-3xl bg-white p-3 ring-1 ring-stone-200">
                     <div className="relative size-24 shrink-0 overflow-hidden rounded-2xl bg-[#efe8dc]">
                         <ProductPhoto src={line.image ?? null} alt="" sizes="96px" />
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
                         <p className="font-medium text-emerald-950">{line.name}</p>
-                        <p className="mt-1 text-sm text-stone-500">{prices?.[line.productId] == null ? copy.shopOut : formatMoney(prices[line.productId], currency, locale)}</p>
+                        <p className="mt-1 text-sm text-stone-500">{prices?.[line.variantId] == null ? copy.shopOut : formatMoney(prices[line.variantId], currency, locale)}</p>
                         <div className="mt-auto flex items-center justify-between gap-3 pt-3">
                             <label className="inline-flex items-center gap-2 text-sm text-stone-600">
                                 <span className="sr-only">{copy.shopStockField}</span>
@@ -110,21 +110,21 @@ export default function CartView({ copy, locale, currency }: { copy: Copy; local
                                     onChange={(event) => {
                                         const quantity = Number(event.target.value);
                                         if (!Number.isFinite(quantity)) return;
-                                        update(lines.map((item) => item.productId === line.productId ? { ...item, quantity: Math.min(20, Math.max(1, quantity)) } : item));
+                                        update(lines.map((item) => item.variantId === line.variantId ? { ...item, quantity: Math.min(20, Math.max(1, quantity)) } : item));
                                     }}
                                     className="w-16 rounded-full border border-stone-200 px-2 py-1 text-sm"
                                 />
                             </label>
                             <button
                                 type="button"
-                                onClick={() => update(lines.filter((item) => item.productId !== line.productId))}
+                                onClick={() => update(lines.filter((item) => item.variantId !== line.variantId))}
                                 className="text-sm text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-emerald-900"
                             >
                                 {copy.shopRemove}
                             </button>
                         </div>
                     </div>
-                    <p className="text-sm font-medium text-emerald-950">{prices?.[line.productId] == null ? "" : formatMoney(prices[line.productId] * line.quantity, currency, locale)}</p>
+                    <p className="text-sm font-medium text-emerald-950">{prices?.[line.variantId] == null ? "" : formatMoney(prices[line.variantId] * line.quantity, currency, locale)}</p>
                 </div>
             ))}
             {lines.length > 0 && (

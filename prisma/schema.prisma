@@ -504,41 +504,56 @@ model ProductCategory {
 }
 
 model Product {
-  id            String          @id @default(uuid())
-  slug          String?         @unique
+  id            String           @id @default(uuid())
+  slug          String?          @unique
   name          String
   nameAr        String
   description   String?
   descriptionAr String?
-  // Minor units of ClinicSetting.priceCurrency. Cents when that is USD, whole pounds when it is LBP.
-  price         Int
-  stock         Int             @default(0)
-  // Available units at or below this number are low stock. Zero is out of stock.
-  lowStockAt    Int             @default(2)
   photoUrl      String?
-  available     Boolean         @default(true)
+  available     Boolean          @default(true)
   categoryId    String
-  category      ProductCategory @relation(fields: [categoryId], references: [id])
+  category      ProductCategory  @relation(fields: [categoryId], references: [id])
+  variants      ProductVariant[]
   orderItems    OrderItem[]
-  movements     StockMovement[]
 
   @@index([categoryId])
   @@map("product")
 }
 
+// One row per version a customer can buy. A single version with a blank label is one price and one stock count.
+model ProductVariant {
+  id         String          @id @default(uuid())
+  label      String          @default("")
+  labelAr    String          @default("")
+  // Minor units of ClinicSetting.priceCurrency. Cents when that is USD, whole pounds when it is LBP.
+  price      Int
+  stock      Int             @default(0)
+  // Available units at or below this number are low stock. Zero is out of stock.
+  lowStockAt Int             @default(2)
+  position   Int             @default(0)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  movements  StockMovement[]
+
+  @@index([productId, position])
+  @@map("product_variant")
+}
+
 // Staff adjustments to the sellable quantity. Order reservations stay on the order items.
 model StockMovement {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   type      String
   delta     Int
   note      String?
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   staffId   String
-  staff     User     @relation(fields: [staffId], references: [id])
-  createdAt DateTime @default(now())
+  staff     User           @relation(fields: [staffId], references: [id])
+  createdAt DateTime       @default(now())
 
-  @@index([productId, createdAt])
+  @@index([variantId, createdAt])
   @@map("stock_movement")
 }
 
@@ -608,8 +623,14 @@ model OrderItem {
   orderId        String
   order          ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId      String
-  product        Product   @relation(fields: [productId], references: [id])
+  product        Product        @relation(fields: [productId], references: [id])
+  variantId      String
+  variant        ProductVariant @relation(fields: [variantId], references: [id])
+  // Copied at purchase. A later rename does not rewrite this sale.
+  variantLabel   String         @default("")
+  variantLabelAr String         @default("")
 
   @@index([orderId])
+  @@index([variantId])
   @@map("order_item")
 }

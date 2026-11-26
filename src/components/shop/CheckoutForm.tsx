@@ -17,7 +17,7 @@ export default function CheckoutForm({ copy, locale, phone, currency }: { copy: 
     const [payment, setPayment] = useState<"CASH" | "WHISH">("CASH");
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
-    const total = lines.reduce((sum, line) => sum + (prices?.[line.productId] ?? 0) * line.quantity, 0);
+    const total = lines.reduce((sum, line) => sum + (prices?.[line.variantId] ?? 0) * line.quantity, 0);
 
     if (lines.length === 0) {
         return <p className="mt-8 text-stone-600">{copy.shopCartEmpty}</p>;
@@ -34,7 +34,7 @@ export default function CheckoutForm({ copy, locale, phone, currency }: { copy: 
                 setPending(true);
                 setError(null);
                 const result = await placeOrder({
-                    items: lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
+                    items: lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
                     fulfillment,
                     payment,
                     deliveryAddress: String(form.get("address") ?? ""),

@@ -6,6 +6,7 @@ import { getLocale, messages } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { prisma } from "@/lib/prisma";
 import { formatLbp, orderFulfillmentLabel, orderPaymentLabel, orderStatusLabel, orderStatusTone, shortOrderId, shopText } from "@/lib/shop/catalog";
+import { sellableName } from "@/lib/shop/variants";
 import { formatStored, orderCharge } from "@/lib/shop/money";
 
 export default async function MyOrdersPage() {
@@ -56,7 +57,7 @@ export default async function MyOrdersPage() {
                                 <ul className="mt-3 border-t border-stone-100 px-5 py-2 text-sm text-stone-700">
                                     {order.items.map((item) => (
                                         <li key={item.id} className="flex justify-between gap-4 py-2">
-                                            <span>{shopText(locale, item.product.name, item.product.nameAr)} × {formatLbp(item.quantity, locale)}</span>
+                                            <span>{sellableName(shopText(locale, item.product.name, item.product.nameAr), shopText(locale, item.variantLabel, item.variantLabelAr))} × {formatLbp(item.quantity, locale)}</span>
                                             <span className="shrink-0">{formatStored(item.unitPrice * item.quantity, order.currency, locale)}</span>
                                         </li>
                                     ))}

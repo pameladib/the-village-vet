@@ -12,6 +12,7 @@ export function mapShopError(message: string | undefined, copy: Copy) {
         || message === "File storage is not set up yet."
     ) return copy.shopErrPhotoFile;
     if (message === "This product is on an order, so it can be hidden instead of deleted.") return copy.shopErrOnOrder;
+    if (message === "A version that is already on an order stays on the product.") return copy.shopErrVersionOrder;
     if (message === "This order changed.") return copy.shopErrConflict;
     if (message === "Enter the customer’s name and phone.") return copy.shopErrCustomer;
     if (message === "Choose at least one product.") return copy.shopErrItems;

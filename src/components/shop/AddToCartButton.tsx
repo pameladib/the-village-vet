@@ -6,7 +6,7 @@ import { addToCart, cartEvent, readCart, setCartQuantity } from "./CartView";
 import type { Copy, Locale } from "@/lib/i18n";
 
 export default function AddToCartButton({
-    productId,
+    variantId,
     name,
     price,
     stock,
@@ -15,7 +15,7 @@ export default function AddToCartButton({
     locale = "en",
     compact = false,
 }: {
-    productId: string;
+    variantId: string;
     name: string;
     price: number;
     stock: number;
@@ -33,15 +33,15 @@ export default function AddToCartButton({
 
     useEffect(() => {
         const refresh = () => {
-            const current = readCart().find((line) => line.productId === productId)?.quantity ?? 0;
+            const current = readCart().find((line) => line.variantId === variantId)?.quantity ?? 0;
             setInCart(current);
         };
         refresh();
         window.addEventListener(cartEvent, refresh);
         return () => window.removeEventListener(cartEvent, refresh);
-    }, [productId]);
+    }, [variantId]);
 
-    const line = { productId, name, price, image };
+    const line = { variantId, name, price, image };
 
     if (stock < 1 && inCart < 1) {
         return <p className={`text-sm font-medium text-stone-500 ${compact ? "" : "mt-4"}`}>{copy.shopOut}</p>;
