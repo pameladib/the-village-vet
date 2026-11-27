@@ -47,6 +47,7 @@ function refreshLists() {
     revalidatePath("/dashboard/pets/archived");
     revalidatePath("/dashboard/pets/past");
     revalidatePath("/admin/patients");
+    revalidatePath("/admin/patients/past");
     revalidatePath("/admin/appointments");
     revalidatePath("/admin/care");
     revalidatePath("/admin/follow-ups");

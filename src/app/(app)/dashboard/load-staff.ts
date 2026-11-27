@@ -191,11 +191,12 @@ export async function loadPatients(rawQuery: string, rawPage: string | undefined
         }
         : {};
     const where = { AND: [patientTabWhere(tab), search] };
-    const [total, active, archived, deceased] = await Promise.all([
+    const [total, active, archived, deceased, past] = await Promise.all([
         prisma.pet.count({ where }),
         prisma.pet.count({ where: { AND: [patientTabWhere("active"), search] } }),
         prisma.pet.count({ where: { AND: [patientTabWhere("archived"), search] } }),
         prisma.pet.count({ where: { AND: [patientTabWhere("deceased"), search] } }),
+        prisma.pet.count({ where: { status: "DECEASED" } }),
     ]);
     const pages = Math.max(1, Math.ceil(total / pageSize));
     const requested = Number.parseInt(rawPage ?? "1", 10);
@@ -216,7 +217,7 @@ export async function loadPatients(rawQuery: string, rawPage: string | undefined
         skip: (page - 1) * pageSize,
         take: pageSize,
     });
-    return { query, pets, page, pages, counts: { active, archived, deceased } };
+    return { query, pets, page, pages, counts: { active, archived, deceased }, hasPastPets: past > 0 };
 }
 
 export async function loadCareReminders() {

@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 export default function PatientSearch({
     query,
     tab = "active",
+    path = "/admin/patients",
     label,
     placeholder,
     children,
 }: {
     query: string;
     tab?: "active" | "archived" | "deceased";
+    path?: string;
     label: string;
     placeholder: string;
     children: React.ReactNode;
@@ -34,15 +36,15 @@ export default function PatientSearch({
         const timer = window.setTimeout(() => {
             requested.current = next;
             const params = new URLSearchParams();
-            if (tab !== "active") params.set("tab", tab);
+            if (path === "/admin/patients" && tab !== "active") params.set("tab", tab);
             if (next) params.set("q", next);
             const search = params.toString();
             startTransition(() => {
-                router.replace(search ? `/admin/patients?${search}` : "/admin/patients", { scroll: false });
+                router.replace(search ? `${path}?${search}` : path, { scroll: false });
             });
         }, delay);
         return () => window.clearTimeout(timer);
-    }, [value, query, tab, router]);
+    }, [value, query, tab, path, router]);
 
     return (
         <>
