@@ -31,12 +31,14 @@ export default function MedicalTab({
     pet,
     documents,
     canUpload,
+    canRemove = false,
     copy,
     locale,
 }: {
     pet: PetProfileData;
     documents: PetDocument[];
     canUpload: boolean;
+    canRemove?: boolean;
     copy: Copy;
     locale: Locale;
 }) {
@@ -66,7 +68,7 @@ export default function MedicalTab({
                 </div>
             ))}
             </div>
-            <DocumentList petId={pet.id} documents={documents} canUpload={canUpload} copy={copy} locale={locale} />
+            <DocumentList petId={pet.id} documents={documents} canUpload={canUpload} canRemove={canRemove} copy={copy} locale={locale} />
         </div>
     );
 }

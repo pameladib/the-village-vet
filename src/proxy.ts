@@ -16,9 +16,13 @@ export async function proxy(request: NextRequest) {
         return NextResponse.next({ request: { headers: requestHeaders } });
     }
 
-    if (pathname !== "/account/password" && pathname !== "/login" && !pathname.startsWith("/api/auth") && hasSessionCookie(request)) {
+    if (!pathname.startsWith("/api/auth") && hasSessionCookie(request)) {
         const session = await auth.api.getSession({ headers: request.headers });
-        if (session?.user.role === "OWNER" && await ownerMustChangePassword(session.user.id)) {
+        if (session?.user.deactivatedAt && pathname !== "/login") {
+            const status = request.method === "GET" || request.method === "HEAD" ? 307 : 303;
+            return NextResponse.redirect(new URL("/login", request.url), status);
+        }
+        if (pathname !== "/account/password" && pathname !== "/login" && session?.user.role === "OWNER" && await ownerMustChangePassword(session.user.id)) {
             const status = request.method === "GET" || request.method === "HEAD" ? 307 : 303;
             return NextResponse.redirect(new URL("/account/password", request.url), status);
         }

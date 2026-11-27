@@ -15,6 +15,7 @@ export default function PatientCard({
     ownerName,
     phoneLabel,
     phone,
+    note,
 }: {
     petHref: string;
     ownerHref: string;
@@ -26,6 +27,7 @@ export default function PatientCard({
     ownerName: string;
     phoneLabel: string;
     phone: string;
+    note?: string;
 }) {
     const chat = ownerChat(phone);
     return (
@@ -41,6 +43,7 @@ export default function PatientCard({
                         {speciesLabel}
                         {breed ? ` · ${breed}` : ""}
                     </p>
+                    {note && <p className="truncate text-sm text-stone-500">{note}</p>}
                     <p className="mt-1 truncate text-sm text-stone-500">
                         {ownerLabel}:{" "}
                         <Link

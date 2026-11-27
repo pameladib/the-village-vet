@@ -37,8 +37,9 @@ export async function createPetWeight(input: { petId: string; weight: string; da
     if (notes === "invalid") return { success: false as const, error: "notes" as const };
     if (!recordedAt) return { success: false as const, error: "date" as const };
 
-    const pet = await prisma.pet.findUnique({ where: { id: parsed.data.petId }, select: { id: true } });
+    const pet = await prisma.pet.findUnique({ where: { id: parsed.data.petId }, select: { id: true, status: true } });
     if (!pet) return { success: false as const, error: "missing" as const };
+    if (pet.status !== "ACTIVE") return { success: false as const, error: "closed" as const };
     await prisma.petWeight.create({
         data: { petId: pet.id, weight, recordedAt, notes },
     });

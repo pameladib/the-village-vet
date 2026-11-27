@@ -71,6 +71,7 @@ export async function searchFollowUpPets(query: string) {
     if (q.length < 1) return [];
     return prisma.pet.findMany({
         where: {
+            status: "ACTIVE",
             OR: [
                 { name: { contains: q, mode: "insensitive" } },
                 { owner: { name: { contains: q, mode: "insensitive" } } },
@@ -91,8 +92,8 @@ export async function createVisitFollowUp(input: { petId: string; date: string; 
     if (!petId.success) return { success: false as const, error: "pet" as const };
     if (!tab || !dueOn) return { success: false as const, error: "date" as const };
     if (notes.length > 1000) return { success: false as const, error: "notes" as const };
-    const pet = await prisma.pet.findUnique({ where: { id: petId.data }, select: { id: true } });
-    if (!pet) return { success: false as const, error: "pet" as const };
+    const pet = await prisma.pet.findUnique({ where: { id: petId.data }, select: { id: true, status: true } });
+    if (!pet || pet.status !== "ACTIVE") return { success: false as const, error: "pet" as const };
     const created = await prisma.visitFollowUp.create({
         data: { petId: pet.id, dueOn, notes: notes || null },
         select: { id: true },

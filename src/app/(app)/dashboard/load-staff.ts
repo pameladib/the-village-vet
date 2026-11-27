@@ -2,6 +2,7 @@
 
 import { beirutInstant, clinicDayRange, todayInBeirut } from "@/lib/appointments/availability";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
+import { activePet } from "@/lib/pets/status";
 import { prisma } from "@/lib/prisma";
 import { stockState } from "@/lib/shop/inventory";
 import { followUpBuckets } from "@/lib/visits/follow-up";
@@ -88,12 +89,12 @@ export async function loadStaffDashboard(role: string) {
         prisma.shopOrder.count({ where: { status: "PENDING" } }),
         prisma.productVariant.findMany({ select: { stock: true, lowStockAt: true } }),
         clinical
-            ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { lt: todayStart } } })
+            ? prisma.careReminder.count({ where: { completedAt: null, dueAt: { lt: todayStart }, pet: activePet } })
             : 0,
         prisma.appointment.count({ where: { status: "BOOKED", startAt: { lt: new Date() } } }),
         clinical
             ? prisma.visitFollowUp.findMany({
-                where: { status: "PENDING" },
+                where: { status: "PENDING", pet: activePet },
                 select: { status: true, dueOn: true },
             })
             : [],
@@ -170,9 +171,17 @@ export async function loadAppointmentsBetween(start: Date, end: Date) {
 
 const pageSize = 10;
 
-export async function loadPatients(rawQuery: string, rawPage: string | undefined) {
+export type PatientTab = "active" | "archived" | "deceased";
+
+function patientTabWhere(tab: PatientTab) {
+    if (tab === "deceased") return { status: "DECEASED" as const };
+    if (tab === "archived") return { status: "ARCHIVED" as const };
+    return { status: "ACTIVE" as const };
+}
+
+export async function loadPatients(rawQuery: string, rawPage: string | undefined, tab: PatientTab) {
     const query = rawQuery.trim();
-    const where = query
+    const search = query
         ? {
             OR: [
                 { name: { contains: query, mode: "insensitive" as const } },
@@ -181,7 +190,13 @@ export async function loadPatients(rawQuery: string, rawPage: string | undefined
             ],
         }
         : {};
-    const total = await prisma.pet.count({ where });
+    const where = { AND: [patientTabWhere(tab), search] };
+    const [total, active, archived, deceased] = await Promise.all([
+        prisma.pet.count({ where }),
+        prisma.pet.count({ where: { AND: [patientTabWhere("active"), search] } }),
+        prisma.pet.count({ where: { AND: [patientTabWhere("archived"), search] } }),
+        prisma.pet.count({ where: { AND: [patientTabWhere("deceased"), search] } }),
+    ]);
     const pages = Math.max(1, Math.ceil(total / pageSize));
     const requested = Number.parseInt(rawPage ?? "1", 10);
     const page = Number.isFinite(requested) ? Math.min(Math.max(1, requested), pages) : 1;
@@ -193,18 +208,20 @@ export async function loadPatients(rawQuery: string, rawPage: string | undefined
             name: true,
             species: true,
             breed: true,
+            status: true,
+            deceasedAt: true,
             owner: { select: { id: true, name: true, phoneNumber: true } },
         },
         orderBy: [{ name: "asc" }, { id: "asc" }],
         skip: (page - 1) * pageSize,
         take: pageSize,
     });
-    return { query, pets, page, pages };
+    return { query, pets, page, pages, counts: { active, archived, deceased } };
 }
 
 export async function loadCareReminders() {
     const reminders = await prisma.careReminder.findMany({
-        where: { completedAt: null },
+        where: { completedAt: null, pet: activePet },
         orderBy: { dueAt: "asc" },
         include: {
             pet: {

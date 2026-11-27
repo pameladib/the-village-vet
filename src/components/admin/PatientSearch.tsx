@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 
 export default function PatientSearch({
     query,
+    tab = "active",
     label,
     placeholder,
     children,
 }: {
     query: string;
+    tab?: "active" | "archived" | "deceased";
     label: string;
     placeholder: string;
     children: React.ReactNode;
@@ -32,6 +34,7 @@ export default function PatientSearch({
         const timer = window.setTimeout(() => {
             requested.current = next;
             const params = new URLSearchParams();
+            if (tab !== "active") params.set("tab", tab);
             if (next) params.set("q", next);
             const search = params.toString();
             startTransition(() => {
@@ -39,7 +42,7 @@ export default function PatientSearch({
             });
         }, delay);
         return () => window.clearTimeout(timer);
-    }, [value, query, router]);
+    }, [value, query, tab, router]);
 
     return (
         <>

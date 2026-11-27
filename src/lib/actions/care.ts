@@ -61,10 +61,12 @@ export async function saveVaccination(input: unknown) {
         select: {
             id: true,
             species: true,
+            status: true,
             vaccinations: { select: { id: true, type: true, administeredAt: true } },
         },
     });
     if (!pet) return { success: false as const, error: "missing" as const };
+    if (!parsed.data.recordId && pet.status !== "ACTIVE") return { success: false as const, error: "closed" as const };
     const visit = await visitOnPet(pet.id, parsed.data.recordId ? undefined : parsed.data.medicalVisitId);
     if (!visit) return { success: false as const, error: "visit" as const };
 
@@ -148,9 +150,10 @@ export async function saveTreatment(input: unknown) {
 
     const pet = await prisma.pet.findUnique({
         where: { id: parsed.data.petId },
-        select: { id: true },
+        select: { id: true, status: true },
     });
     if (!pet) return { success: false as const, error: "missing" as const };
+    if (!parsed.data.recordId && pet.status !== "ACTIVE") return { success: false as const, error: "closed" as const };
     const visit = await visitOnPet(pet.id, parsed.data.recordId ? undefined : parsed.data.medicalVisitId);
     if (!visit) return { success: false as const, error: "visit" as const };
     const kind = parsed.data.type === "DEWORMING" ? "DEWORMING" as const : "FLEA_TREATMENT" as const;

@@ -5,6 +5,9 @@ import Link from "next/link";
 import { ChevronLeft, SquarePen } from "lucide-react";
 import { useState } from "react";
 import HistoryBack from "@/components/HistoryBack";
+import MarkDeceased from "@/components/pets/MarkDeceased";
+import OwnerPetActions from "@/components/pets/OwnerPetActions";
+import PetLifecycle from "@/components/pets/PetLifecycle";
 import { ownerChat } from "@/lib/clinic/phone";
 import GeneralTab from "./tabs/GeneralTab";
 import AppointmentsTab from "./tabs/AppointmentsTab";
@@ -14,6 +17,7 @@ import WeightHistory, { type WeightEntry } from "./tabs/WeightHistory";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 import type { Copy, Locale } from "@/lib/i18n";
 import { petPhotoSrc } from "@/lib/storage/files";
+import { intlLocale } from "@/lib/intl-locale";
 import { pageKey } from "@/lib/slug";
 import type { PetDocument } from "@/components/pets/DocumentList";
 
@@ -77,6 +81,8 @@ export default function PetProfile({
     documents = [],
     canUpload = false,
     canRecord = false,
+    canManage = false,
+    hasHistory = false,
     reminders = [],
     weights = [],
     today = "",
@@ -90,6 +96,8 @@ export default function PetProfile({
     documents?: PetDocument[];
     canUpload?: boolean;
     canRecord?: boolean;
+    canManage?: boolean;
+    hasHistory?: boolean;
     reminders?: ProfileReminder[];
     weights?: WeightEntry[];
     today?: string;
@@ -112,6 +120,7 @@ export default function PetProfile({
     const breed = pet.breed?.trim();
     const species = pet.species === "CAT" ? copy.speciesCat : copy.speciesDog;
     const photo = petPhotoSrc(pet.id, pet.photoUrl);
+    const operable = pet.status === "ACTIVE";
 
     return (
         <div className="flex flex-1 justify-center px-4 py-6 sm:px-6">
@@ -124,14 +133,53 @@ export default function PetProfile({
                         <ChevronLeft className="size-4 rtl:rotate-180" strokeWidth={1.5} />
                         {copy.profileBack}
                     </HistoryBack>
-                    <Link
-                        href={`/pets/${pageKey(pet)}/edit`}
-                        replace
-                        className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
-                    >
-                        <SquarePen className="size-4" strokeWidth={1.5} />
-                        {copy.profileEdit}
-                    </Link>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        {canManage && canRecord ? (
+                            <>
+                                <PetLifecycle
+                                    petId={pet.id}
+                                    petName={pet.name}
+                                    archived={pet.status === "ARCHIVED"}
+                                    canArchive={pet.status === "ACTIVE"}
+                                    canRestore={pet.status === "ARCHIVED"}
+                                    hasHistory={hasHistory}
+                                    isAdmin={canRecord}
+                                    backHref={backHref}
+                                    copy={copy}
+                                />
+                                <Link
+                                    href={`/pets/${pageKey(pet)}/edit`}
+                                    replace
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
+                                >
+                                    <SquarePen className="size-4" strokeWidth={1.5} />
+                                    {copy.profileEdit}
+                                </Link>
+                            </>
+                        ) : (
+                            <>
+                                <Link
+                                    href={`/pets/${pageKey(pet)}/edit`}
+                                    replace
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-emerald-400 dark:hover:text-emerald-200"
+                                >
+                                    <SquarePen className="size-4" strokeWidth={1.5} />
+                                    {copy.profileEdit}
+                                </Link>
+                                {canManage && (
+                                    <OwnerPetActions
+                                        petId={pet.id}
+                                        petName={pet.name}
+                                        canArchive={pet.status === "ACTIVE"}
+                                        canRestore={pet.status === "ARCHIVED"}
+                                        hasHistory={hasHistory}
+                                        backHref={backHref}
+                                        copy={copy}
+                                    />
+                                )}
+                            </>
+                        )}
+                    </div>
                 </header>
 
                 <section className="mt-4 flex flex-col gap-4 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:flex-row sm:items-center dark:border-stone-800 dark:bg-stone-900">
@@ -150,6 +198,16 @@ export default function PetProfile({
                             {species}
                             {breed ? ` · ${breed}` : ""}
                         </p>
+                        {pet.status === "ARCHIVED" && (
+                            <p className="mt-2 text-sm text-stone-500">{copy.petArchivedNote}</p>
+                        )}
+                        {pet.status === "DECEASED" && (
+                            <p className="mt-2 text-sm text-stone-500">
+                                {copy.petDeceased}
+                                {pet.deceasedAt ? ` · ${new Intl.DateTimeFormat(intlLocale(locale), { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" }).format(pet.deceasedAt)}` : ""}
+                            </p>
+                        )}
+                        {canRecord && pet.status !== "DECEASED" && <MarkDeceased petId={pet.id} today={today} copy={copy} />}
                         {owner && (
                             <p className="mt-2 text-sm text-stone-500">
                                 {copy.profileOwner}:{" "}
@@ -188,10 +246,10 @@ export default function PetProfile({
                 </div>
                 <div className="mt-3">
                     {activeTab === "general" && <GeneralTab pet={pet} copy={copy} locale={locale} />}
-                    {activeTab === "appointments" && <AppointmentsTab pet={pet} visits={visits} canRecord={canRecord} copy={copy} locale={locale} />}
-                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} reminders={reminders} canRecord={canRecord} copy={copy} locale={locale} />}
-                    {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload} copy={copy} locale={locale} />}
-                    {activeTab === "weight" && <WeightHistory petId={pet.id} today={today} weights={weights} canRecord={canRecord} copy={copy} locale={locale} />}
+                    {activeTab === "appointments" && <AppointmentsTab pet={pet} visits={visits} canRecord={canRecord && operable} copy={copy} locale={locale} />}
+                    {activeTab === "vaccinations" && <VaccinationsTab pet={pet} reminders={reminders} canRecord={canRecord} canAdd={canRecord && operable} copy={copy} locale={locale} />}
+                    {activeTab === "medical" && <MedicalTab pet={pet} documents={documents} canUpload={canUpload && operable} canRemove={canUpload} copy={copy} locale={locale} />}
+                    {activeTab === "weight" && <WeightHistory petId={pet.id} today={today} weights={weights} canRecord={canRecord} canAdd={canRecord && operable} copy={copy} locale={locale} />}
                 </div>
             </div>
         </div>

@@ -5,6 +5,8 @@ import { notFound, redirect } from "next/navigation";
 import OwnerAccountForm from "@/components/admin/OwnerAccountForm";
 import Page from "@/components/Page";
 import OwnerPasswordReset from "@/components/admin/OwnerPasswordReset";
+import OwnerAccountClosure from "@/components/auth/OwnerAccountClosure";
+import { ownerAccountSignals } from "@/lib/actions/account";
 import SpeciesMark from "@/components/pets/SpeciesMark";
 import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
@@ -33,8 +35,9 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
             phoneNumber: true,
             username: true,
             createdAt: true,
+            deactivatedAt: true,
             pets: {
-                select: { id: true, slug: true, name: true, species: true, breed: true, photoUrl: true },
+                select: { id: true, slug: true, name: true, species: true, breed: true, photoUrl: true, status: true, deceasedAt: true },
                 orderBy: { name: "asc" },
             },
             sessions: {
@@ -46,7 +49,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
     });
     if (!owner) notFound();
 
-    const [recentOrders, orderCount] = await Promise.all([
+    const [recentOrders, orderCount, signals] = await Promise.all([
         prisma.shopOrder.findMany({
             where: { ownerId: owner.id },
             orderBy: { createdAt: "desc" },
@@ -63,6 +66,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
             },
         }),
         prisma.shopOrder.count({ where: { ownerId: owner.id } }),
+        session.user.role === "ADMIN" ? ownerAccountSignals(owner.id) : null,
     ]);
 
     const locale = await getLocale();
@@ -70,6 +74,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
     const clinical = canSeeClinicalRecords(session.user.role);
     const since = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "Asia/Beirut" });
     const signedIn = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Beirut" });
+    const deceasedOn = new Intl.DateTimeFormat(intlLocale(locale), { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" });
     const lastLogin = owner.sessions[0]?.createdAt;
     const speciesName = { CAT: copy.speciesCat, DOG: copy.speciesDog };
 
@@ -80,6 +85,7 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                 {copy.profileBack}
             </HistoryBack>
             <h1 className="mt-4 text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{owner.name}</h1>
+            {owner.deactivatedAt && <p className="mt-2 text-sm font-medium text-stone-500">{copy.accountDeactivated}</p>}
             <p className="mt-1 text-sm text-stone-500">{copy.ownerSince} {since.format(owner.createdAt)}</p>
 
             <div className="mt-5 grid gap-3 lg:grid-cols-2">
@@ -101,7 +107,22 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                 <p dir="ltr" className="text-left text-sm font-medium text-stone-900 dark:text-stone-50">{owner.username}</p>
                 <p className="mt-3 text-sm text-stone-500">{copy.ownerLastLogin}</p>
                 <p className="text-sm font-medium text-stone-900 dark:text-stone-50">{lastLogin ? signedIn.format(lastLogin) : copy.ownerNoLogin}</p>
-                {session.user.role === "ADMIN" && <div className="mt-auto"><OwnerPasswordReset copy={copy} userId={owner.id} /></div>}
+                {session.user.role === "ADMIN" && (
+                    <div className="mt-auto">
+                        <OwnerPasswordReset copy={copy} userId={owner.id} />
+                        {signals && (
+                            <OwnerAccountClosure
+                                userId={owner.id}
+                                self={false}
+                                deactivated={Boolean(owner.deactivatedAt)}
+                                petCount={signals.petCount}
+                                upcomingAppointments={signals.upcomingAppointments}
+                                openOrders={signals.openOrders}
+                                copy={copy}
+                            />
+                        )}
+                    </div>
+                )}
             </section>
             </div>
 
@@ -126,6 +147,15 @@ export default async function OwnerProfilePage({ params }: { params: Promise<{ i
                                                 {speciesName[pet.species]}
                                                 {breed ? ` · ${breed}` : ""}
                                             </span>
+                                            {pet.status === "ARCHIVED" && (
+                                                <span className="block truncate text-sm text-stone-500">{copy.petArchived}</span>
+                                            )}
+                                            {pet.status === "DECEASED" && (
+                                                <span className="block truncate text-sm text-stone-500">
+                                                    {copy.petDeceased}
+                                                    {pet.deceasedAt ? ` · ${deceasedOn.format(pet.deceasedAt)}` : ""}
+                                                </span>
+                                            )}
                                         </span>
                                     </Link>
                                 </li>

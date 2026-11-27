@@ -1,6 +1,6 @@
 "use client";
 
-import { PawPrint } from "lucide-react";
+import { ChevronRight, PawPrint } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import EnablePush from "@/components/EnablePush";
@@ -40,8 +40,16 @@ const statusTone = {
     upcoming: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
 };
 
+function petBadge(pet: PetCardData, copy: Copy) {
+    if (pet.status === "DECEASED") return copy.petDeceased;
+    if (pet.status === "ARCHIVED") return copy.petArchived;
+    return undefined;
+}
+
 export default function OwnerDashboard({
     pets,
+    hasArchivedPets,
+    hasPastPets,
     ownerName,
     appointments,
     copy,
@@ -50,6 +58,8 @@ export default function OwnerDashboard({
     notices,
 }: {
     pets: PetCardData[];
+    hasArchivedPets: boolean;
+    hasPastPets: boolean;
     ownerName: string;
     appointments: AppointmentWithPet[];
     copy: Copy;
@@ -85,7 +95,7 @@ export default function OwnerDashboard({
                     {pets.length === 0 && <p className="mt-3 text-sm text-stone-500">{copy.noPets}</p>}
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {pets.map((pet) => (
-                            <PetCard key={pet.id} pet={pet} copy={copy} />
+                            <PetCard key={pet.id} pet={pet} copy={copy} badge={petBadge(pet, copy)} />
                         ))}
                         <button
                             type="button"
@@ -95,6 +105,22 @@ export default function OwnerDashboard({
                             {copy.addPet}
                         </button>
                     </div>
+                    {(hasArchivedPets || hasPastPets) && (
+                        <div className="mt-3 flex flex-col items-end gap-2">
+                            {hasArchivedPets && (
+                                <Link href="/dashboard/pets/archived" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200">
+                                    {copy.viewArchivedPets}
+                                    <ChevronRight className="size-4 rtl:rotate-180" strokeWidth={1.75} />
+                                </Link>
+                            )}
+                            {hasPastPets && (
+                                <Link href="/dashboard/pets/past" className="inline-flex items-center gap-1 text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-200">
+                                    {copy.viewPastPets}
+                                    <ChevronRight className="size-4 rtl:rotate-180" strokeWidth={1.75} />
+                                </Link>
+                            )}
+                        </div>
+                    )}
                 </section>
 
                 <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">

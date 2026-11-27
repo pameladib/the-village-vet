@@ -26,6 +26,36 @@ export function canChangePetPhoto(role: string) {
     return role === "OWNER" || role === "ADMIN";
 }
 
+// Archive, restore, and delete stay with the pet's owner and the veterinarian.
+export function canManagePetLifecycle(role: string, userId: string, ownerId: string) {
+    if (role === "ADMIN") return true;
+    return role === "OWNER" && userId === ownerId;
+}
+
+// Only an owner account can be closed. The owner can close their own. An admin can close any owner account.
+export function canCloseOwnerAccount(actorRole: string, actorId: string, ownerRole: string, ownerId: string) {
+    if (ownerRole !== "OWNER") return false;
+    if (actorRole === "ADMIN") return true;
+    return actorRole === "OWNER" && actorId === ownerId;
+}
+
+export function canReactivateOwnerAccount(actorRole: string, ownerRole: string) {
+    return actorRole === "ADMIN" && ownerRole === "OWNER";
+}
+
+// Pets keep the medical record, so the account stays. Appointments and shop orders do not block this.
+export function canPermanentlyDeleteOwnerAccount(actorRole: string, actorId: string, ownerRole: string, ownerId: string, petCount: number) {
+    if (petCount > 0) return false;
+    return canCloseOwnerAccount(actorRole, actorId, ownerRole, ownerId);
+}
+
+// An owner can permanently delete only a pet that has no history. The veterinarian can delete either way.
+export function canPermanentlyDeletePet(role: string, userId: string, ownerId: string, hasHistory: boolean) {
+    if (!canManagePetLifecycle(role, userId, ownerId)) return false;
+    if (role === "ADMIN") return true;
+    return !hasHistory;
+}
+
 // The assistant can see a photo on the diary. They cannot change it.
 export function canViewPetPhoto(role: string, userId: string, ownerId: string) {
     if (role === "ADMIN" || role === "SECONDARY_ADMIN") return true;

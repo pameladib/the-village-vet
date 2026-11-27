@@ -7,6 +7,7 @@ export const petCardSelect = {
     species: true,
     breed: true,
     photoUrl: true,
+    status: true,
 } as const satisfies PetSelect;
 
 export type PetCardData = PetGetPayload<{ select: typeof petCardSelect }>;

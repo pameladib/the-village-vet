@@ -3,6 +3,7 @@ import NewAppointmentForm from "@/components/NewAppointmentForm";
 import { todayInBeirut } from "@/lib/appointments/availability";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
+import { activePet } from "@/lib/pets/status";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminNewAppointmentPage({ searchParams }: { searchParams: Promise<{ petId?: string; service?: string }> }) {
@@ -16,6 +17,7 @@ export default async function AdminNewAppointmentPage({ searchParams }: { search
     const locale = await getLocale();
     const copy = messages(locale);
     const pets = await prisma.pet.findMany({
+        where: activePet,
         select: { id: true, name: true, species: true, owner: { select: { name: true, phoneNumber: true } } },
         orderBy: [{ name: "asc" }, { id: "asc" }],
     });

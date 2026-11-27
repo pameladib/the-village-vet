@@ -29,6 +29,8 @@ model User {
   accounts      Account[]
   pets          Pet[]
   role          UserRole      @default(OWNER)
+  // Set when the owner leaves the clinic. Null means they can sign in.
+  deactivatedAt DateTime?
   appointments  Appointment[]
   scheduleBlocks ScheduleBlock[] // periods blocked by admin
   notifications Notification[]
@@ -105,6 +107,9 @@ model Pet {
   estimatedAgeUnit  AgeUnit?
   estimatedAgeAt    DateTime?
   lifestyle         Lifestyle?
+  status            PetStatus @default(ACTIVE)
+  // Optional day, stored only when status is DECEASED and the day is known.
+  deceasedAt        DateTime?
 
   // medical information
   spayedNeutered    spayedNeuteredStatus?
@@ -135,6 +140,12 @@ enum spayedNeuteredStatus {
   YES
   NO
   UNKNOWN
+}
+
+enum PetStatus {
+  ACTIVE
+  ARCHIVED
+  DECEASED
 }
 
 model Treatment {

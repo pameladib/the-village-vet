@@ -22,12 +22,13 @@ export default async function PublicLayout({ children }: { children: React.React
         auth.api.getSession({ headers: headerList }),
         getClinicSettings(),
     ]);
-    await enforcePasswordChange(session?.user.role, session?.user.id);
-    await rememberLocale(session?.user.id, locale);
+    const active = session?.user.deactivatedAt ? null : session;
+    await enforcePasswordChange(active?.user.role, active?.user.id);
+    await rememberLocale(active?.user.id, locale);
 
     return (
         <div className={`flex flex-1 flex-col bg-white font-sans text-stone-800 ${locale === "en" ? `${fraunces.variable} public-serif` : ""}`}>
-            <PublicHeader copy={copy} locale={locale} currency={currency} loggedIn={Boolean(session)} showProfile={session?.user.role === "OWNER"} />
+            <PublicHeader copy={copy} locale={locale} currency={currency} loggedIn={Boolean(active)} showProfile={active?.user.role === "OWNER"} />
             <div className={headerList.get("x-pathname") === "/emergency" ? "flex min-w-0 flex-1 flex-col" : "min-w-0 flex-1"}>{children}</div>
             <PublicFooter copy={copy} settings={settings} />
         </div>

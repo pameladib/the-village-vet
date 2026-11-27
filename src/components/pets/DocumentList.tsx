@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, File, FileImage, FileText, X } from "lucide-react";
-import { confirmMedicalDocument, prepareMedicalDocumentUpload } from "@/lib/actions/documents";
+import { confirmMedicalDocument, deleteMedicalDocument, prepareMedicalDocumentUpload } from "@/lib/actions/documents";
 import type { Copy, Locale } from "@/lib/i18n";
 import { intlLocale } from "@/lib/intl-locale";
 import { uploadToSignedUrl } from "@/lib/storage/direct-upload";
@@ -39,12 +39,14 @@ function uploadMessage(message: string | undefined, copy: Copy) {
 export default function DocumentList({
     petId,
     canUpload,
+    canRemove = false,
     documents,
     copy,
     locale,
 }: {
     petId: string;
     canUpload: boolean;
+    canRemove?: boolean;
     documents: PetDocument[];
     copy: Copy;
     locale: Locale;
@@ -56,6 +58,8 @@ export default function DocumentList({
     const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [open, setOpen] = useState<PetDocument | null>(null);
+    const [confirmId, setConfirmId] = useState<string | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
     const uploadedOn = new Intl.DateTimeFormat(intlLocale(locale), {
         day: "numeric",
         month: "short",
@@ -76,6 +80,21 @@ export default function DocumentList({
     }
 
     const viewing = open ? fileKind(open.contentType) : null;
+
+    async function remove(documentId: string) {
+        setPending(true);
+        setDeleteError(null);
+        const result = await deleteMedicalDocument(petId, documentId);
+        setPending(false);
+        if (!result.success) {
+            setDeleteError(copy.medDocsDeleteFailed);
+            return;
+        }
+        if (open?.id === documentId) viewerDialog.current?.close();
+        setConfirmId(null);
+        setNotice(copy.medDocsDeleted);
+        router.refresh();
+    }
 
     return (
         <section className="mt-3">
@@ -117,15 +136,35 @@ export default function DocumentList({
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex shrink-0 gap-2">
-                                    <button type="button" onClick={() => view(document)} className="rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">
-                                        {copy.medDocsView}
-                                    </button>
-                                    <a href={`/pets/${petId}/documents/${document.id}`} className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] px-3 py-1.5 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-900 dark:border-stone-700 dark:text-stone-200">
-                                        <Download className="size-3.5" strokeWidth={1.75} />
-                                        {copy.medDocsDownload}
-                                    </a>
-                                </div>
+                                {confirmId === document.id ? (
+                                    <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                                        <p className="text-sm text-stone-600 dark:text-stone-300">{copy.medDocsDeleteAsk}</p>
+                                        <div className="flex gap-2">
+                                            <button type="button" disabled={pending} onClick={() => void remove(document.id)} className="rounded-full bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-60">
+                                                {copy.medDocsDelete}
+                                            </button>
+                                            <button type="button" disabled={pending} onClick={() => { setConfirmId(null); setDeleteError(null); }} className="rounded-full px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-60 dark:text-stone-300 dark:hover:bg-stone-800">
+                                                {copy.medDocsCancel}
+                                            </button>
+                                        </div>
+                                        {deleteError && <p className="text-sm text-red-700 dark:text-red-300">{deleteError}</p>}
+                                    </div>
+                                ) : (
+                                    <div className="flex shrink-0 gap-2">
+                                        <button type="button" onClick={() => view(document)} className="rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">
+                                            {copy.medDocsView}
+                                        </button>
+                                        <a href={`/pets/${petId}/documents/${document.id}`} className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] px-3 py-1.5 text-sm font-medium text-stone-700 hover:border-emerald-700 hover:text-emerald-900 dark:border-stone-700 dark:text-stone-200">
+                                            <Download className="size-3.5" strokeWidth={1.75} />
+                                            {copy.medDocsDownload}
+                                        </a>
+                                        {canRemove && (
+                                            <button type="button" onClick={() => { setConfirmId(document.id); setDeleteError(null); setNotice(null); }} className="rounded-full border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950">
+                                                {copy.medDocsDelete}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </li>
                         );
                     })}

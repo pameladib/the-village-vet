@@ -59,7 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className={`flex min-h-full flex-col ${locale === "ar" ? "font-[family-name:var(--font-arabic)]" : ""}`}>
         {vapid ? <meta name="village-vet-vapid" content={vapid} /> : null}
-        <PwaProvider copy={copy} signedIn={Boolean(session)} />
+        <PwaProvider copy={copy} signedIn={Boolean(session) && !session?.user.deactivatedAt} />
         {children}
       </body>
     </html>

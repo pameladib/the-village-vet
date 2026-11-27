@@ -55,12 +55,14 @@ export default function VaccinationsTab({
     pet,
     reminders = [],
     canRecord = false,
+    canAdd = canRecord,
     copy,
     locale = "en",
 }: {
     pet: PetProfileData;
     reminders?: ProfileReminder[];
     canRecord?: boolean;
+    canAdd?: boolean;
     copy: Copy;
     locale?: Locale;
 }) {
@@ -86,11 +88,11 @@ export default function VaccinationsTab({
             <section>
                 <div className="mb-2 flex items-center justify-between gap-3">
                     <h3 className="text-sm font-medium text-emerald-900 dark:text-emerald-200">{copy.vaccineHistory}</h3>
-                    {canRecord && vaccineForm !== "new" && (
+                    {canAdd && vaccineForm !== "new" && (
                         <button type="button" onClick={() => { setVaccineForm("new"); setTreatmentForm(null); }} className="rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.addVaccination}</button>
                     )}
                 </div>
-                {canRecord && vaccineForm === "new" && (
+                {canAdd && vaccineForm === "new" && (
                     <VaccineForm
                         petId={pet.id}
                         species={pet.species}
@@ -143,11 +145,11 @@ export default function VaccinationsTab({
             <section>
                 <div className="mb-2 flex items-center justify-between gap-3">
                     <h3 className="text-sm font-medium text-emerald-900 dark:text-emerald-200">{copy.treatmentHistory}</h3>
-                    {canRecord && treatmentForm !== "new" && (
+                    {canAdd && treatmentForm !== "new" && (
                         <button type="button" onClick={() => { setTreatmentForm("new"); setVaccineForm(null); }} className="rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.addTreatment}</button>
                     )}
                 </div>
-                {canRecord && treatmentForm === "new" && <TreatmentForm petId={pet.id} copy={copy} onClose={() => setTreatmentForm(null)} />}
+                {canAdd && treatmentForm === "new" && <TreatmentForm petId={pet.id} copy={copy} onClose={() => setTreatmentForm(null)} />}
                 {treatments.length === 0 ? <EmptyRecord>{copy.noTreatmentRecords}</EmptyRecord> : (
                     <Table headers={[copy.colTreatment, copy.colGiven, ...(canRecord ? [""] : [])]}>
                         {treatments.map((row) => (

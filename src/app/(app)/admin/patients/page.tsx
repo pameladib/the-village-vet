@@ -4,7 +4,7 @@ import PatientCard from "@/components/admin/PatientCard";
 import PatientSearch from "@/components/admin/PatientSearch";
 import Page from "@/components/Page";
 import { redirect } from "next/navigation";
-import { loadPatients } from "@/app/(app)/dashboard/load-staff";
+import { loadPatients, type PatientTab } from "@/app/(app)/dashboard/load-staff";
 import { requireRole } from "@/lib/auth/session";
 import { canSeeClinicalRecords } from "@/lib/auth/permissions";
 import { getLocale, messages } from "@/lib/i18n";
@@ -15,15 +15,18 @@ function first(value: string | string[] | undefined) {
     return Array.isArray(value) ? value[0] : value;
 }
 
-function patientsHref(query: string, page: number) {
+const tabs = ["active", "archived", "deceased"] as const satisfies readonly PatientTab[];
+
+function patientsHref(query: string, page: number, tab: PatientTab) {
     const params = new URLSearchParams();
+    if (tab !== "active") params.set("tab", tab);
     if (query) params.set("q", query);
     if (page > 1) params.set("page", String(page));
     const search = params.toString();
     return search ? `/admin/patients?${search}` : "/admin/patients";
 }
 
-export default async function PatientsPage({ searchParams }: { searchParams: Promise<{ q?: string | string[]; page?: string | string[] }> }) {
+export default async function PatientsPage({ searchParams }: { searchParams: Promise<{ q?: string | string[]; page?: string | string[]; tab?: string | string[] }> }) {
     let session;
     try {
         session = await requireRole(["ADMIN", "SECONDARY_ADMIN"]);
@@ -35,7 +38,12 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
     const locale = await getLocale();
     const copy = messages(locale);
     const clinical = canSeeClinicalRecords(session.user.role);
-    const { query, pets, page, pages } = await loadPatients(first(raw.q) ?? "", first(raw.page));
+    const requestedTab = first(raw.tab);
+    const tab: PatientTab = requestedTab === "archived" || requestedTab === "deceased" ? requestedTab : "active";
+    const { query, pets, page, pages, counts } = await loadPatients(first(raw.q) ?? "", first(raw.page), tab);
+    const tabLabel = { active: copy.patientsActive, archived: copy.patientsArchived, deceased: copy.patientsDeceased };
+    const empty = { active: copy.patientsActiveEmpty, archived: copy.patientsArchivedEmpty, deceased: copy.patientsDeceasedEmpty };
+    const deceasedOn = new Intl.DateTimeFormat(intlLocale(locale), { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" });
     const count = new Intl.NumberFormat(intlLocale(locale));
     const speciesName = { CAT: copy.speciesCat, DOG: copy.speciesDog };
 
@@ -43,7 +51,28 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
         <Page width="medium">
             <h1 className="text-2xl font-semibold tracking-tight text-emerald-950 dark:text-emerald-50">{copy.patients}</h1>
             <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">{copy.patientsLead}</p>
-            <PatientSearch query={query} label={copy.search} placeholder={copy.searchHint}>
+            <div role="tablist" aria-label={copy.patients} className="mt-6 flex w-max min-w-0 max-w-full gap-2 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {tabs.map((id) => {
+                    const selected = tab === id;
+                    return (
+                        <Link
+                            key={id}
+                            href={patientsHref(query, 1, id)}
+                            role="tab"
+                            aria-selected={selected}
+                            className={selected
+                                ? "inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white shadow-sm dark:bg-emerald-700"
+                                : "inline-flex shrink-0 items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-900 shadow-sm hover:border-emerald-700 hover:bg-emerald-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-50 dark:hover:border-emerald-400 dark:hover:bg-emerald-950/40"}
+                        >
+                            {tabLabel[id]}
+                            <span className={selected ? "rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold" : "rounded-full bg-stone-100 px-1.5 py-0.5 text-xs font-semibold text-stone-600 dark:bg-stone-800 dark:text-stone-300"}>
+                                {count.format(counts[id])}
+                            </span>
+                        </Link>
+                    );
+                })}
+            </div>
+            <PatientSearch query={query} tab={tab} label={copy.search} placeholder={copy.searchHint}>
                 <ul className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-2">
                     {pets.map((pet) => {
                         const breed = pet.breed?.trim();
@@ -61,27 +90,28 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
                                 ownerName={pet.owner.name}
                                 phoneLabel={copy.phone}
                                 phone={pet.owner.phoneNumber}
+                                note={pet.status === "DECEASED" ? (pet.deceasedAt ? `${copy.petDeceased} · ${deceasedOn.format(pet.deceasedAt)}` : copy.petDeceased) : pet.status === "ARCHIVED" ? copy.petArchived : undefined}
                             />
                         );
                     })}
-                    {pets.length === 0 && <li className="text-sm text-stone-500">{query ? copy.noMatches : copy.patientsEmpty}</li>}
+                    {pets.length === 0 && <li className="text-sm text-stone-500">{query ? copy.noMatches : empty[tab]}</li>}
                 </ul>
                 {pages > 1 && (
                     <nav aria-label={copy.patients} className="mt-5 flex flex-wrap items-center justify-center gap-1">
-                        <PageLink href={page > 1 ? patientsHref(query, page - 1) : undefined} label={copy.patientsPrevious}>
+                        <PageLink href={page > 1 ? patientsHref(query, page - 1, tab) : undefined} label={copy.patientsPrevious}>
                             <ChevronLeft className="size-4 rtl:rotate-180" />
                         </PageLink>
                         {Array.from({ length: pages }, (_, index) => index + 1).map((number) => (
                             <Link
                                 key={number}
-                                href={patientsHref(query, number)}
+                                href={patientsHref(query, number, tab)}
                                 aria-current={number === page ? "page" : undefined}
                                 className={`inline-flex size-9 items-center justify-center rounded-full text-sm ${number === page ? "bg-emerald-900 text-white" : "text-emerald-950 hover:bg-emerald-50 dark:text-emerald-50 dark:hover:bg-stone-800"}`}
                             >
                                 {count.format(number)}
                             </Link>
                         ))}
-                        <PageLink href={page < pages ? patientsHref(query, page + 1) : undefined} label={copy.patientsNext}>
+                        <PageLink href={page < pages ? patientsHref(query, page + 1, tab) : undefined} label={copy.patientsNext}>
                             <ChevronRight className="size-4 rtl:rotate-180" />
                         </PageLink>
                     </nav>

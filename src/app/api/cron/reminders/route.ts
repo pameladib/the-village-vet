@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     const dayAfterStart = beirutInstant(dayAfter, 0, 0); // the day after tomorrow at midnight in Beirut time
 
     const visits = await prisma.appointment.findMany({ // retrieving all booked appointments between today at midnight and the day after tomorrow at midnight in Beirut time
-        where: { status: "BOOKED", startAt: { gte: todayStart, lt: dayAfterStart } }, // gte (greater than or equal to) and lt (less than) are Prisma query filters that translate into SQL >= and < operators. We didn't use BETWEEN because we don't want to include an appointment that starts exactly at the day after tomorrow at midnight.
+        where: { status: "BOOKED", startAt: { gte: todayStart, lt: dayAfterStart }, owner: { deactivatedAt: null } }, // gte (greater than or equal to) and lt (less than) are Prisma query filters that translate into SQL >= and < operators. We didn't use BETWEEN because we don't want to include an appointment that starts exactly at the day after tomorrow at midnight.
         select: { id: true, ownerId: true, startAt: true, type: true, groomingService: true }, // id builds the dedupe key. type and groomingService name the visit. startAt supplies the clock time.
     });
 
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
 
     // Open reminders whose due instant is already before tomorrow. careNoticeDay keeps only the due date and the date seven days later.
     const open = await prisma.careReminder.findMany({
-        where: { completedAt: null, dueAt: { lt: tomorrowStart } },
+        where: { completedAt: null, dueAt: { lt: tomorrowStart }, pet: { status: "ACTIVE", owner: { deactivatedAt: null } } },
         select: {
             id: true,
             kind: true,

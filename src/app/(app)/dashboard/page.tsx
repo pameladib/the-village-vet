@@ -16,7 +16,7 @@ export default async function DashboardPage({
     const session = await auth.api.getSession({
         headers: await headers(),
     });
-    if (!session) redirect("/login");
+    if (!session || session.user.deactivatedAt) redirect("/login");
 
     const locale = await getLocale();
     const copy = messages(locale);

@@ -1,6 +1,7 @@
 import PetProfile from "@/components/pets/pet-profile/PetProfile";
 import { calendarDateInBeirut, careTiming, todayInBeirut } from "@/lib/appointments/availability";
 import { canViewPetWeights } from "@/lib/auth/permissions";
+import { petHasHistory } from "@/lib/pets/removal";
 import { historyWeightsFromRecords } from "@/lib/pets/weight";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
@@ -62,6 +63,19 @@ export default async function PetProfilePage({
         orderBy: { recordedAt: "desc" },
         select: { id: true, weight: true, recordedAt: true, notes: true, medicalVisitId: true },
       },
+      _count: {
+        select: {
+          appointments: true,
+          medicalVisits: true,
+          vaccinations: true,
+          treatments: true,
+          weightRecords: true,
+          weights: true,
+          careReminders: true,
+          visitFollowUps: true,
+          documents: true,
+        },
+      },
     },
   });
 
@@ -76,7 +90,7 @@ export default async function PetProfilePage({
   */
   if (!canViewPetWeights(session.user.role, session.user.id, pet.ownerId)) notFound();
 
-  const { weightRecords, weights, estimatedAgeValue, vaccinations, treatments, appointments, medicalVisits, documents, careReminders, owner, ...petFields } = pet;
+  const { weightRecords, weights, estimatedAgeValue, vaccinations, treatments, appointments, medicalVisits, documents, careReminders, owner, _count, ...petFields } = pet;
   const carried = historyWeightsFromRecords(
     weightRecords,
     weights.map((row) => ({ weight: row.weight.toFixed(2), recordedAt: row.recordedAt })),
@@ -112,6 +126,8 @@ export default async function PetProfilePage({
       }))}
       canUpload
       canRecord={session.user.role === "ADMIN"}
+      canManage
+      hasHistory={petHasHistory(_count)}
       reminders={careReminders.map((reminder) => ({
         ...reminder,
         status: careTiming(reminder.dueAt),

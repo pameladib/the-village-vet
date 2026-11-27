@@ -9,6 +9,7 @@ import {
     acceptDocument,
     DOCUMENT_TYPES,
     isPetObjectKey,
+    isSafeObjectKey,
     MEDICAL_DOCUMENTS_BUCKET,
     objectKey,
     prepareDocument,
@@ -26,8 +27,8 @@ async function editablePet(petId: string): Promise<{ petId: string } | Failure> 
     }
     if (!z.uuid().safeParse(petId).success) return { success: false, formErrors: ["That pet was not found."] };
     try {
-        const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { id: true, ownerId: true } });
-        if (!pet || !canUploadMedicalDocument(session.user.role, session.user.id, pet.ownerId)) {
+        const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { id: true, ownerId: true, status: true } });
+        if (!pet || !canUploadMedicalDocument(session.user.role, session.user.id, pet.ownerId) || pet.status !== "ACTIVE") {
             return { success: false, formErrors: ["You cannot add documents for this pet."] };
         }
         return { petId: pet.id };
@@ -100,5 +101,43 @@ export async function confirmMedicalDocument(petId: string, input: { title: stri
     }
 
     await revalidatePet(allowed.petId);
+    return { success: true as const };
+}
+
+export async function deleteMedicalDocument(petId: string, documentId: string) {
+    let session;
+    try {
+        session = await requireRole(["ADMIN", "OWNER"]);
+    } catch {
+        return { success: false as const, error: "denied" as const };
+    }
+    if (!z.uuid().safeParse(petId).success || !z.uuid().safeParse(documentId).success) {
+        return { success: false as const, error: "missing" as const };
+    }
+
+    const document = await prisma.medicalDocument.findFirst({
+        where: { id: documentId, petId },
+        select: { id: true, storedName: true, pet: { select: { id: true, ownerId: true } } },
+    });
+    if (!document || !canUploadMedicalDocument(session.user.role, session.user.id, document.pet.ownerId)) {
+        return { success: false as const, error: "denied" as const };
+    }
+    if (!isSafeObjectKey(document.storedName) || !document.storedName.startsWith(`${document.pet.id.toLowerCase()}/`)) {
+        return { success: false as const, error: "file" as const };
+    }
+
+    try {
+        await removeStoredObject(MEDICAL_DOCUMENTS_BUCKET, document.storedName);
+    } catch (error) {
+        if (error instanceof StorageNotConfiguredError) return { success: false as const, error: "storage" as const };
+        return { success: false as const, error: "file" as const };
+    }
+
+    try {
+        await prisma.medicalDocument.deleteMany({ where: { id: document.id, petId: document.pet.id } });
+    } catch {
+        return { success: false as const, error: "file" as const };
+    }
+    await revalidatePet(document.pet.id);
     return { success: true as const };
 }

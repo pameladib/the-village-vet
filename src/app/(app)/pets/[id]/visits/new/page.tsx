@@ -17,9 +17,10 @@ export default async function NewWalkInPage({ params }: { params: Promise<{ id: 
     const { id } = await params;
     const pet = await prisma.pet.findUnique({
         where: refWhere(id),
-        select: { id: true, slug: true, name: true, species: true, vaccinations: { select: { type: true, administeredAt: true } } },
+        select: { id: true, slug: true, name: true, species: true, status: true, vaccinations: { select: { type: true, administeredAt: true } } },
     });
     if (!pet) notFound();
+    if (pet.status !== "ACTIVE") redirect(`/pets/${pageKey(pet)}`);
     if (pet.slug && id !== pet.slug) redirect(`/pets/${pet.slug}/visits/new`);
 
     const locale = await getLocale();

@@ -2,6 +2,7 @@ import NewAppointmentForm from "@/components/NewAppointmentForm";
 import { requireRole } from "@/lib/auth/session";
 import { todayInBeirut } from "@/lib/appointments/availability";
 import { getLocale, messages } from "@/lib/i18n";
+import { activePet } from "@/lib/pets/status";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -37,7 +38,7 @@ export default async function NewAppointmentPage({
     const locale = await getLocale();
     const copy = messages(locale);
     const pets = await prisma.pet.findMany({
-        where: staff ? {} : { ownerId: session.user.id },
+        where: { ownerId: session.user.id, ...activePet },
         select: { id: true, name: true, species: true, owner: { select: { name: true } } },
         orderBy: [{ name: "asc" }, { id: "asc" }],
     });

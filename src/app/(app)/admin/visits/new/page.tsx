@@ -3,6 +3,7 @@ import VisitForm from "@/components/visits/VisitForm";
 import { requireRole } from "@/lib/auth/session";
 import { availableVaccineDoses } from "@/lib/clinic/vaccines";
 import { getLocale, messages } from "@/lib/i18n";
+import { activePet } from "@/lib/pets/status";
 import { prisma } from "@/lib/prisma";
 
 export default async function NewDashboardVisitPage() {
@@ -13,6 +14,7 @@ export default async function NewDashboardVisitPage() {
     }
 
     const pets = await prisma.pet.findMany({
+        where: activePet,
         select: {
             id: true,
             name: true,

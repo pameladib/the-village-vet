@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { applyRecordedFollowUps, syncVaccineReminder } from "@/lib/clinic/reminders";
 import { canChangePetPhoto } from "@/lib/auth/permissions";
+import { isOperablePet } from "@/lib/pets/status";
 import { petWeightFromGrams } from "@/lib/pets/weight";
 import { uniqueSlug } from "@/lib/record-slug";
 import { PET_PHOTOS_BUCKET, isSafeObjectKey } from "@/lib/storage/files";
@@ -240,6 +241,7 @@ export async function updatePet(id: string, data: PetForm) {
         where: isAdmin ? { id } : { id, ownerId: session.user.id },
         select: {
             photoUrl: true,
+            status: true,
             name: true,
             slug: true,
             species: true,
@@ -277,6 +279,11 @@ export async function updatePet(id: string, data: PetForm) {
 
     const vaccinations = splitKeptAndNew(existing.vaccinations, result.data.vaccinations);
     const treatments = splitKeptAndNew(existing.treatments, result.data.treatments);
+    const latestWeight = existing.weightRecords[0]?.weightGrams;
+    const addsWeight = weightGrams != null && (latestWeight == null || weightGrams !== gramsShownInForm(latestWeight));
+    if (!isOperablePet(existing) && (vaccinations.toCreate.length > 0 || treatments.toCreate.length > 0 || addsWeight)) {
+        return { success: false, formErrors: ["This pet is archived."] };
+    }
     if (result.data.removePhoto && !canChangePetPhoto(session.user.role)) {
         return { success: false, formErrors: ["You cannot change this photo."] };
     }
@@ -379,12 +386,14 @@ export async function updatePet(id: string, data: PetForm) {
         await savePet(result.data.removePhoto ? null : undefined);
         if (result.data.removePhoto) await discardPhoto(existing.photoUrl).catch(() => undefined);
         // The pet is already saved. A failed reminder must not undo that save. The next save rebuilds it.
-        await applyRecordedFollowUps(prisma, id, form.species, result.data.vaccinations, result.data.treatments, {
-            vaccine: result.data.vaccineNextDueAt,
-            deworming: result.data.dewormingNextDueAt,
-            flea: result.data.fleaNextDueAt,
-        }).catch(() => undefined);
-        await syncVaccineReminder(prisma, id, form.species).catch(() => undefined);
+        if (isOperablePet(existing)) {
+            await applyRecordedFollowUps(prisma, id, form.species, result.data.vaccinations, result.data.treatments, {
+                vaccine: result.data.vaccineNextDueAt,
+                deworming: result.data.dewormingNextDueAt,
+                flea: result.data.fleaNextDueAt,
+            }).catch(() => undefined);
+            await syncVaccineReminder(prisma, id, form.species).catch(() => undefined);
+        }
 
         return { success: true, id, slug };
     } catch {

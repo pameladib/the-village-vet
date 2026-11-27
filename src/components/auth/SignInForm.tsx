@@ -39,7 +39,8 @@ function logInFieldErrors(form: LogInFields, copy: Copy) {
     return errors;
 }
 
-function logInRequestMessage(error: { code?: string }, copy: Copy) {
+function logInRequestMessage(error: { code?: string; message?: string }, copy: Copy) {
+    if (error.code === "ACCOUNT_DEACTIVATED" || error.message === "This account is deactivated.") return copy.errAccountDeactivated;
     if (error.code === "USERNAME_TOO_SHORT") return copy.errUsernameShort;
     if (error.code === "USERNAME_TOO_LONG") return copy.errUsernameLong;
     if (error.code === "INVALID_USERNAME") return copy.errUsernameChars;

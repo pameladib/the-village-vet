@@ -43,6 +43,7 @@ export default function WeightHistory({
     today,
     weights,
     canRecord,
+    canAdd = canRecord,
     copy,
     locale,
 }: {
@@ -50,6 +51,7 @@ export default function WeightHistory({
     today: string;
     weights: WeightEntry[];
     canRecord: boolean;
+    canAdd?: boolean;
     copy: Copy;
     locale: Locale;
 }) {
@@ -120,7 +122,7 @@ export default function WeightHistory({
         <section>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-emerald-950 dark:text-emerald-50">{copy.weightHistory}</h2>
-                {canRecord && form === null && weights.length > 0 && (
+                {canAdd && form === null && weights.length > 0 && (
                     <button type="button" onClick={openNew} className={solid}>{copy.weightAdd}</button>
                 )}
             </div>
@@ -157,7 +159,7 @@ export default function WeightHistory({
             {weights.length === 0 ? (
                 <div className="mt-4">
                     <p className="text-sm text-stone-500">{copy.weightEmpty}</p>
-                    {canRecord && form === null && (
+                    {canAdd && form === null && (
                         <button type="button" onClick={openNew} className={`${solid} mt-3`}>{copy.weightAdd}</button>
                     )}
                 </div>

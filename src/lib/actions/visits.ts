@@ -190,8 +190,8 @@ export async function createWalkIn(input: { petId: string; date: string; type: "
     const reminder = storedFollowUp(parsed.data.followUp);
     if (reminder === false) return { success: false as const, error: "followUp" as const };
 
-    const pet = await prisma.pet.findUnique({ where: { id: parsed.data.petId }, select: { id: true } });
-    if (!pet) return { success: false as const, error: "closed" as const };
+    const pet = await prisma.pet.findUnique({ where: { id: parsed.data.petId }, select: { id: true, status: true } });
+    if (!pet || pet.status !== "ACTIVE") return { success: false as const, error: "closed" as const };
 
     try {
         const visit = await prisma.$transaction(async (tx) => {

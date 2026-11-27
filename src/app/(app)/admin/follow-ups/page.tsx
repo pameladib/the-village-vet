@@ -27,7 +27,7 @@ export default async function FollowUpsPage({ searchParams }: { searchParams: Pr
     const added = one(params.added);
     const highlightId = added && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(added) ? added : null;
     const reminders = await prisma.visitFollowUp.findMany({
-        where: { status: "PENDING" },
+        where: { status: "PENDING", pet: { status: "ACTIVE" } },
         orderBy: { dueOn: "asc" },
         select: {
             id: true,

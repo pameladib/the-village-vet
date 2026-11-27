@@ -7,7 +7,7 @@ export async function requireAuth() {
     const session = await auth.api.getSession({
         headers: await headers(),
     });
-    if (!session) {
+    if (!session || session.user.deactivatedAt) {
         throw new Error("User is not authenticated"); // stops execution of the current function and returns an error to the caller. The caller can then handle this error appropriately, such as redirecting the user to a login page (in server components) or displaying an error message (in server actions using try...catch blocks).
     }
 

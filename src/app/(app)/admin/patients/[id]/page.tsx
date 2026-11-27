@@ -65,6 +65,8 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
             sex: true,
             color: true,
             lifestyle: true,
+            status: true,
+            deceasedAt: true,
             dateOfBirth: true,
             estimatedAgeValue: true,
             estimatedAgeUnit: true,
@@ -108,6 +110,13 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
                         {pet.species === "CAT" ? copy.speciesCat : copy.speciesDog}
                         {breed ? ` · ${breed}` : ""}
                     </p>
+                    {pet.status === "ARCHIVED" && <p className="text-sm text-stone-500">{copy.petArchivedNote}</p>}
+                    {pet.status === "DECEASED" && (
+                        <p className="text-sm text-stone-500">
+                            {copy.petDeceased}
+                            {pet.deceasedAt ? ` · ${born.format(pet.deceasedAt)}` : ""}
+                        </p>
+                    )}
                 </div>
             </div>
             <p className="mt-3 text-sm text-stone-500">{copy.patientLimited}</p>
@@ -135,7 +144,9 @@ export default async function PatientSummaryPage({ params }: { params: Promise<{
                         <a href={ownerWhatsapp} target="_blank" rel="noopener noreferrer" className="font-medium text-emerald-900 hover:underline dark:text-emerald-200">{pet.owner.phoneNumber}</a>
                     ) : pet.owner.phoneNumber}
                 </p>
-                <Link href={`/admin/appointments/new?petId=${pet.id}`} className="mt-3 inline-flex rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.book}</Link>
+                {pet.status === "ACTIVE" && (
+                    <Link href={`/admin/appointments/new?petId=${pet.id}`} className="mt-3 inline-flex rounded-full bg-emerald-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-950">{copy.book}</Link>
+                )}
             </section>
 
             <AppointmentGroup title={copy.patientUpcoming} empty={copy.patientNoneUpcoming} visits={upcoming} when={when} copy={copy} />

@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { APIError, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { username } from "better-auth/plugins" // for username-based authentication functionality
 import { prisma } from "@/lib/prisma"; // our prisma client instance
@@ -30,7 +30,12 @@ export const auth = betterAuth({
                 type: ["OWNER", "ADMIN", "SECONDARY_ADMIN"],
                 defaultValue: "OWNER",
                 input: false
-            }
+            },
+            deactivatedAt: {
+                type: "date",
+                required: false,
+                input: false,
+            },
         },
     },
     // Memory limits apply on each server instance. Production still uses this until a shared store is added.
@@ -44,6 +49,22 @@ export const auth = betterAuth({
         },
     },
     databaseHooks: {
+        session: {
+            create: {
+                before: async (session) => {
+                    const user = await prisma.user.findUnique({
+                        where: { id: session.userId },
+                        select: { deactivatedAt: true },
+                    });
+                    if (user?.deactivatedAt) {
+                        throw APIError.from("FORBIDDEN", {
+                            message: "This account is deactivated.",
+                            code: "ACCOUNT_DEACTIVATED",
+                        });
+                    }
+                },
+            },
+        },
         user: {
             create: {
                 after: async (user) => {

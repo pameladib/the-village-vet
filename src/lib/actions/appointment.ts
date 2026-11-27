@@ -33,7 +33,9 @@ async function bookingSession() {
 }
 
 function petWhere(userId: string, role: UserRole, petId: string) {
-    return role === "OWNER" ? { id: petId, ownerId: userId } : { id: petId };
+    return role === "OWNER"
+        ? { id: petId, ownerId: userId, status: "ACTIVE" as const }
+        : { id: petId, status: "ACTIVE" as const };
 }
 
 // One clinic, so one lock is enough. It is held until the transaction ends, so two bookings cannot take the same slot.
@@ -270,9 +272,11 @@ export async function rescheduleAppointment(input: { appointmentId: string; date
                 where: session.user.role === "OWNER"
                     ? { id: parsed.data.appointmentId, ownerId: session.user.id, status: "BOOKED" }
                     : { id: parsed.data.appointmentId, status: "BOOKED" },
-                include: { pet: { select: { species: true, name: true } }, owner: { select: { name: true } } },
+                include: { pet: { select: { species: true, name: true, status: true } }, owner: { select: { name: true } } },
             });
-            if (!current || current.startAt <= new Date()) return { error: "This appointment can no longer be changed." } as const;
+            if (!current || current.startAt <= new Date() || current.pet.status !== "ACTIVE") {
+                return { error: "This appointment can no longer be changed." } as const;
+            }
 
             const schedule = await loadSchedule(tx, parsed.data.date);
             const others = {

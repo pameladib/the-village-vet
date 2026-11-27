@@ -1,6 +1,8 @@
 import { ChevronLeft } from "lucide-react";
 import HistoryBack from "@/components/HistoryBack";
+import OwnerAccountClosure from "@/components/auth/OwnerAccountClosure";
 import ProfileForm from "@/components/auth/ProfileForm";
+import { ownerAccountSignals } from "@/lib/actions/account";
 import { requireRole } from "@/lib/auth/session";
 import { getLocale, messages } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -21,7 +23,8 @@ export default async function ProfilePage() {
     });
     if (!owner?.username) redirect("/dashboard");
 
-    const locale = await getLocale();
+    const [locale, signals] = await Promise.all([getLocale(), ownerAccountSignals(session.user.id)]);
+    if (!signals) redirect("/dashboard");
     const copy = messages(locale);
 
     return (
@@ -39,6 +42,15 @@ export default async function ProfilePage() {
                         username={owner.username}
                         name={owner.name}
                         phoneNumber={owner.phoneNumber}
+                    />
+                    <OwnerAccountClosure
+                        userId={session.user.id}
+                        self
+                        deactivated={false}
+                        petCount={signals.petCount}
+                        upcomingAppointments={signals.upcomingAppointments}
+                        openOrders={signals.openOrders}
+                        copy={copy}
                     />
                 </section>
             </div>
